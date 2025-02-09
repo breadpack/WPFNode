@@ -11,6 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\WPFNode.Controls\WPFNode.Controls.csproj" />
     <ProjectReference Include="..\WPFNode.Core\WPFNode.Core.csproj" />
+    <ProjectReference Include="..\WPFNode.Plugins.Basic\WPFNode.Plugins.Basic.csproj" />
   </ItemGroup>
 
 </Project> 

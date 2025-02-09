@@ -1,17 +1,18 @@
 using WPFNode.Core.Models;
+using WPFNode.Plugin.SDK;
 
 namespace WPFNode.Core.Commands;
 
 public class CreateGroupCommand : ICommand
 {
-    private readonly NodeCanvas _canvas;
-    private readonly IEnumerable<Node> _nodes;
-    private readonly string _name;
-    private NodeGroup? _createdGroup;
+    private readonly NodeCanvas            _canvas;
+    private readonly IEnumerable<NodeBase> _nodes;
+    private readonly string                _name;
+    private          NodeGroup?            _createdGroup;
 
     public string Description => "그룹 생성";
 
-    public CreateGroupCommand(NodeCanvas canvas, IEnumerable<Node> nodes, string name)
+    public CreateGroupCommand(NodeCanvas canvas, IEnumerable<NodeBase> nodes, string name)
     {
         _canvas = canvas;
         _nodes = nodes.ToList();

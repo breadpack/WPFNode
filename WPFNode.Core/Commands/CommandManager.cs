@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+using System.Collections.Generic;
 
 namespace WPFNode.Core.Commands;
 
@@ -76,5 +76,11 @@ public class CommandManager
         {
             _isExecuting = false;
         }
+    }
+
+    public void Clear()
+    {
+        _undoStack.Clear();
+        _redoStack.Clear();
     }
 } 

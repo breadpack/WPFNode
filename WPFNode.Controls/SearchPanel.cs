@@ -8,6 +8,8 @@ using System.Windows.Markup;
 using WPFNode.Core.Models;
 using WPFNode.Core.Services;
 using WPFNode.Core.ViewModels.Nodes;
+using WPFNode.Core.Interfaces;
+using WPFNode.Plugin.SDK;
 
 namespace WPFNode.Controls;
 
@@ -17,6 +19,23 @@ public class SearchPanel : Control
     private TextBox? _searchBox;
     private Popup? _popup;
     private ListBox? _resultList;
+
+    public static readonly DependencyProperty PluginServiceProperty =
+        DependencyProperty.Register(
+            nameof(PluginService),
+            typeof(INodePluginService),
+            typeof(SearchPanel),
+            new PropertyMetadata(null));
+
+    public INodePluginService? PluginService
+    {
+        get => (INodePluginService?)GetValue(PluginServiceProperty);
+        set => SetValue(PluginServiceProperty, value);
+    }
+
+    public SearchPanel()
+    {
+    }
 
     static SearchPanel()
     {
@@ -29,7 +48,7 @@ public class SearchPanel : Control
             nameof(ViewModel),
             typeof(NodeCanvasViewModel),
             typeof(SearchPanel),
-            new PropertyMetadata(null, OnViewModelChanged));
+            new PropertyMetadata(null));
 
     public NodeCanvasViewModel? ViewModel
     {
@@ -50,14 +69,6 @@ public class SearchPanel : Control
         set => SetValue(ContentProperty, value);
     }
 
-    private static void OnViewModelChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-    {
-        if (d is SearchPanel control)
-        {
-            control.DataContext = e.NewValue;
-        }
-    }
-
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
@@ -76,7 +87,6 @@ public class SearchPanel : Control
 
         if (_resultList != null)
         {
-            _resultList.SelectionChanged += OnResultListSelectionChanged;
             _resultList.MouseDoubleClick += OnResultListMouseDoubleClick;
         }
     }
@@ -99,7 +109,7 @@ public class SearchPanel : Control
 
     private void OnSearchBoxTextChanged(object sender, TextChangedEventArgs e)
     {
-        if (_searchBox == null || _popup == null || _resultList == null) return;
+        if (_searchBox == null || _popup == null || _resultList == null || PluginService == null) return;
 
         var searchText = _searchBox.Text;
         if (string.IsNullOrWhiteSpace(searchText) || searchText == "검색...")
@@ -108,13 +118,17 @@ public class SearchPanel : Control
             return;
         }
 
-        // 검색 결과 업데이트
-        var results = ViewModel?.SearchNodes(searchText);
-        if (results != null)
-        {
-            _resultList.ItemsSource = results;
-            _popup.IsOpen = true;
-        }
+        // 메타데이터 기반 검색 결과 업데이트
+        var results = PluginService.GetAllNodeMetadata()
+            .Where(m => m.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+                       m.Category.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+                       m.Description.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(m => m.Category)
+            .ThenBy(m => m.Name)
+            .ToList();
+
+        _resultList.ItemsSource = results;
+        _popup.IsOpen = results.Any();
     }
 
     private void OnSearchBoxPreviewKeyDown(object sender, KeyEventArgs e)
@@ -154,11 +168,6 @@ public class SearchPanel : Control
         }
     }
 
-    private void OnResultListSelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        // 선택된 항목 미리보기 표시
-    }
-
     private void OnResultListMouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         AddSelectedNode();
@@ -166,14 +175,18 @@ public class SearchPanel : Control
 
     private void AddSelectedNode()
     {
-        if (_resultList == null || _popup == null || ViewModel == null) return;
+        if (_resultList == null || _popup == null || ViewModel == null || PluginService == null) return;
 
-        var selectedTemplate = _resultList.SelectedItem as NodeTemplate;
-        if (selectedTemplate != null)
+        var selectedMetadata = _resultList.SelectedItem as NodeMetadata;
+        if (selectedMetadata?.NodeType != null)
         {
-            var node = selectedTemplate.CreateNode();
-            ViewModel.AddNodeCommand.Execute(node);
+            var nodeType = selectedMetadata.NodeType;
+            ViewModel.AddNodeCommand.Execute(nodeType);
             _popup.IsOpen = false;
+            if (_searchBox != null)
+            {
+                _searchBox.Text = "검색...";
+            }
         }
     }
 } 

@@ -1,11 +1,13 @@
 using System.Collections.ObjectModel;
 using WPFNode.Core.Commands;
+using WPFNode.Plugin.SDK;
+using WPFNode.Abstractions;
 
 namespace WPFNode.Core.Models;
 
 public class NodeCanvas
 {
-    public ObservableCollection<Node> Nodes { get; }
+    public ObservableCollection<NodeBase> Nodes { get; }
     public ObservableCollection<Connection> Connections { get; }
     public ObservableCollection<NodeGroup> Groups { get; }
     public double Scale { get; set; } = 1.0;
@@ -15,33 +17,33 @@ public class NodeCanvas
 
     public NodeCanvas()
     {
-        Nodes = new ObservableCollection<Node>();
-        Connections = new ObservableCollection<Connection>();
-        Groups = new ObservableCollection<NodeGroup>();
+        Nodes          = new ObservableCollection<NodeBase>();
+        Connections    = new ObservableCollection<Connection>();
+        Groups         = new ObservableCollection<NodeGroup>();
         CommandManager = new CommandManager();
     }
 
-    public Connection? Connect(NodePort source, NodePort target)
+    public Connection? Connect(IPort source, IPort target)
     {
-        try
-        {
-            var connection = new Connection(Guid.NewGuid().ToString(), source, target);
-            Connections.Add(connection);
-            return connection;
-        }
-        catch (ArgumentException)
-        {
+        if (source.IsInput == target.IsInput) return null;
+        
+        IPort actualSource = source.IsInput ? target : source;
+        IPort actualTarget = source.IsInput ? source : target;
+        
+        if (!actualTarget.DataType.IsAssignableFrom(actualSource.DataType))
             return null;
-        }
+
+        var connection = new Connection(actualSource, actualTarget);
+        Connections.Add(connection);
+        return connection;
     }
 
     public void Disconnect(Connection connection)
     {
-        connection.Disconnect();
         Connections.Remove(connection);
     }
 
-    public NodeGroup CreateGroup(IEnumerable<Node> nodes, string name = "New Group")
+    public NodeGroup CreateGroup(IEnumerable<NodeBase> nodes, string name = "New Group")
     {
         var group = new NodeGroup(Guid.NewGuid().ToString(), name);
         foreach (var node in nodes)

@@ -5,33 +5,36 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:WPFNode.Demo"
         xmlns:controls="clr-namespace:WPFNode.Controls;assembly=WPFNode.Controls"
-        x:Name="MainWindowControl"
+        xmlns:vm="clr-namespace:WPFNode.Demo.ViewModels"
         mc:Ignorable="d"
         Title="Node Editor" Height="450" Width="800"
         WindowStartupLocation="CenterScreen">
-    <Grid x:Name="MainGrid" Background="Red">
+    <Window.Resources>
+        <vm:MainWindowViewModel x:Key="MainViewModel"/>
+    </Window.Resources>
+    <Window.DataContext>
+        <StaticResource ResourceKey="MainViewModel"/>
+    </Window.DataContext>
+    <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
         <ToolBar Grid.Row="0">
-            <Button Content="노드 추가" Click="AddNode_Click"/>
-            <Button Content="그룹 만들기" Click="CreateGroup_Click"/>
-            <Button Content="자동 정렬" Click="AutoLayout_Click"/>
+            <Button Content="자동 정렬" Command="{Binding NodeCanvasViewModel.AutoLayoutCommand}"/>
             <Separator/>
-            <Button Content="실행 취소" Click="Undo_Click"/>
-            <Button Content="다시 실행" Click="Redo_Click"/>
+            <Button Content="실행 취소" Command="{Binding NodeCanvasViewModel.UndoCommand}"/>
+            <Button Content="다시 실행" Command="{Binding NodeCanvasViewModel.RedoCommand}"/>
         </ToolBar>
 
-        <Border Grid.Row="1" Background="Green">
-            <controls:NodeCanvasControl x:Name="NodeCanvas"
-                                        Background="Blue"
-                                      DataContext="{Binding ElementName=MainWindowControl, Path=DataContext}"
-                                      HorizontalAlignment="Stretch" 
-                                      VerticalAlignment="Stretch"
-                                      HorizontalContentAlignment="Stretch"
-                                      VerticalContentAlignment="Stretch"/>
-        </Border>
+        <controls:NodeCanvasControl
+            x:Name="NodeCanvas"
+            Grid.Row="1"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch"
+            HorizontalContentAlignment="Stretch"
+            VerticalContentAlignment="Stretch" 
+            ViewModel="{Binding NodeCanvasViewModel, Source={StaticResource MainViewModel}}" />
     </Grid>
 </Window> 

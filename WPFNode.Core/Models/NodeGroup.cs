@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
+using WPFNode.Plugin.SDK;
 
 namespace WPFNode.Core.Models;
 
@@ -22,7 +23,7 @@ public class NodeGroup : INotifyPropertyChanged
         _width = 200;
         _height = 150;
         _color = Colors.LightBlue;
-        Nodes = new ObservableCollection<Node>();
+        Nodes = new ObservableCollection<NodeBase>();
         
         // 노드 추가/제거 시 그룹 크기 업데이트
         Nodes.CollectionChanged += (s, e) => UpdateBounds();
@@ -146,7 +147,7 @@ public class NodeGroup : INotifyPropertyChanged
         }
     }
 
-    public ObservableCollection<Node> Nodes { get; }
+    public ObservableCollection<NodeBase> Nodes { get; }
 
     private void UpdateBounds()
     {

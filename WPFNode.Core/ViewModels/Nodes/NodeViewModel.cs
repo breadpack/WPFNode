@@ -4,52 +4,57 @@ using System.Windows.Input;
 using WPFNode.Core.Models;
 using WPFNode.Core.ViewModels.Base;
 using CommunityToolkit.Mvvm.Input;
+using WPFNode.Core.Interfaces;
+using WPFNode.Core.Services;
+using WPFNode.Plugin.SDK;
 
 namespace WPFNode.Core.ViewModels.Nodes;
 
 public class NodeViewModel : ViewModelBase
 {
-    private readonly Node _node;
-    private Point _position;
-    private string _name;
-    private bool _isSelected;
+    private readonly NodeBase                                    _model;
+    private readonly INodeCommandService                     _commandService;
+    private          Point                                   _position;
+    private          string                                  _name;
+    private          bool                                    _isSelected;
     private readonly ObservableCollection<NodePortViewModel> _inputPorts;
     private readonly ObservableCollection<NodePortViewModel> _outputPorts;
 
-    public NodeViewModel(Node node)
+    public NodeViewModel(NodeBase model, INodeCommandService commandService)
     {
-        _node = node;
-        _name = node.Name;
-        _position = new Point(node.X, node.Y);
-        _isSelected = node.IsSelected;
+        _model = model;
+        _commandService = commandService;
+        _name = model.Name;
+        _position = new Point(model.X, model.Y);
+        _isSelected = model.IsSelected;
         
         _inputPorts = new ObservableCollection<NodePortViewModel>(
-            node.InputPorts.Select(p => new NodePortViewModel(p)));
+            model.InputPorts.Select(p => new NodePortViewModel(p)));
         _outputPorts = new ObservableCollection<NodePortViewModel>(
-            node.OutputPorts.Select(p => new NodePortViewModel(p)));
+            model.OutputPorts.Select(p => new NodePortViewModel(p)));
 
         DeleteCommand = new RelayCommand(Delete);
         
         // Model 속성 변경 감지
-        _node.PropertyChanged += (s, e) =>
+        _model.PropertyChanged += (s, e) =>
         {
             switch (e.PropertyName)
             {
-                case nameof(Node.X):
-                case nameof(Node.Y):
-                    Position = new Point(_node.X, _node.Y);
+                case nameof(NodeBase.X):
+                case nameof(NodeBase.Y):
+                    Position = new Point(_model.X, _model.Y);
                     break;
-                case nameof(Node.Name):
-                    Name = _node.Name;
+                case nameof(NodeBase.Name):
+                    Name = _model.Name;
                     break;
-                case nameof(Node.IsSelected):
-                    IsSelected = _node.IsSelected;
+                case nameof(NodeBase.IsSelected):
+                    IsSelected = _model.IsSelected;
                     break;
             }
         };
     }
 
-    public string Id => _node.Id;
+    public Guid Id => _model.Id;
     
     public string Name
     {
@@ -58,7 +63,7 @@ public class NodeViewModel : ViewModelBase
         {
             if (SetProperty(ref _name, value))
             {
-                _node.Name = value;
+                _model.Name = value;
             }
         }
     }
@@ -70,8 +75,8 @@ public class NodeViewModel : ViewModelBase
         {
             if (SetProperty(ref _position, value))
             {
-                _node.X = value.X;
-                _node.Y = value.Y;
+                _model.X = value.X;
+                _model.Y = value.Y;
             }
         }
     }
@@ -83,7 +88,7 @@ public class NodeViewModel : ViewModelBase
         {
             if (SetProperty(ref _isSelected, value))
             {
-                _node.IsSelected = value;
+                _model.IsSelected = value;
             }
         }
     }
@@ -98,5 +103,24 @@ public class NodeViewModel : ViewModelBase
         // 삭제 로직은 NodeCanvasViewModel에서 처리
     }
 
-    public Node Model => _node;
+    // 노드 타입별 커맨드 실행
+    public bool ExecuteCommand(string commandName, object? parameter = null)
+    {
+        return _commandService.ExecuteCommand(_model.Id, commandName, parameter);
+    }
+
+    public bool CanExecuteCommand(string commandName, object? parameter = null)
+    {
+        return _commandService.CanExecuteCommand(_model.Id, commandName, parameter);
+    }
+
+    // 노드 타입별 커맨드 조회
+    public ICommand? GetCommand(string commandName)
+    {
+        return new RelayCommand(
+            () => ExecuteCommand(commandName),
+            () => CanExecuteCommand(commandName));
+    }
+
+    public NodeBase Model => _model;
 } 

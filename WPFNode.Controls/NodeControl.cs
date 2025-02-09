@@ -5,6 +5,7 @@ using System.Windows.Media;
 using WPFNode.Core.Models;
 using WPFNode.Core.ViewModels.Nodes;
 using System.Windows.Markup;
+using WPFNode.Plugin.SDK;
 
 namespace WPFNode.Controls;
 
@@ -97,7 +98,7 @@ public class NodeControl : Control
         var selectedNodes = canvas.ViewModel.Nodes.Where(n => n.IsSelected).ToList();
         if (selectedNodes.Any())
         {
-            var nodeDataList = selectedNodes.Select(n => n.Model.Clone()).ToList();
+            var nodeDataList = selectedNodes.Select(n => n.Model.CreateCopy()).ToList();
             Clipboard.SetData("NodeEditorNodes", nodeDataList);
         }
     }
@@ -107,7 +108,7 @@ public class NodeControl : Control
         var canvas = this.GetParentOfType<NodeCanvasControl>();
         if (canvas?.ViewModel == null) return;
 
-        if (Clipboard.GetData("NodeEditorNodes") is List<Node> nodeDataList)
+        if (Clipboard.GetData("NodeEditorNodes") is List<NodeBase> nodeDataList)
         {
             foreach (var node in nodeDataList)
             {

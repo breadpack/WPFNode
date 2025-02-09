@@ -1,21 +1,19 @@
-using WPFNode.Core.Models;
 using WPFNode.Core.ViewModels.Base;
+using WPFNode.Abstractions;
 
 namespace WPFNode.Core.ViewModels.Nodes;
 
 public class ConnectionViewModel : ViewModelBase
 {
-    private readonly Connection _connection;
+    private readonly Connection _model;
     private bool _isSelected;
 
-    public ConnectionViewModel(Connection connection)
+    public ConnectionViewModel(Connection model)
     {
-        _connection = connection;
+        _model = model;
+        Source = new NodePortViewModel(model.Source);
+        Target = new NodePortViewModel(model.Target);
     }
-
-    public string Id => _connection.Id;
-    public NodePortViewModel Source => new NodePortViewModel(_connection.Source);
-    public NodePortViewModel Target => new NodePortViewModel(_connection.Target);
 
     public bool IsSelected
     {
@@ -23,7 +21,7 @@ public class ConnectionViewModel : ViewModelBase
         set => SetProperty(ref _isSelected, value);
     }
 
-    public bool IsValid => _connection.IsValid;
-
-    public Connection Model => _connection;
+    public NodePortViewModel Source { get; }
+    public NodePortViewModel Target { get; }
+    public Connection Model => _model;
 } 
