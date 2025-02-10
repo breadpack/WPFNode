@@ -22,17 +22,10 @@ public class NodeControl : Control
             new FrameworkPropertyMetadata(typeof(NodeControl)));
     }
 
-    public static readonly DependencyProperty ViewModelProperty =
-        DependencyProperty.Register(
-            nameof(ViewModel),
-            typeof(NodeViewModel),
-            typeof(NodeControl),
-            new PropertyMetadata(null, OnViewModelChanged));
-
     public NodeViewModel? ViewModel
     {
-        get => (NodeViewModel?)GetValue(ViewModelProperty);
-        set => SetValue(ViewModelProperty, value);
+        get => (NodeViewModel?)DataContext;
+        set => DataContext = value;
     }
 
     public static readonly DependencyProperty ContentProperty =
@@ -131,7 +124,7 @@ public class NodeControl : Control
 
     private void OnNodeDragStart(object sender, MouseButtonEventArgs e)
     {
-        if (ViewModel == null || e.Source != this) return;
+        if (ViewModel == null) return;
 
         if ((Keyboard.Modifiers & ModifierKeys.Control) == 0)
         {

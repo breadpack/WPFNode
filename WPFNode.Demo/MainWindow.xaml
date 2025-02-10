@@ -9,11 +9,8 @@
         mc:Ignorable="d"
         Title="Node Editor" Height="450" Width="800"
         WindowStartupLocation="CenterScreen">
-    <Window.Resources>
-        <vm:MainWindowViewModel x:Key="MainViewModel"/>
-    </Window.Resources>
     <Window.DataContext>
-        <StaticResource ResourceKey="MainViewModel"/>
+        <vm:MainWindowViewModel/>
     </Window.DataContext>
     <Grid>
         <Grid.RowDefinitions>
@@ -34,7 +31,7 @@
             HorizontalAlignment="Stretch"
             VerticalAlignment="Stretch"
             HorizontalContentAlignment="Stretch"
-            VerticalContentAlignment="Stretch" 
-            ViewModel="{Binding NodeCanvasViewModel, Source={StaticResource MainViewModel}}" />
+            VerticalContentAlignment="Stretch"
+            DataContext="{Binding NodeCanvasViewModel}"/>
     </Grid>
 </Window> 

@@ -1,5 +1,6 @@
 using System.Windows;
 using WPFNode.Demo.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace WPFNode.Demo
 {

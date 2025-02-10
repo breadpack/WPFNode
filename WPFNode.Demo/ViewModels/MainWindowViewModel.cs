@@ -7,6 +7,7 @@ using WPFNode.Core.ViewModels.Nodes;
 using CommunityToolkit.Mvvm.Input;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
+using WPFNode.Core.Services;
 
 namespace WPFNode.Demo.ViewModels;
 
@@ -32,11 +33,8 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
     public MainWindowViewModel()
     {
-        var serviceProvider = (IServiceProvider)Application.Current.GetType()
-            .GetProperty("ServiceProvider")!.GetValue(Application.Current)!;
-            
-        _pluginService = serviceProvider.GetRequiredService<INodePluginService>();
-        _commandService = serviceProvider.GetRequiredService<INodeCommandService>();
+        _pluginService = NodeServices.PluginService;
+        _commandService = NodeServices.CommandService;
 
         AutoLayoutCommand = new RelayCommand(ExecuteAutoLayout, CanExecuteAutoLayout);
 

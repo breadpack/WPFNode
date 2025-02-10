@@ -10,17 +10,15 @@ using System.Collections.Generic;
 using WPFNode.Core.Commands;
 using WPFNode.Core.ViewModels.Nodes;
 using System.Reflection;
-using Microsoft.Extensions.DependencyInjection;
 using System.ComponentModel;
 using WPFNode.Abstractions;
 using WPFNode.Plugin.SDK;
+using System.IO;
 
 namespace WPFNode.Controls;
 
 public class NodeCanvasControl : Control
 {
-    private INodePluginService _pluginService;
-    private INodeCommandService _commandService;
     private NodeViewModel? _dragNode;
     private Point? _lastMousePosition;
     private NodePortViewModel? _dragStartPort;
@@ -28,94 +26,17 @@ public class NodeCanvasControl : Control
     private Canvas? _dragCanvas;
     private SearchPanel? _searchPanel;
 
-    public static readonly DependencyProperty ServiceProviderProperty =
-        DependencyProperty.Register(
-            nameof(ServiceProvider),
-            typeof(IServiceProvider),
-            typeof(NodeCanvasControl),
-            new PropertyMetadata(null, OnServiceProviderChanged));
+    public INodePluginService PluginService { get; }
+    public INodeCommandService CommandService { get; }
 
-    public IServiceProvider? ServiceProvider
-    {
-        get => (IServiceProvider?)GetValue(ServiceProviderProperty);
-        set => SetValue(ServiceProviderProperty, value);
-    }
-
-    private static void OnServiceProviderChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-    {
-        if (d is NodeCanvasControl control)
-        {
-            if (e.NewValue is IServiceProvider serviceProvider)
-            {
-                control.InitializeServices(serviceProvider);
-            }
-            else if (!DesignerProperties.GetIsInDesignMode(d))
-            {
-                // ServiceProvider가 설정되지 않은 경우 Application.Current에서 찾아봄
-                var app = Application.Current;
-                var serviceProviderProperty = app?.GetType().GetProperty("ServiceProvider");
-                var appServiceProvider = serviceProviderProperty?.GetValue(app) as IServiceProvider;
-
-                if (appServiceProvider != null)
-                {
-                    control.InitializeServices(appServiceProvider);
-                }
-                else
-                {
-                    throw new InvalidOperationException(
-                        "ServiceProvider must be set for NodeCanvasControl in runtime, " +
-                        "or Application.Current must have a ServiceProvider property.");
-                }
-            }
-        }
-    }
-
-    private void InitializeServices(IServiceProvider serviceProvider)
-    {
-        _pluginService = serviceProvider.GetRequiredService<INodePluginService>();
-        _commandService = serviceProvider.GetRequiredService<INodeCommandService>();
-    }
-
-    public INodePluginService PluginService => _pluginService;
-    public INodeCommandService CommandService => _commandService;
-
-    public static readonly DependencyProperty ViewModelProperty =
-        DependencyProperty.Register(
-            nameof(ViewModel),
-            typeof(NodeCanvasViewModel),
-            typeof(NodeCanvasControl),
-            new PropertyMetadata(null, OnViewModelChanged));
-
-    public NodeCanvasViewModel? ViewModel
-    {
-        get => (NodeCanvasViewModel?)GetValue(ViewModelProperty);
-        set => SetValue(ViewModelProperty, value);
-    }
-
-    static NodeCanvasControl()
-    {
-        DefaultStyleKeyProperty.OverrideMetadata(typeof(NodeCanvasControl),
-            new FrameworkPropertyMetadata(typeof(NodeCanvasControl)));
-    }
-
-    public static readonly DependencyProperty NameProperty =
-        DependencyProperty.Register(
-            nameof(Name),
-            typeof(string),
-            typeof(NodeCanvasControl),
-            new PropertyMetadata(null));
-
-    public string? Name
-    {
-        get => (string?)GetValue(NameProperty);
-        set => SetValue(NameProperty, value);
+    public NodeCanvasViewModel? ViewModel {
+        get => (NodeCanvasViewModel?)DataContext;
+        set => DataContext = value;
     }
 
     private static void OnViewModelChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        if (d is NodeCanvasControl control)
-        {
-            control.DataContext = e.NewValue;
+        if (d is NodeCanvasControl control) {
             System.Diagnostics.Debug.WriteLine($"NodeCanvasControl ViewModel changed: {e.NewValue}");
             if (e.NewValue is NodeCanvasViewModel viewModel)
             {
@@ -124,37 +45,23 @@ public class NodeCanvasControl : Control
         }
     }
 
+    static NodeCanvasControl()
+    {
+        DefaultStyleKeyProperty.OverrideMetadata(typeof(NodeCanvasControl),
+            new FrameworkPropertyMetadata(typeof(NodeCanvasControl)));
+    }
+
     private class DesignTimeNodePluginService : INodePluginService 
     {
-        private readonly Dictionary<Type, NodeMetadata> _nodeTypes;
-        
-        public DesignTimeNodePluginService()
-        {
-            _nodeTypes = new Dictionary<Type, NodeMetadata>();
-            var metadata = new NodeMetadata(typeof(object), "Sample Node", "Basic", "Sample node for design");
-            _nodeTypes[typeof(object)] = metadata;
-        }
-
-        public IReadOnlyCollection<Type> NodeTypes => _nodeTypes.Keys;
-        
-        public IEnumerable<NodeMetadata> GetAllNodeMetadata() => _nodeTypes.Values;
-        
-        public IEnumerable<string> GetCategories() => new[] { "Basic" };
-        
+        public IReadOnlyCollection<Type> NodeTypes => new List<Type>();
+        public IEnumerable<NodeMetadata> GetAllNodeMetadata() => Enumerable.Empty<NodeMetadata>();
+        public IEnumerable<string> GetCategories() => Enumerable.Empty<string>();
         public void LoadPlugins(string pluginPath) { }
-        
         public INode CreateNode(Type nodeType) => throw new NotImplementedException();
-        
         public void RegisterNodeType(Type nodeType) { }
-        
-        public IEnumerable<Type> GetNodeTypesByCategory(string category) => 
-            _nodeTypes.Where(kvp => kvp.Value.Category == category).Select(kvp => kvp.Key);
-        
-        public NodeMetadata GetNodeMetadata(Type nodeType) => 
-            _nodeTypes.TryGetValue(nodeType, out var metadata) ? metadata : throw new ArgumentException("Node type not found");
-        
-        public IEnumerable<NodeMetadata> GetNodeMetadataByCategory(string category) =>
-            _nodeTypes.Values.Where(m => m.Category == category);
+        public IEnumerable<Type> GetNodeTypesByCategory(string category) => Enumerable.Empty<Type>();
+        public NodeMetadata GetNodeMetadata(Type nodeType) => throw new NotImplementedException();
+        public IEnumerable<NodeMetadata> GetNodeMetadataByCategory(string category) => Enumerable.Empty<NodeMetadata>();
     }
 
     private class DesignTimeNodeCommandService : INodeCommandService 
@@ -169,30 +76,14 @@ public class NodeCanvasControl : Control
     {
         if (DesignerProperties.GetIsInDesignMode(this))
         {
-            _pluginService = new DesignTimeNodePluginService();
-            _commandService = new DesignTimeNodeCommandService();
+            PluginService = new DesignTimeNodePluginService();
+            CommandService = new DesignTimeNodeCommandService();
         }
         else
         {
-            // 생성자에서도 ServiceProvider를 찾아봄
-            var app = Application.Current;
-            var serviceProviderProperty = app?.GetType().GetProperty("ServiceProvider");
-            var serviceProvider = serviceProviderProperty?.GetValue(app) as IServiceProvider;
-
-            if (serviceProvider != null)
-            {
-                InitializeServices(serviceProvider);
-            }
+            PluginService = NodeServices.PluginService;
+            CommandService = NodeServices.CommandService;
         }
-        Initialize();
-    }
-
-    public NodeCanvasControl(
-        INodePluginService pluginService,
-        INodeCommandService commandService)
-    {
-        _pluginService = pluginService ?? throw new ArgumentNullException(nameof(pluginService));
-        _commandService = commandService ?? throw new ArgumentNullException(nameof(commandService));
         Initialize();
     }
 
@@ -213,8 +104,8 @@ public class NodeCanvasControl : Control
         ContextMenu.Items.Add(managePluginsMenuItem);
         
         // 마우스 이벤트 처리
-        MouseLeftButtonDown += OnMouseLeftButtonDown;
-        MouseLeftButtonUp += OnMouseLeftButtonUp;
+        MouseDown += OnMouseButtonDown;
+        MouseUp += OnMouseButtonUp;
         MouseMove += OnMouseMove;
         MouseWheel += OnMouseWheel;
 
@@ -239,14 +130,15 @@ public class NodeCanvasControl : Control
         
         if (_searchPanel != null)
         {
-            _searchPanel.DataContext = ViewModel;
-            _searchPanel.ViewModel = ViewModel;
+            _searchPanel.DataContext = DataContext;
             _searchPanel.PluginService = PluginService;
         }
     }
 
-    private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void OnMouseButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if(e.MiddleButton != MouseButtonState.Pressed) return;
+        
         Focus();
         _lastMousePosition = e.GetPosition(this);
 
@@ -291,8 +183,10 @@ public class NodeCanvasControl : Control
         }
     }
 
-    private void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    private void OnMouseButtonUp(object sender, MouseButtonEventArgs e)
     {
+        if(e.MiddleButton != MouseButtonState.Released) return;
+        
         // 포트 연결 처리
         if (_dragStartPort != null && e.Source is PortControl portControl && portControl.ViewModel != null)
         {
@@ -321,7 +215,7 @@ public class NodeCanvasControl : Control
 
     private void OnMouseMove(object sender, MouseEventArgs e)
     {
-        if (e.LeftButton != MouseButtonState.Pressed || !_lastMousePosition.HasValue) return;
+        if (e.MiddleButton != MouseButtonState.Pressed || !_lastMousePosition.HasValue) return;
 
         var currentPosition = e.GetPosition(this);
         var delta = currentPosition - _lastMousePosition.Value;
