@@ -34,13 +34,25 @@ public class NodeCanvas
             return null;
 
         var connection = new Connection(actualSource, actualTarget);
+        
+        // 포트에 연결 추가
+        ((PortBase)actualSource).AddConnection(connection);
+        ((PortBase)actualTarget).AddConnection(connection);
+        
+        // Canvas의 Connections 컬렉션에 추가
         Connections.Add(connection);
+        
         return connection;
     }
 
     public void Disconnect(Connection connection)
     {
+        // Canvas의 Connections 컬렉션에서 제거
         Connections.Remove(connection);
+        
+        // 포트에서 연결 제거
+        ((PortBase)connection.Source).RemoveConnection(connection);
+        ((PortBase)connection.Target).RemoveConnection(connection);
     }
 
     public NodeGroup CreateGroup(IEnumerable<NodeBase> nodes, string name = "New Group")

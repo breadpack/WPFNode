@@ -9,6 +9,7 @@ namespace WPFNode.Controls;
 public class ConnectionControl : Control
 {
     private Path? _path;
+    private PathGeometry? _lastPathGeometry;
 
     static ConnectionControl()
     {
@@ -37,24 +38,33 @@ public class ConnectionControl : Control
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        System.Diagnostics.Debug.WriteLine($"ConnectionControl OnLoaded: {ViewModel?.Source?.Name} -> {ViewModel?.Target?.Name}");
         var canvas = this.GetParentOfType<NodeCanvasControl>();
         if (canvas != null)
         {
             canvas.LayoutUpdated += OnCanvasLayoutUpdated;
+            System.Diagnostics.Debug.WriteLine($"LayoutUpdated 이벤트 구독 성공");
+        }
+        else
+        {
+            System.Diagnostics.Debug.WriteLine($"NodeCanvasControl을 찾을 수 없음");
         }
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
+        System.Diagnostics.Debug.WriteLine($"ConnectionControl OnUnloaded: {ViewModel?.Source?.Name} -> {ViewModel?.Target?.Name}");
         var canvas = this.GetParentOfType<NodeCanvasControl>();
         if (canvas != null)
         {
             canvas.LayoutUpdated -= OnCanvasLayoutUpdated;
+            System.Diagnostics.Debug.WriteLine($"LayoutUpdated 이벤트 구독 해제");
         }
     }
 
     private void OnCanvasLayoutUpdated(object? sender, EventArgs e)
     {
+        System.Diagnostics.Debug.WriteLine($"ConnectionControl LayoutUpdated: {ViewModel?.Source?.Name} -> {ViewModel?.Target?.Name}");
         UpdateConnectionPath();
     }
 
@@ -107,10 +117,39 @@ public class ConnectionControl : Control
         pathFigure.Segments.Add(segment);
         pathGeometry.Figures.Add(pathFigure);
 
-        if (GetTemplateChild("PART_Path") is Path path)
+        // 이전 Geometry와 비교하여 변경이 있을 때만 업데이트
+        if (_path != null && !GeometriesEqual(_lastPathGeometry, pathGeometry))
         {
-            path.Data = pathGeometry;
+            System.Diagnostics.Debug.WriteLine($"ConnectionControl Path 업데이트: {ViewModel?.Source?.Name} -> {ViewModel?.Target?.Name}");
+            _path.Data = pathGeometry;
+            _lastPathGeometry = pathGeometry;
         }
+    }
+
+    private bool GeometriesEqual(PathGeometry? g1, PathGeometry? g2)
+    {
+        if (g1 == null || g2 == null) return false;
+        if (g1.Figures.Count != g2.Figures.Count) return false;
+
+        for (int i = 0; i < g1.Figures.Count; i++)
+        {
+            var f1 = g1.Figures[i];
+            var f2 = g2.Figures[i];
+
+            if (f1.StartPoint != f2.StartPoint) return false;
+            if (f1.Segments.Count != f2.Segments.Count) return false;
+
+            for (int j = 0; j < f1.Segments.Count; j++)
+            {
+                if (f1.Segments[j] is BezierSegment b1 && f2.Segments[j] is BezierSegment b2)
+                {
+                    if (b1.Point1 != b2.Point1 || b1.Point2 != b2.Point2 || b1.Point3 != b2.Point3)
+                        return false;
+                }
+                else return false;
+            }
+        }
+        return true;
     }
 
     private PortControl? GetPortControl(NodePortViewModel port)

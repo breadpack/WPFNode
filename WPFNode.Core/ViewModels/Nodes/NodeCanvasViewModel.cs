@@ -12,6 +12,7 @@ using WPFNode.Abstractions;
 using WPFNode.Core.Commands;
 using IWpfCommand = System.Windows.Input.ICommand;
 using WPFNode.Plugin.SDK;
+using System.Collections.Specialized;
 
 namespace WPFNode.Core.ViewModels.Nodes;
 
@@ -58,10 +59,10 @@ public partial class NodeCanvasViewModel : ObservableObject
         _commandManager = new WPFNode.Core.Commands.CommandManager();
         
         _nodes = new ObservableCollection<NodeViewModel>(
-            canvas.Nodes.Select(n => new NodeViewModel(n, commandService)));
+            canvas.Nodes.Select(n => new NodeViewModel(n, commandService, this)));
         
         _connections = new ObservableCollection<ConnectionViewModel>(
-            canvas.Connections.Select(c => new ConnectionViewModel(c)));
+            canvas.Connections.Select(c => new ConnectionViewModel(c, this)));
         _groups = new ObservableCollection<NodeGroupViewModel>();
 
         AddNodeCommand = new RelayCommand<Type>(ExecuteAddNode);
@@ -76,42 +77,118 @@ public partial class NodeCanvasViewModel : ObservableObject
         // Model 변경 감지
         _canvas.Nodes.CollectionChanged += (s, e) =>
         {
-            if (e.NewItems != null)
+            switch (e.Action)
             {
-                foreach (NodeBase node in e.NewItems)
-                {
-                    _nodes.Add(new NodeViewModel(node, commandService));
-                }
-            }
-            if (e.OldItems != null)
-            {
-                foreach (NodeBase node in e.OldItems)
-                {
-                    var vm = _nodes.FirstOrDefault(n => n.Model == node);
-                    if (vm != null)
-                        _nodes.Remove(vm);
-                }
+                case NotifyCollectionChangedAction.Add:
+                    if (e.NewItems != null)
+                    {
+                        foreach (NodeBase node in e.NewItems)
+                        {
+                            _nodes.Add(new NodeViewModel(node, commandService, this));
+                        }
+                    }
+                    break;
+
+                case NotifyCollectionChangedAction.Remove:
+                    if (e.OldItems != null)
+                    {
+                        foreach (NodeBase node in e.OldItems)
+                        {
+                            var vm = _nodes.FirstOrDefault(n => n.Model == node);
+                            if (vm != null)
+                            {
+                                _nodes.Remove(vm);
+                            }
+                        }
+                        ValidateConnections();
+                    }
+                    break;
+
+                case NotifyCollectionChangedAction.Replace:
+                    if (e.OldItems != null && e.NewItems != null)
+                    {
+                        for (int i = 0; i < e.OldItems.Count; i++)
+                        {
+                            var oldNode = (NodeBase)e.OldItems[i]!;
+                            var newNode = (NodeBase)e.NewItems[i]!;
+                            var oldVm = _nodes.FirstOrDefault(n => n.Model == oldNode);
+                            if (oldVm != null)
+                            {
+                                var index = _nodes.IndexOf(oldVm);
+                                _nodes[index] = new NodeViewModel(newNode, commandService, this);
+                            }
+                        }
+                        ValidateConnections();
+                    }
+                    break;
+
+                case NotifyCollectionChangedAction.Reset:
+                    _nodes.Clear();
+                    foreach (var node in _canvas.Nodes)
+                    {
+                        _nodes.Add(new NodeViewModel(node, commandService, this));
+                    }
+                    ValidateConnections();
+                    break;
             }
         };
 
         _canvas.Connections.CollectionChanged += (s, e) =>
         {
-            if (e.NewItems != null)
+            switch (e.Action)
             {
-                foreach (Connection conn in e.NewItems)
-                {
-                    _connections.Add(new ConnectionViewModel(conn));
-                }
+                case NotifyCollectionChangedAction.Add:
+                    if (e.NewItems != null)
+                    {
+                        foreach (Connection conn in e.NewItems)
+                        {
+                            _connections.Add(new ConnectionViewModel(conn, this));
+                        }
+                    }
+                    break;
+
+                case NotifyCollectionChangedAction.Remove:
+                    if (e.OldItems != null)
+                    {
+                        foreach (Connection conn in e.OldItems)
+                        {
+                            var vm = _connections.FirstOrDefault(c => c.Model == conn);
+                            if (vm != null)
+                            {
+                                _connections.Remove(vm);
+                            }
+                        }
+                    }
+                    break;
+
+                case NotifyCollectionChangedAction.Replace:
+                    if (e.OldItems != null && e.NewItems != null)
+                    {
+                        for (int i = 0; i < e.OldItems.Count; i++)
+                        {
+                            var oldConn = (Connection)e.OldItems[i]!;
+                            var newConn = (Connection)e.NewItems[i]!;
+                            var oldVm = _connections.FirstOrDefault(c => c.Model == oldConn);
+                            if (oldVm != null)
+                            {
+                                var index = _connections.IndexOf(oldVm);
+                                _connections[index] = new ConnectionViewModel(newConn, this);
+                            }
+                        }
+                    }
+                    break;
+
+                case NotifyCollectionChangedAction.Reset:
+                    _connections.Clear();
+                    foreach (var conn in _canvas.Connections)
+                    {
+                        _connections.Add(new ConnectionViewModel(conn, this));
+                    }
+                    break;
             }
-            if (e.OldItems != null)
-            {
-                foreach (Connection conn in e.OldItems)
-                {
-                    var vm = _connections.FirstOrDefault(c => c.Model == conn);
-                    if (vm != null)
-                        _connections.Remove(vm);
-                }
-            }
+
+            // 연결이 변경될 때마다 유효성 검사 수행
+            ValidateConnections();
         };
     }
 
@@ -161,11 +238,24 @@ public partial class NodeCanvasViewModel : ObservableObject
             return;
 
         var (source, target) = ports;
-        var connection = new Connection(source.Model, target.Model);
-        _canvas.Connections.Add(connection);
+        
+        // 입력 포트에 기존 연결이 있는지 확인
+        var inputPort = source.IsInput ? source : target;
+        var existingConnection = inputPort.Connections.FirstOrDefault()?.Model;
+
+        if (existingConnection != null)
+        {
+            var replaceCommand = new ReplaceConnectionCommand(_canvas, source.Model, target.Model, existingConnection);
+            _commandManager.Execute(replaceCommand);
+        }
+        else
+        {
+            var connectCommand = new ConnectCommand(_canvas, source.Model, target.Model);
+            _commandManager.Execute(connectCommand);
+        }
     }
 
-    private void ExecuteDisconnect((NodePortViewModel, NodePortViewModel) ports)
+    private void ExecuteDisconnect((NodePortViewModel source, NodePortViewModel target) ports)
     {
         var (sourcePort, targetPort) = ports;
         if (sourcePort == null || targetPort == null) return;
@@ -228,5 +318,37 @@ public partial class NodeCanvasViewModel : ObservableObject
             .ToList();
     }
 
+    public NodePortViewModel? FindPortViewModel(IPort port)
+    {
+        foreach (var node in _nodes)
+        {
+            var portVM = node.InputPorts.FirstOrDefault(p => p.Model == port) ??
+                        node.OutputPorts.FirstOrDefault(p => p.Model == port);
+            if (portVM != null)
+                return portVM;
+        }
+        return null;
+    }
+
     public NodeCanvas Model => _canvas;
+
+    private void ValidateConnections()
+    {
+        var invalidConnections = _canvas.Connections
+            .Where(c => !IsValidPort(c.Source) || !IsValidPort(c.Target))
+            .ToList();
+
+        foreach (var connection in invalidConnections)
+        {
+            var command = new DisconnectCommand(_canvas, connection);
+            _commandManager.Execute(command);
+        }
+    }
+
+    private bool IsValidPort(IPort port)
+    {
+        return _nodes.Any(n => 
+            n.InputPorts.Any(p => p.Model == port) || 
+            n.OutputPorts.Any(p => p.Model == port));
+    }
 } 

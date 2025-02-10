@@ -78,16 +78,18 @@ public abstract class PortBase : IPort
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
-    internal void AddConnection(Connection connection)
+    public void AddConnection(Connection connection)
     {
         _connections.Add(connection);
         IsConnected = true;
+        OnPropertyChanged(nameof(Connections));
     }
 
-    internal void RemoveConnection(Connection connection)
+    public void RemoveConnection(Connection connection)
     {
         _connections.Remove(connection);
         IsConnected = _connections.Count > 0;
+        OnPropertyChanged(nameof(Connections));
     }
 
     internal PortBase Clone()

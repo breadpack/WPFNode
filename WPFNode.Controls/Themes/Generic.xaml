@@ -182,7 +182,9 @@
                                 <ItemsControl ItemsSource="{Binding Connections}">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
-                                            <Canvas IsItemsHost="True" ZIndex="1"/>
+                                            <Canvas IsItemsHost="True" ZIndex="1"
+                                                    VirtualizingPanel.IsVirtualizing="False"
+                                                    VirtualizingPanel.VirtualizationMode="Standard"/>
                                         </ItemsPanelTemplate>
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>

@@ -1,6 +1,7 @@
 using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using WPFNode.Core.ViewModels.Nodes;
 using System.Linq;
@@ -177,27 +178,16 @@ public class NodeCanvasStateManager
         return portControl;
     }
 
-    private void InitializeControlCache(NodeCanvasViewModel? viewModel)
+    private void InitializeControlCache(NodeCanvasViewModel viewModel)
     {
-        if (viewModel == null) return;
-
-        var canvas = _owner.GetDragCanvas();
-        if (canvas == null) return;
-
-        var nodeItemsControl = FindChildrenOfType<ItemsControl>(canvas).Skip(1).FirstOrDefault();
-        if (nodeItemsControl == null) return;
-
-        foreach (var nodeViewModel in viewModel.Nodes)
+        foreach (var node in viewModel.Nodes)
         {
-            CacheNodeControls(nodeViewModel);
+            CacheNodeControls(node);
         }
-
-        var connectionItemsControl = FindChildrenOfType<ItemsControl>(canvas).FirstOrDefault();
-        if (connectionItemsControl == null) return;
-
-        foreach (var connectionViewModel in viewModel.Connections)
+        
+        foreach (var connection in viewModel.Connections)
         {
-            CacheConnectionControl(connectionViewModel);
+            CacheConnectionControl(connection);
         }
     }
 
@@ -243,7 +233,26 @@ public class NodeCanvasStateManager
         if (connectionItemsControl == null) return;
 
         var container = connectionItemsControl.ItemContainerGenerator.ContainerFromItem(connection);
-        if (container == null) return;
+        if (container == null)
+        {
+            // 컨테이너가 아직 생성되지 않았다면, ItemContainerGenerator가 준비될 때까지 대기
+            connectionItemsControl.ItemContainerGenerator.StatusChanged += (s, e) =>
+            {
+                if (connectionItemsControl.ItemContainerGenerator.Status == GeneratorStatus.ContainersGenerated)
+                {
+                    var newContainer = connectionItemsControl.ItemContainerGenerator.ContainerFromItem(connection);
+                    if (newContainer != null)
+                    {
+                        var connectionControl = FindChildOfType<ConnectionControl>(newContainer);
+                        if (connectionControl != null)
+                        {
+                            _connectionControlCache[connection] = connectionControl;
+                        }
+                    }
+                }
+            };
+            return;
+        }
 
         var connectionControl = FindChildOfType<ConnectionControl>(container);
         if (connectionControl != null)

@@ -13,19 +13,18 @@ public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
     private object? _value;
     private bool _isSelected;
     private readonly ObservableCollection<ConnectionViewModel> _connections;
+    private readonly NodeCanvasViewModel _canvas;
 
-    public NodePortViewModel(IPort port)
+    public NodePortViewModel(IPort port, NodeCanvasViewModel canvas)
     {
         _port = port;
+        _canvas = canvas;
         _name = port.Name;
         _value = port.Value;
         _connections = new ObservableCollection<ConnectionViewModel>();
 
         // 초기 연결 상태 설정
-        foreach (var connection in port.Connections)
-        {
-            _connections.Add(new ConnectionViewModel(connection));
-        }
+        UpdateConnections();
 
         // Model 속성 변경 감지
         _port.PropertyChanged += (s, e) =>
@@ -47,21 +46,14 @@ public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
 
     private void UpdateConnections()
     {
-        var currentConnections = _connections.Select(c => c.Model).ToList();
-        var modelConnections = _port.Connections.ToList();
-
-        // 제거된 연결 처리
-        foreach (var connection in currentConnections.Where(c => !modelConnections.Contains(c)))
+        _connections.Clear();
+        foreach (var connection in _port.Connections)
         {
-            var vm = _connections.FirstOrDefault(c => c.Model == connection);
+            var vm = _canvas.Connections.FirstOrDefault(c => c.Model == connection);
             if (vm != null)
-                _connections.Remove(vm);
-        }
-
-        // 새로운 연결 처리
-        foreach (var connection in modelConnections.Where(c => !currentConnections.Contains(c)))
-        {
-            _connections.Add(new ConnectionViewModel(connection));
+            {
+                _connections.Add(vm);
+            }
         }
     }
 

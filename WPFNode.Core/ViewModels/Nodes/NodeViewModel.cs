@@ -21,7 +21,7 @@ public class NodeViewModel : ViewModelBase
     private readonly ObservableCollection<NodePortViewModel> _inputPorts;
     private readonly ObservableCollection<NodePortViewModel> _outputPorts;
 
-    public NodeViewModel(NodeBase model, INodeCommandService commandService)
+    public NodeViewModel(NodeBase model, INodeCommandService commandService, NodeCanvasViewModel canvas)
     {
         _model = model;
         _commandService = commandService;
@@ -30,9 +30,9 @@ public class NodeViewModel : ViewModelBase
         _isSelected = model.IsSelected;
         
         _inputPorts = new ObservableCollection<NodePortViewModel>(
-            model.InputPorts.Select(p => new NodePortViewModel(p)));
+            model.InputPorts.Select(p => new NodePortViewModel(p, canvas)));
         _outputPorts = new ObservableCollection<NodePortViewModel>(
-            model.OutputPorts.Select(p => new NodePortViewModel(p)));
+            model.OutputPorts.Select(p => new NodePortViewModel(p, canvas)));
 
         // 포트의 Parent 설정
         foreach (var port in _inputPorts.Concat(_outputPorts))

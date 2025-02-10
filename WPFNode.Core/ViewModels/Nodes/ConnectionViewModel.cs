@@ -7,12 +7,14 @@ public class ConnectionViewModel : ViewModelBase
 {
     private readonly Connection _model;
     private bool _isSelected;
+    private NodePortViewModel? _source;
+    private NodePortViewModel? _target;
 
-    public ConnectionViewModel(Connection model)
+    public ConnectionViewModel(Connection model, NodeCanvasViewModel canvas)
     {
         _model = model;
-        Source = new NodePortViewModel(model.Source);
-        Target = new NodePortViewModel(model.Target);
+        Source = canvas.FindPortViewModel(model.Source);
+        Target = canvas.FindPortViewModel(model.Target);
     }
 
     public bool IsSelected
@@ -21,7 +23,17 @@ public class ConnectionViewModel : ViewModelBase
         set => SetProperty(ref _isSelected, value);
     }
 
-    public NodePortViewModel Source { get; }
-    public NodePortViewModel Target { get; }
+    public NodePortViewModel? Source
+    {
+        get => _source;
+        private set => SetProperty(ref _source, value);
+    }
+
+    public NodePortViewModel? Target
+    {
+        get => _target;
+        private set => SetProperty(ref _target, value);
+    }
+    
     public Connection Model => _model;
 } 
