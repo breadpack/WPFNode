@@ -104,7 +104,15 @@ public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
 
     public bool CanConnectTo(NodePortViewModel other)
     {
+        // 입력-출력 포트 방향이 맞는지 확인
         if (IsInput == other.IsInput) return false;
+
+        // 같은 노드의 포트인지 확인
+        var parent = Parent;
+        var otherParent = other.Parent;
+        if (parent != null && parent == otherParent) return false;
+
+        // 데이터 타입 호환성 확인
         if (IsInput)
         {
             return DataType.IsAssignableFrom(other.DataType);
@@ -113,6 +121,8 @@ public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
     }
 
     public IPort Model => _port;
+
+    public NodeViewModel? Parent { get; internal set; }
 
     public override bool Equals(object? obj)
     {

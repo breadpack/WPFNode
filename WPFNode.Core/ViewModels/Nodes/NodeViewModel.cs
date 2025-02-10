@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 using WPFNode.Core.Interfaces;
 using WPFNode.Core.Services;
 using WPFNode.Plugin.SDK;
+using System.Collections.Specialized;
 
 namespace WPFNode.Core.ViewModels.Nodes;
 
@@ -32,6 +33,16 @@ public class NodeViewModel : ViewModelBase
             model.InputPorts.Select(p => new NodePortViewModel(p)));
         _outputPorts = new ObservableCollection<NodePortViewModel>(
             model.OutputPorts.Select(p => new NodePortViewModel(p)));
+
+        // 포트의 Parent 설정
+        foreach (var port in _inputPorts.Concat(_outputPorts))
+        {
+            port.Parent = this;
+        }
+
+        // 포트 컬렉션 변경 이벤트 구독
+        _inputPorts.CollectionChanged += OnPortsCollectionChanged;
+        _outputPorts.CollectionChanged += OnPortsCollectionChanged;
 
         DeleteCommand = new RelayCommand(Delete);
         
@@ -101,6 +112,17 @@ public class NodeViewModel : ViewModelBase
     private void Delete()
     {
         // 삭제 로직은 NodeCanvasViewModel에서 처리
+    }
+
+    private void OnPortsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.NewItems != null)
+        {
+            foreach (NodePortViewModel port in e.NewItems)
+            {
+                port.Parent = this;
+            }
+        }
     }
 
     // 노드 타입별 커맨드 실행
