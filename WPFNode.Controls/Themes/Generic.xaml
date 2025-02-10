@@ -39,11 +39,12 @@
 
                                 <!-- 입력 포트 -->
                                 <ItemsControl Grid.Column="0"
+                                            x:Name="InputPortsPanel"
                                             ItemsSource="{Binding InputPorts}"
                                             Margin="0,0,4,0">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <local:PortControl DataContext="{Binding}"/>
+                                            <local:InputPortControl DataContext="{Binding}"/>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
@@ -54,11 +55,12 @@
 
                                 <!-- 출력 포트 -->
                                 <ItemsControl Grid.Column="2"
+                                            x:Name="OutputPortsPanel"
                                             ItemsSource="{Binding OutputPorts}"
                                             Margin="4,0,0,0">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <local:PortControl DataContext="{Binding}"/>
+                                            <local:OutputPortControl DataContext="{Binding}"/>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
@@ -80,24 +82,43 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type local:PortControl}">
-                    <Grid>
+                    <Grid Background="Transparent" MinWidth="60" MinHeight="12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="12"/>
-                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
                         <!-- 포트 연결점 -->
-                        <Ellipse Grid.Column="0"
+                        <Ellipse x:Name="PART_ConnectionPoint"
                                 Width="12" Height="12"
                                 Fill="{TemplateBinding Background}"
-                                Stroke="{TemplateBinding BorderBrush}"/>
+                                Stroke="{TemplateBinding BorderBrush}"
+                                IsHitTestVisible="False"/>
 
                         <!-- 포트 이름 -->
                         <TextBlock Grid.Column="1"
+                                 x:Name="PART_PortName"
                                  Text="{Binding Model.Name}"
                                  Margin="4,0,0,0"
-                                 VerticalAlignment="Center"/>
+                                 VerticalAlignment="Center"
+                                 IsHitTestVisible="False"/>
                     </Grid>
+                    <ControlTemplate.Triggers>
+                        <!-- Input/Output 포트에 따른 레이아웃 변경 -->
+                        <DataTrigger Binding="{Binding IsInput}" Value="False">
+                            <Setter Property="Grid.Column" TargetName="PART_ConnectionPoint" Value="1"/>
+                            <Setter Property="Grid.Column" TargetName="PART_PortName" Value="0"/>
+                            <Setter Property="TextAlignment" TargetName="PART_PortName" Value="Right"/>
+                            <Setter Property="Margin" TargetName="PART_PortName" Value="0,0,4,0"/>
+                        </DataTrigger>
+                        
+                        <!-- 마우스 오버 효과 -->
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Fill" TargetName="PART_ConnectionPoint" Value="LightBlue"/>
+                            <Setter Property="Stroke" TargetName="PART_ConnectionPoint" Value="DarkBlue"/>
+                            <Setter Property="StrokeThickness" TargetName="PART_ConnectionPoint" Value="2"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -159,7 +180,7 @@
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <local:ConnectionControl ViewModel="{Binding}"/>
+                                            <local:ConnectionControl DataContext="{Binding}"/>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
@@ -255,6 +276,78 @@
                             </Border>
                         </Popup>
                     </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="{x:Type local:InputPortControl}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type local:InputPortControl}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- 포트 연결점 -->
+                        <Ellipse x:Name="PART_ConnectionPoint"
+                                Width="12" Height="12"
+                                Fill="{TemplateBinding Background}"
+                                Stroke="{TemplateBinding BorderBrush}"/>
+
+                        <!-- 포트 이름 -->
+                        <TextBlock Grid.Column="1"
+                                 Text="{Binding Model.Name}"
+                                 Margin="4,0,0,0"
+                                 VerticalAlignment="Center"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <!-- 마우스 오버 효과 -->
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Fill" TargetName="PART_ConnectionPoint" Value="LightBlue"/>
+                            <Setter Property="Stroke" TargetName="PART_ConnectionPoint" Value="DarkBlue"/>
+                            <Setter Property="StrokeThickness" TargetName="PART_ConnectionPoint" Value="2"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="{x:Type local:OutputPortControl}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type local:OutputPortControl}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="12"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- 포트 이름 -->
+                        <TextBlock Grid.Column="0"
+                                 Text="{Binding Model.Name}"
+                                 Margin="0,0,4,0"
+                                 TextAlignment="Right"
+                                 VerticalAlignment="Center"/>
+
+                        <!-- 포트 연결점 -->
+                        <Ellipse x:Name="PART_ConnectionPoint"
+                                Grid.Column="1"
+                                Width="12" Height="12"
+                                Fill="{TemplateBinding Background}"
+                                Stroke="{TemplateBinding BorderBrush}"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <!-- 마우스 오버 효과 -->
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Fill" TargetName="PART_ConnectionPoint" Value="LightBlue"/>
+                            <Setter Property="Stroke" TargetName="PART_ConnectionPoint" Value="DarkBlue"/>
+                            <Setter Property="StrokeThickness" TargetName="PART_ConnectionPoint" Value="2"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

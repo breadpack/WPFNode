@@ -6,7 +6,7 @@ using WPFNode.Abstractions;
 
 namespace WPFNode.Core.ViewModels.Nodes;
 
-public class NodePortViewModel : ViewModelBase
+public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
 {
     private readonly IPort _port;
     private string _name;
@@ -113,4 +113,34 @@ public class NodePortViewModel : ViewModelBase
     }
 
     public IPort Model => _port;
+
+    public override bool Equals(object? obj)
+    {
+        if (obj is NodePortViewModel other)
+            return Equals(other);
+        return false;
+    }
+
+    public bool Equals(NodePortViewModel? other)
+    {
+        if (other is null) return false;
+        return Id == other.Id;
+    }
+
+    public override int GetHashCode()
+    {
+        return Id.GetHashCode();
+    }
+
+    public static bool operator ==(NodePortViewModel? left, NodePortViewModel? right)
+    {
+        if (ReferenceEquals(left, right)) return true;
+        if (left is null || right is null) return false;
+        return left.Equals(right);
+    }
+
+    public static bool operator !=(NodePortViewModel? left, NodePortViewModel? right)
+    {
+        return !(left == right);
+    }
 } 

@@ -41,14 +41,6 @@ public class NodeControl : Control
         set => SetValue(ContentProperty, value);
     }
 
-    private static void OnViewModelChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-    {
-        if (d is NodeControl control)
-        {
-            control.DataContext = e.NewValue;
-        }
-    }
-
     public NodeControl()
     {
         Background = Brushes.White;
@@ -124,6 +116,8 @@ public class NodeControl : Control
 
     private void OnNodeDragStart(object sender, MouseButtonEventArgs e)
     {
+        if (e.Source is PortControl) return;
+
         if (ViewModel == null) return;
 
         if ((Keyboard.Modifiers & ModifierKeys.Control) == 0)
@@ -197,5 +191,25 @@ public class NodeControl : Control
 
             e.Handled = true;
         }
+    }
+
+    public PortControl? FindPortControl(NodePortViewModel port)
+    {
+        var portItemsControl = GetTemplateChild(port.IsInput ? "InputPortsPanel" : "OutputPortsPanel") as ItemsControl;
+        if (portItemsControl == null) return null;
+
+        var portContainer = portItemsControl.ItemContainerGenerator
+            .ContainerFromItem(port) as ContentPresenter;
+
+        if (portContainer == null) return null;
+
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(portContainer); i++)
+        {
+            var child = VisualTreeHelper.GetChild(portContainer, i);
+            if (child is PortControl portControl)
+                return portControl;
+        }
+
+        return null;
     }
 } 

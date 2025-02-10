@@ -16,26 +16,9 @@ public class ConnectionControl : Control
             new FrameworkPropertyMetadata(typeof(ConnectionControl)));
     }
 
-    public static readonly DependencyProperty ViewModelProperty =
-        DependencyProperty.Register(
-            nameof(ViewModel),
-            typeof(ConnectionViewModel),
-            typeof(ConnectionControl),
-            new PropertyMetadata(null, OnViewModelChanged));
-
-    public ConnectionViewModel? ViewModel
-    {
-        get => (ConnectionViewModel?)GetValue(ViewModelProperty);
-        set => SetValue(ViewModelProperty, value);
-    }
-
-    private static void OnViewModelChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-    {
-        if (d is ConnectionControl control)
-        {
-            control.DataContext = e.NewValue;
-            control.UpdatePath();
-        }
+    public ConnectionViewModel? ViewModel {
+        get => (ConnectionViewModel?)DataContext;
+        set => DataContext = value;
     }
 
     public ConnectionControl()
@@ -49,7 +32,7 @@ public class ConnectionControl : Control
     {
         base.OnApplyTemplate();
         _path = GetTemplateChild("PART_Path") as Path;
-        UpdatePath();
+        UpdateConnectionPath();
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -72,45 +55,67 @@ public class ConnectionControl : Control
 
     private void OnCanvasLayoutUpdated(object? sender, EventArgs e)
     {
-        UpdatePath();
+        UpdateConnectionPath();
     }
 
-    private void UpdatePath()
+    private Point GetPortCenterPosition(PortControl port)
     {
-        if (_path == null || ViewModel == null) return;
+        return port.GetConnectionPointCenter(this);
+    }
 
-        var sourcePort = ViewModel.Source;
-        var targetPort = ViewModel.Target;
+    private Point GetPortEdgePosition(Point center, Point target)
+    {
+        const double radius = 6.0;
+        var dx = target.X - center.X;
+        var dy = target.Y - center.Y;
+        var distance = Math.Sqrt(dx * dx + dy * dy);
+        
+        if (distance < 0.0001) return center;
+
+        // 중심점에서 target 방향으로 반지름만큼 이동한 점
+        var x = center.X + (dx / distance) * radius;
+        var y = center.Y + (dy / distance) * radius;
+        
+        return new Point(x, y);
+    }
+
+    private void UpdateConnectionPath()
+    {
+        if (ViewModel == null) return;
+
+        var sourcePort = GetPortControl(ViewModel.Source);
+        var targetPort = GetPortControl(ViewModel.Target);
 
         if (sourcePort == null || targetPort == null) return;
 
-        var sourceControl = FindPortControl(sourcePort);
-        var targetControl = FindPortControl(targetPort);
+        var sourceCenter = GetPortCenterPosition(sourcePort);
+        var targetCenter = GetPortCenterPosition(targetPort);
 
-        if (sourceControl == null || targetControl == null) return;
+        // Ellipse 가장자리 위치 계산
+        var startPoint = GetPortEdgePosition(sourceCenter, targetCenter);
+        var endPoint = GetPortEdgePosition(targetCenter, sourceCenter);
 
-        var sourcePoint = sourceControl.TranslatePoint(new Point(6, 6), this);
-        var targetPoint = targetControl.TranslatePoint(new Point(6, 6), this);
+        var pathGeometry = new PathGeometry();
+        var pathFigure = new PathFigure { StartPoint = startPoint };
 
-        var geometry = new PathGeometry();
-        var figure = new PathFigure { StartPoint = sourcePoint };
+        // 제어점 계산 (시작점과 끝점의 x 차이를 이용하여 곡률 조정)
+        var deltaX = Math.Abs(endPoint.X - startPoint.X);
+        var control1 = new Point(startPoint.X + deltaX * 0.5, startPoint.Y);
+        var control2 = new Point(endPoint.X - deltaX * 0.5, endPoint.Y);
 
-        // 베지어 곡선으로 연결선 그리기
-        var controlPoint1 = new Point(sourcePoint.X + 50, sourcePoint.Y);
-        var controlPoint2 = new Point(targetPoint.X - 50, targetPoint.Y);
-        figure.Segments.Add(new BezierSegment(controlPoint1, controlPoint2, targetPoint, true));
+        var segment = new BezierSegment(control1, control2, endPoint, true);
+        pathFigure.Segments.Add(segment);
+        pathGeometry.Figures.Add(pathFigure);
 
-        geometry.Figures.Add(figure);
-        _path.Data = geometry;
+        if (GetTemplateChild("PART_Path") is Path path)
+        {
+            path.Data = pathGeometry;
+        }
     }
 
-    private PortControl? FindPortControl(NodePortViewModel port)
+    private PortControl? GetPortControl(NodePortViewModel port)
     {
         var canvas = this.GetParentOfType<NodeCanvasControl>();
-        if (canvas == null) return null;
-
-        return canvas.GetVisualDescendants()
-            .OfType<PortControl>()
-            .FirstOrDefault(p => p.ViewModel == port);
+        return canvas?.FindPortControl(port);
     }
 } 
