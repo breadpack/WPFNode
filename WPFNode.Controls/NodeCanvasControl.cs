@@ -32,6 +32,9 @@ public class NodeCanvasControl : Control
     public INodePluginService PluginService { get; }
     public INodeCommandService CommandService { get; }
 
+    public bool IsDraggingPort => _dragStartPort != null;
+    public NodePortViewModel? DraggingPort => _dragStartPort;
+
     private NodeCanvasViewModel? _previousViewModel;
 
     public NodeCanvasViewModel? ViewModel
@@ -420,5 +423,15 @@ public class NodeCanvasControl : Control
     public PortControl? FindPortControl(NodePortViewModel port)
     {
         return _stateManager.FindPortControl(port);
+    }
+
+    internal void StartPortDrag(NodePortViewModel port)
+    {
+        _dragStartPort = port;
+    }
+
+    internal void EndPortDrag()
+    {
+        _dragStartPort = null;
     }
 } 

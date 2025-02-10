@@ -4,11 +4,46 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using WPFNode.Core.ViewModels.Nodes;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace WPFNode.Controls;
 
 public abstract class PortControl : Control
 {
+    private Point? _dragStart;
+    private Path? _dragPath;
+    private Canvas? _dragCanvas;
+    private Point? _portCenter;
+    private readonly Brush _originalBackground;
+    private bool _isHighlighted;
+    private PortControl? _lastTargetPort;
+    
+    private static readonly Brush ValidConnectionBrush = Brushes.LightGreen;
+    private static readonly Brush InvalidConnectionBrush = Brushes.Red;
+    private static readonly Brush DefaultConnectionBrush = Brushes.Gray;
+    
+    private static readonly DoubleCollection DashedStroke = new(new[] { 4d, 2d });
+    private const double ConnectionLineThickness = 2.0;
+    private const double ConnectionPointRadius = 6.0;
+
+    private static readonly DependencyPropertyKey IsInputPropertyKey = 
+        DependencyProperty.RegisterReadOnly(
+            nameof(IsInput),
+            typeof(bool),
+            typeof(PortControl),
+            new FrameworkPropertyMetadata(false));
+
+    public static readonly DependencyProperty IsInputProperty = IsInputPropertyKey.DependencyProperty;
+
+    public bool IsInput
+    {
+        get => (bool)GetValue(IsInputProperty);
+        protected set => SetValue(IsInputPropertyKey, value);
+    }
+    
+    public bool IsDragging => _dragStart.HasValue;
+
     static PortControl()
     {
         DefaultStyleKeyProperty.OverrideMetadata(typeof(PortControl),
@@ -21,205 +56,195 @@ public abstract class PortControl : Control
         set => DataContext = value;
     }
 
-    private Point? _dragStart;
-    private Path? _dragPath;
-    private Canvas? _dragCanvas;
-    private Point? _portCenter;
-    public bool IsDragging => _dragStart.HasValue;
-
-    public static readonly RoutedEvent PortDragStartEvent = EventManager.RegisterRoutedEvent(
-        nameof(PortDragStart), RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(PortControl));
-
-    public static readonly RoutedEvent PortDragEndEvent = EventManager.RegisterRoutedEvent(
-        nameof(PortDragEnd), RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(PortControl));
-
-    public event RoutedEventHandler PortDragStart
+    public PortControl()
     {
-        add { AddHandler(PortDragStartEvent, value); }
-        remove { RemoveHandler(PortDragStartEvent, value); }
+        _originalBackground = Background ?? Brushes.Transparent;
+        MouseEnter += OnMouseEnter;
+        MouseLeave += OnMouseLeave;
     }
 
-    public event RoutedEventHandler PortDragEnd
+    private void OnMouseEnter(object sender, MouseEventArgs e)
     {
-        add { AddHandler(PortDragEndEvent, value); }
-        remove { RemoveHandler(PortDragEndEvent, value); }
+        // 다른 포트에서 드래그 중일 때만 연결 가능 여부 표시
+        var canvas = this.GetParentOfType<NodeCanvasControl>();
+        if (canvas?.IsDraggingPort == true && canvas.DraggingPort != null && ViewModel != null)
+        {
+            var draggingPort = canvas.DraggingPort;
+            if (draggingPort.CanConnectTo(ViewModel))
+            {
+                Background = Brushes.LightGreen;
+                _isHighlighted = true;
+            }
+            else
+            {
+                Background = Brushes.Red;
+                _isHighlighted = true;
+            }
+        }
     }
 
-    protected PortControl()
+    private void OnMouseLeave(object sender, MouseEventArgs e)
     {
-        Background = Brushes.LightGray;
-        BorderBrush = Brushes.DarkGray;
-
-        MouseLeftButtonDown += OnPortMouseDown;
-        MouseLeftButtonUp += OnPortMouseUp;
-        MouseMove += OnPortMouseMove;
-    }
-
-    private Point GetPortEdgePosition(Point center, Point target)
-    {
-        const double radius = 6.0;
-        var dx = target.X - center.X;
-        var dy = target.Y - center.Y;
-        var distance = Math.Sqrt(dx * dx + dy * dy);
-        
-        if (distance < 0.0001) return center;
-
-        var x = center.X + (dx / distance) * radius;
-        var y = center.Y + (dy / distance) * radius;
-        
-        return new Point(x, y);
-    }
-
-    private PathGeometry CreateBezierPathGeometry(Point start, Point end)
-    {
-        var pathGeometry = new PathGeometry();
-        var pathFigure = new PathFigure();
-
-        // 시작점과 끝점을 각각의 Ellipse 가장자리로 조정
-        var adjustedStart = GetPortEdgePosition(start, end);
-        var adjustedEnd = GetPortEdgePosition(end, start);
-        
-        pathFigure.StartPoint = adjustedStart;
-
-        // 제어점 계산 (시작점과 끝점의 x 차이를 이용하여 곡률 조정)
-        var deltaX = Math.Abs(adjustedEnd.X - adjustedStart.X);
-        var control1 = new Point(adjustedStart.X + deltaX * 0.5, adjustedStart.Y);
-        var control2 = new Point(adjustedEnd.X - deltaX * 0.5, adjustedEnd.Y);
-
-        var segment = new BezierSegment(control1, control2, adjustedEnd, true);
-        pathFigure.Segments.Add(segment);
-        pathGeometry.Figures.Add(pathFigure);
-
-        return pathGeometry;
+        if (_isHighlighted)
+        {
+            Background = _originalBackground;
+            _isHighlighted = false;
+        }
     }
 
     public Point GetConnectionPointCenter(UIElement relativeTo)
     {
-        var connectionPoint = GetTemplateChild("PART_ConnectionPoint") as Ellipse;
-        if (connectionPoint == null) return new Point();
+        var xOffset = IsInput ? 6 : ActualWidth - 6;
+        var yOffset = ActualHeight / 2;
 
-        var isInput = ViewModel?.IsInput ?? false;
-        var xOffset = isInput ? 6 : ActualWidth - 6; // 입력 포트는 왼쪽, 출력 포트는 오른쪽
-
-        var ellipseCenter = new Point(xOffset, 6);
-        return this.TranslatePoint(ellipseCenter, relativeTo);
+        return TranslatePoint(new Point(xOffset, yOffset), relativeTo);
     }
 
-    private Point GetPortCenterPosition()
+    protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
-        if (_dragCanvas == null) return new Point();
-        return GetConnectionPointCenter(_dragCanvas);
-    }
-
-    private Point GetTargetPortPosition(FrameworkElement targetElement)
-    {
-        if (_dragCanvas == null) return new Point();
-
-        var targetPort = targetElement as PortControl;
-        if (targetPort?.ViewModel == null) return new Point();
-
-        double xOffset = targetPort.ViewModel.IsInput ? 0 : 12;
-        return targetPort.TranslatePoint(new Point(xOffset, 6), _dragCanvas);
-    }
-
-    private void OnPortMouseDown(object sender, MouseButtonEventArgs e)
-    {
+        base.OnMouseLeftButtonDown(e);
+        
         if (ViewModel == null) return;
 
         _dragStart = e.GetPosition(this);
-        _dragCanvas = this.GetParentOfType<NodeCanvasControl>()?.GetDragCanvas();
-
-        if (_dragCanvas != null)
+        _portCenter = GetConnectionPointCenter(this);
+        
+        var canvas = this.GetParentOfType<NodeCanvasControl>();
+        if (canvas != null)
         {
-            _dragPath = new Path
+            canvas.StartPortDrag(ViewModel);
+            _dragCanvas = canvas.GetDragCanvas();
+            if (_dragCanvas != null)
             {
-                Stroke = Brushes.Gray,
-                StrokeThickness = 2,
-                StrokeDashArray = new DoubleCollection(new[] { 4d, 2d })
-            };
+                _dragPath = new Path
+                {
+                    Stroke = DefaultConnectionBrush,
+                    StrokeThickness = ConnectionLineThickness,
+                    StrokeDashArray = DashedStroke,
+                    IsHitTestVisible = false // 드래그 중인 라인이 히트 테스트를 방해하지 않도록 함
+                };
+                _dragCanvas.Children.Add(_dragPath);
+            }
+            CaptureMouse();
+            e.Handled = true;
+        }
+    }
 
-            // 드래그 시작 시 포트 중심점 계산
-            _portCenter = GetPortCenterPosition();
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+
+        if (_dragPath != null && _dragCanvas != null && _dragStart.HasValue && _portCenter.HasValue)
+        {
             var currentPos = e.GetPosition(_dragCanvas);
+            var portPos = GetConnectionPointCenter(_dragCanvas);
 
-            if (ViewModel.IsInput)
+            // 마우스 위치에서 가장 가까운 포트 찾기
+            var hitTestResult = VisualTreeHelper.HitTest(_dragCanvas, currentPos);
+            var targetPort = hitTestResult?.VisualHit?.GetParentOfType<PortControl>();
+            
+            // 현재 타겟 포트 저장 (자기 자신이 아닌 경우에만)
+            _lastTargetPort = (targetPort != this) ? targetPort : null;
+            
+            // 연결 가능 여부에 따라 라인 스타일 변경
+            UpdateConnectionLineStyle(_dragPath, targetPort);
+
+            var pathGeometry = new PathGeometry();
+            var pathFigure = new PathFigure { StartPoint = portPos };
+
+            // 제어점 계산 (시작점과 끝점의 x 차이를 이용하여 곡률 조정)
+            var deltaX = Math.Abs(currentPos.X - portPos.X);
+            Point control1, control2;
+
+            if (IsInput)
             {
-                _dragPath.Data = CreateBezierPathGeometry(currentPos, _portCenter.Value);
+                // 입력 포트: 왼쪽에서 오른쪽으로
+                control1 = new Point(portPos.X - deltaX * 0.5, portPos.Y);
+                control2 = new Point(currentPos.X + deltaX * 0.5, currentPos.Y);
             }
             else
             {
-                _dragPath.Data = CreateBezierPathGeometry(_portCenter.Value, currentPos);
+                // 출력 포트: 오른쪽에서 왼쪽으로
+                control1 = new Point(portPos.X + deltaX * 0.5, portPos.Y);
+                control2 = new Point(currentPos.X - deltaX * 0.5, currentPos.Y);
             }
 
-            _dragCanvas.Children.Add(_dragPath);
-            RaiseEvent(new RoutedEventArgs(PortDragStartEvent));
-        }
+            var segment = new BezierSegment(control1, control2, currentPos, true);
+            pathFigure.Segments.Add(segment);
+            pathGeometry.Figures.Add(pathFigure);
 
-        CaptureMouse();
-        e.Handled = true;
+            _dragPath.Data = pathGeometry;
+        }
     }
 
-    private void OnPortMouseUp(object sender, MouseButtonEventArgs e)
+    private void UpdateConnectionLineStyle(Path path, PortControl? targetPort)
     {
-        if (_dragStart.HasValue && ViewModel != null)
+        if (targetPort == null || targetPort == this || ViewModel == null || targetPort.ViewModel == null)
         {
-            if (_dragCanvas != null)
-            {
-                var mousePosition = e.GetPosition(_dragCanvas);
-                var hitTestResult = VisualTreeHelper.HitTest(_dragCanvas, mousePosition);
-                if (hitTestResult?.VisualHit is FrameworkElement targetElement)
-                {
-                    var targetPort = targetElement.DataContext as NodePortViewModel;
-                    if (targetPort != null && ViewModel.CanConnectTo(targetPort))
-                    {
-                        var canvas = this.GetParentOfType<NodeCanvasControl>();
-                        if (canvas?.ViewModel != null)
-                        {
-                            if (ViewModel.IsInput)
-                            {
-                                canvas.ViewModel.ConnectCommand.Execute((targetPort, ViewModel));
-                            }
-                            else
-                            {
-                                canvas.ViewModel.ConnectCommand.Execute((ViewModel, targetPort));
-                            }
-                        }
-                    }
-                }
-            }
+            // 유효한 대상이 없을 때는 기본 스타일
+            path.Stroke = DefaultConnectionBrush;
+            path.StrokeThickness = ConnectionLineThickness;
+            path.StrokeDashArray = DashedStroke;
+            return;
         }
 
-        if (_dragPath != null && _dragCanvas != null)
+        if (ViewModel.CanConnectTo(targetPort.ViewModel))
+        {
+            // 연결 가능한 경우
+            path.Stroke = ValidConnectionBrush;
+            path.StrokeThickness = ConnectionLineThickness * 1.5; // 더 두껍게
+            path.StrokeDashArray = null; // 실선
+        }
+        else
+        {
+            // 연결 불가능한 경우
+            path.Stroke = InvalidConnectionBrush;
+            path.StrokeThickness = ConnectionLineThickness;
+            path.StrokeDashArray = DashedStroke;
+        }
+    }
+
+    protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
+    {
+        base.OnMouseLeftButtonUp(e);
+
+        if (_dragPath != null && _dragCanvas != null && 
+            _lastTargetPort?.ViewModel != null && ViewModel != null &&
+            ViewModel.CanConnectTo(_lastTargetPort.ViewModel))
+        {
+            var nodeCanvas = this.GetParentOfType<NodeCanvasControl>();
+            if (nodeCanvas?.ViewModel != null)
+            {
+                if (ViewModel.IsInput)
+                {
+                    nodeCanvas.ViewModel.ConnectCommand.Execute((_lastTargetPort.ViewModel, ViewModel));
+                }
+                else
+                {
+                    nodeCanvas.ViewModel.ConnectCommand.Execute((ViewModel, _lastTargetPort.ViewModel));
+                }
+            }
+
+            _dragCanvas.Children.Remove(_dragPath);
+            _dragPath = null;
+        }
+        else if (_dragPath != null && _dragCanvas != null)
         {
             _dragCanvas.Children.Remove(_dragPath);
             _dragPath = null;
         }
 
-        if (_dragStart.HasValue)
+        var canvas = this.GetParentOfType<NodeCanvasControl>();
+        if (canvas != null)
         {
-            RaiseEvent(new RoutedEventArgs(PortDragEndEvent));
+            canvas.EndPortDrag();
         }
 
-        _dragStart = null;
-        _portCenter = null;
         ReleaseMouseCapture();
-    }
-
-    private void OnPortMouseMove(object sender, MouseEventArgs e)
-    {
-        if (_dragStart.HasValue && ViewModel != null && IsMouseCaptured && _dragPath != null && _dragCanvas != null && _portCenter.HasValue)
-        {
-            var currentPos = e.GetPosition(_dragCanvas);
-
-            if (ViewModel.IsInput)
-            {
-                _dragPath.Data = CreateBezierPathGeometry(currentPos, _portCenter.Value);
-            }
-            else
-            {
-                _dragPath.Data = CreateBezierPathGeometry(_portCenter.Value, currentPos);
-            }
-        }
+        _dragStart = null;
+        _lastTargetPort = null;
+        Background = _originalBackground;
+        _isHighlighted = false;
     }
 
     private T? GetParentOfType<T>(DependencyObject? element) where T : DependencyObject
@@ -237,6 +262,11 @@ public class InputPortControl : PortControl
         DefaultStyleKeyProperty.OverrideMetadata(typeof(InputPortControl),
             new FrameworkPropertyMetadata(typeof(InputPortControl)));
     }
+
+    public InputPortControl()
+    {
+        IsInput = true;
+    }
 }
 
 public class OutputPortControl : PortControl
@@ -245,5 +275,10 @@ public class OutputPortControl : PortControl
     {
         DefaultStyleKeyProperty.OverrideMetadata(typeof(OutputPortControl),
             new FrameworkPropertyMetadata(typeof(OutputPortControl)));
+    }
+
+    public OutputPortControl()
+    {
+        IsInput = false;
     }
 } 

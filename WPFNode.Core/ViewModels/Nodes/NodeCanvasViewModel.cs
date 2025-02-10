@@ -130,13 +130,39 @@ public partial class NodeCanvasViewModel : ObservableObject
         _commandManager.Execute(command);
     }
 
-    private void ExecuteConnect((NodePortViewModel, NodePortViewModel) ports)
+    private bool IsValidConnection(NodePortViewModel sourcePort, NodePortViewModel targetPort)
     {
-        var (sourcePort, targetPort) = ports;
-        if (sourcePort == null || targetPort == null) return;
+        // 같은 노드의 포트인 경우 연결 불가
+        var sourceNode = Nodes.FirstOrDefault(n => 
+            n.InputPorts.Contains(sourcePort) || n.OutputPorts.Contains(sourcePort));
+        var targetNode = Nodes.FirstOrDefault(n => 
+            n.InputPorts.Contains(targetPort) || n.OutputPorts.Contains(targetPort));
+            
+        if (sourceNode == null || targetNode == null || sourceNode == targetNode)
+            return false;
 
-        var command = new ConnectCommand(_canvas, sourcePort.Model, targetPort.Model);
-        _commandManager.Execute(command);
+        // 입력-출력 포트 방향이 맞는지 확인
+        if (sourcePort.IsInput == targetPort.IsInput)
+            return false;
+
+        // 이미 연결된 포트인지 확인
+        if (Connections.Any(c => 
+            (c.Source == sourcePort && c.Target == targetPort) ||
+            (c.Source == targetPort && c.Target == sourcePort)))
+            return false;
+
+        // 포트 타입 호환성 확인
+        return sourcePort.CanConnectTo(targetPort);
+    }
+
+    private void ExecuteConnect((NodePortViewModel source, NodePortViewModel target) ports)
+    {
+        if (!IsValidConnection(ports.source, ports.target))
+            return;
+
+        var (source, target) = ports;
+        var connection = new Connection(source.Model, target.Model);
+        _canvas.Connections.Add(connection);
     }
 
     private void ExecuteDisconnect((NodePortViewModel, NodePortViewModel) ports)

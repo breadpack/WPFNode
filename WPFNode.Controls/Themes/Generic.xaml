@@ -79,50 +79,57 @@
     </Style>
 
     <Style TargetType="{x:Type local:PortControl}">
+        <Setter Property="MinWidth" Value="50"/>
+        <Setter Property="Height" Value="24"/>
+        <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type local:PortControl}">
-                    <Grid Background="Transparent" MinWidth="60" MinHeight="12">
+                    <Grid Background="{TemplateBinding Background}">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-
-                        <!-- 포트 연결점 -->
+                        
+                        <!-- 연결점 -->
                         <Ellipse x:Name="PART_ConnectionPoint"
                                 Width="12" Height="12"
-                                Fill="{TemplateBinding Background}"
-                                Stroke="{TemplateBinding BorderBrush}"
-                                IsHitTestVisible="False"/>
-
+                                Fill="#FF404040"
+                                Stroke="#FF606060"
+                                StrokeThickness="1"
+                                Margin="0,6,0,6"/>
+                                
                         <!-- 포트 이름 -->
-                        <TextBlock Grid.Column="1"
-                                 x:Name="PART_PortName"
-                                 Text="{Binding Model.Name}"
-                                 Margin="4,0,0,0"
+                        <TextBlock x:Name="PART_PortName"
+                                 Grid.Column="1"
+                                 Text="{Binding Name}"
                                  VerticalAlignment="Center"
-                                 IsHitTestVisible="False"/>
+                                 Margin="4,0,0,0"
+                                 Foreground="Black"/>
                     </Grid>
                     <ControlTemplate.Triggers>
-                        <!-- Input/Output 포트에 따른 레이아웃 변경 -->
-                        <DataTrigger Binding="{Binding IsInput}" Value="False">
-                            <Setter Property="Grid.Column" TargetName="PART_ConnectionPoint" Value="1"/>
-                            <Setter Property="Grid.Column" TargetName="PART_PortName" Value="0"/>
-                            <Setter Property="TextAlignment" TargetName="PART_PortName" Value="Right"/>
-                            <Setter Property="Margin" TargetName="PART_PortName" Value="0,0,4,0"/>
-                        </DataTrigger>
-                        
-                        <!-- 마우스 오버 효과 -->
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Fill" TargetName="PART_ConnectionPoint" Value="LightBlue"/>
-                            <Setter Property="Stroke" TargetName="PART_ConnectionPoint" Value="DarkBlue"/>
-                            <Setter Property="StrokeThickness" TargetName="PART_ConnectionPoint" Value="2"/>
+                        <Trigger Property="IsInput" Value="True">
+                            <Setter TargetName="PART_ConnectionPoint" Property="Grid.Column" Value="0"/>
+                            <Setter TargetName="PART_ConnectionPoint" Property="HorizontalAlignment" Value="Left"/>
+                            <Setter TargetName="PART_PortName" Property="Grid.Column" Value="1"/>
+                            <Setter TargetName="PART_PortName" Property="TextAlignment" Value="Left"/>
+                            <Setter TargetName="PART_PortName" Property="Margin" Value="4,0,0,0"/>
+                        </Trigger>
+                        <Trigger Property="IsInput" Value="False">
+                            <Setter TargetName="PART_ConnectionPoint" Property="Grid.Column" Value="1"/>
+                            <Setter TargetName="PART_ConnectionPoint" Property="HorizontalAlignment" Value="Right"/>
+                            <Setter TargetName="PART_PortName" Property="Grid.Column" Value="0"/>
+                            <Setter TargetName="PART_PortName" Property="TextAlignment" Value="Right"/>
+                            <Setter TargetName="PART_PortName" Property="Margin" Value="0,0,4,0"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
     </Style>
+
+    <Style TargetType="{x:Type local:InputPortControl}" BasedOn="{StaticResource {x:Type local:PortControl}}"/>
+    <Style TargetType="{x:Type local:OutputPortControl}" BasedOn="{StaticResource {x:Type local:PortControl}}"/>
 
     <Style TargetType="{x:Type local:ConnectionControl}">
         <Setter Property="Template">
@@ -175,7 +182,7 @@
                                 <ItemsControl ItemsSource="{Binding Connections}">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
-                                            <Canvas IsItemsHost="True"/>
+                                            <Canvas IsItemsHost="True" ZIndex="1"/>
                                         </ItemsPanelTemplate>
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
@@ -189,7 +196,7 @@
                                 <ItemsControl ItemsSource="{Binding Nodes}">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
-                                            <Canvas IsItemsHost="True"/>
+                                            <Canvas IsItemsHost="True" ZIndex="0"/>
                                         </ItemsPanelTemplate>
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
@@ -281,80 +288,15 @@
         </Setter>
     </Style>
 
-    <Style TargetType="{x:Type local:InputPortControl}">
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="{x:Type local:InputPortControl}">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="12"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <!-- 포트 연결점 -->
-                        <Ellipse x:Name="PART_ConnectionPoint"
-                                Width="12" Height="12"
-                                Fill="{TemplateBinding Background}"
-                                Stroke="{TemplateBinding BorderBrush}"/>
-
-                        <!-- 포트 이름 -->
-                        <TextBlock Grid.Column="1"
-                                 Text="{Binding Model.Name}"
-                                 Margin="4,0,0,0"
-                                 VerticalAlignment="Center"/>
-                    </Grid>
-                    <ControlTemplate.Triggers>
-                        <!-- 마우스 오버 효과 -->
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Fill" TargetName="PART_ConnectionPoint" Value="LightBlue"/>
-                            <Setter Property="Stroke" TargetName="PART_ConnectionPoint" Value="DarkBlue"/>
-                            <Setter Property="StrokeThickness" TargetName="PART_ConnectionPoint" Value="2"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <Style TargetType="{x:Type local:OutputPortControl}">
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="{x:Type local:OutputPortControl}">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="12"/>
-                        </Grid.ColumnDefinitions>
-
-                        <!-- 포트 이름 -->
-                        <TextBlock Grid.Column="0"
-                                 Text="{Binding Model.Name}"
-                                 Margin="0,0,4,0"
-                                 TextAlignment="Right"
-                                 VerticalAlignment="Center"/>
-
-                        <!-- 포트 연결점 -->
-                        <Ellipse x:Name="PART_ConnectionPoint"
-                                Grid.Column="1"
-                                Width="12" Height="12"
-                                Fill="{TemplateBinding Background}"
-                                Stroke="{TemplateBinding BorderBrush}"/>
-                    </Grid>
-                    <ControlTemplate.Triggers>
-                        <!-- 마우스 오버 효과 -->
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Fill" TargetName="PART_ConnectionPoint" Value="LightBlue"/>
-                            <Setter Property="Stroke" TargetName="PART_ConnectionPoint" Value="DarkBlue"/>
-                            <Setter Property="StrokeThickness" TargetName="PART_ConnectionPoint" Value="2"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
     <!-- 색상 변환기 -->
     <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
     <local:ColorToBrushConverter x:Key="ColorToBrushConverter"/>
+
+    <!-- Value Converters -->
+    <local:BoolToColumnConverter x:Key="BoolToColumnConverter" TrueValue="0" FalseValue="1"/>
+    <local:BoolToColumnConverter x:Key="BoolToInverseColumnConverter" TrueValue="1" FalseValue="0"/>
+    <local:BoolToAlignmentConverter x:Key="BoolToAlignmentConverter" TrueValue="Left" FalseValue="Right"/>
+    <local:BoolToTextAlignmentConverter x:Key="BoolToTextAlignmentConverter" TrueValue="Left" FalseValue="Right"/>
+    <local:BoolToMarginConverter x:Key="BoolToMarginConverter" TrueValue="4,0,0,0" FalseValue="0,0,4,0"/>
 
 </ResourceDictionary> 
