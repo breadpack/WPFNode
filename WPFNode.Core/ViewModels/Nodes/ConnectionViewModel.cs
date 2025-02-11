@@ -5,12 +5,12 @@ namespace WPFNode.Core.ViewModels.Nodes;
 
 public class ConnectionViewModel : ViewModelBase
 {
-    private readonly Connection _model;
-    private bool _isSelected;
-    private NodePortViewModel? _source;
-    private NodePortViewModel? _target;
+    private readonly IConnection        _model;
+    private          bool               _isSelected;
+    private          NodePortViewModel? _source;
+    private          NodePortViewModel? _target;
 
-    public ConnectionViewModel(Connection model, NodeCanvasViewModel canvas)
+    public ConnectionViewModel(IConnection model, NodeCanvasViewModel canvas)
     {
         _model = model;
         Source = canvas.FindPortViewModel(model.Source);
@@ -35,5 +35,5 @@ public class ConnectionViewModel : ViewModelBase
         private set => SetProperty(ref _target, value);
     }
     
-    public Connection Model => _model;
+    public IConnection Model => _model;
 } 

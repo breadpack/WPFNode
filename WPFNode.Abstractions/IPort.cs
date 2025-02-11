@@ -12,7 +12,7 @@ public interface IPort : INotifyPropertyChanged
     bool IsInput { get; }
     bool IsConnected { get; }
     object? Value { get; set; }
-    IReadOnlyList<Connection> Connections { get; }
+    IReadOnlyList<IConnection> Connections { get; }
 }
 
 public interface IPort<T> : IPort

@@ -7,18 +7,18 @@ namespace WPFNode.Core.Models;
 
 public class NodeCanvas
 {
-    public ObservableCollection<NodeBase> Nodes { get; }
-    public ObservableCollection<Connection> Connections { get; }
-    public ObservableCollection<NodeGroup> Groups { get; }
-    public double Scale { get; set; } = 1.0;
-    public double OffsetX { get; set; }
-    public double OffsetY { get; set; }
-    public CommandManager CommandManager { get; }
+    public ObservableCollection<NodeBase>    Nodes          { get; }
+    public ObservableCollection<IConnection> Connections    { get; }
+    public ObservableCollection<NodeGroup>   Groups         { get; }
+    public double                            Scale          { get; set; } = 1.0;
+    public double                            OffsetX        { get; set; }
+    public double                            OffsetY        { get; set; }
+    public CommandManager                    CommandManager { get; }
 
     public NodeCanvas()
     {
         Nodes          = new ObservableCollection<NodeBase>();
-        Connections    = new ObservableCollection<Connection>();
+        Connections    = new ObservableCollection<IConnection>();
         Groups         = new ObservableCollection<NodeGroup>();
         CommandManager = new CommandManager();
     }
@@ -45,7 +45,7 @@ public class NodeCanvas
         return connection;
     }
 
-    public void Disconnect(Connection connection)
+    public void Disconnect(IConnection connection)
     {
         // Canvas의 Connections 컬렉션에서 제거
         Connections.Remove(connection);

@@ -8,7 +8,7 @@ public class RemoveNodeCommand : ICommand
 {
     private readonly NodeCanvas       _canvas;
     private readonly NodeBase         _node;
-    private readonly List<Connection> _connections;
+    private readonly List<IConnection> _connections;
 
     public string Description => "노드 삭제";
 

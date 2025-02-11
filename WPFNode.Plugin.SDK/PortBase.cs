@@ -8,10 +8,10 @@ namespace WPFNode.Plugin.SDK;
 
 public abstract class PortBase : IPort
 {
-    private string _name;
-    private object? _value;
-    private bool _isConnected;
-    private readonly List<Connection> _connections = new();
+    private          string            _name;
+    private          object?           _value;
+    private          bool              _isConnected;
+    private readonly List<IConnection> _connections = new();
 
     public PortBase(string name, Type dataType, bool isInput)
     {
@@ -71,21 +71,21 @@ public abstract class PortBase : IPort
         }
     }
 
-    public IReadOnlyList<Connection> Connections => _connections;
+    public IReadOnlyList<IConnection> Connections => _connections;
 
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
-    public void AddConnection(Connection connection)
+    public void AddConnection(IConnection connection)
     {
         _connections.Add(connection);
         IsConnected = true;
         OnPropertyChanged(nameof(Connections));
     }
 
-    public void RemoveConnection(Connection connection)
+    public void RemoveConnection(IConnection connection)
     {
         _connections.Remove(connection);
         IsConnected = _connections.Count > 0;

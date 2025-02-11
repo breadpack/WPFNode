@@ -5,10 +5,10 @@ namespace WPFNode.Core.Commands;
 
 public class ConnectCommand : ICommand
 {
-    private readonly NodeCanvas _canvas;
-    private readonly IPort _source;
-    private readonly IPort _target;
-    private Connection? _connection;
+    private readonly NodeCanvas   _canvas;
+    private readonly IPort        _source;
+    private readonly IPort        _target;
+    private          IConnection? _connection;
 
     public string Description => "포트 연결";
 
@@ -36,15 +36,15 @@ public class ConnectCommand : ICommand
 
 public class ReplaceConnectionCommand : ICommand
 {
-    private readonly NodeCanvas _canvas;
-    private readonly IPort _source;
-    private readonly IPort _target;
-    private readonly Connection? _oldConnection;
-    private Connection? _newConnection;
+    private readonly NodeCanvas   _canvas;
+    private readonly IPort        _source;
+    private readonly IPort        _target;
+    private readonly IConnection? _oldConnection;
+    private          Connection?  _newConnection;
 
     public string Description => "포트 연결 교체";
 
-    public ReplaceConnectionCommand(NodeCanvas canvas, IPort source, IPort target, Connection? oldConnection)
+    public ReplaceConnectionCommand(NodeCanvas canvas, IPort source, IPort target, IConnection? oldConnection)
     {
         _canvas = canvas;
         _source = source;
