@@ -24,12 +24,12 @@ public class AddGroupCommand : ICommand
         {
             _group.Nodes.Add(node);
         }
-        _canvas.Groups.Add(_group);
+        _canvas.AddGroup(_group);
     }
 
     public void Undo()
     {
-        _canvas.Groups.Remove(_group);
+        _canvas.RemoveGroup(_group);
     }
 }
 
@@ -50,7 +50,7 @@ public class RemoveGroupCommand : ICommand
 
     public void Execute()
     {
-        _canvas.Groups.Remove(_group);
+        _canvas.RemoveGroup(_group);
     }
 
     public void Undo()
@@ -59,6 +59,6 @@ public class RemoveGroupCommand : ICommand
         {
             _group.Nodes.Add(node);
         }
-        _canvas.Groups.Add(_group);
+        _canvas.AddGroup(_group);
     }
 } 

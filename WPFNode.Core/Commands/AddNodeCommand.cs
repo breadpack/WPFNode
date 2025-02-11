@@ -18,11 +18,11 @@ public class AddNodeCommand : ICommand
 
     public void Execute()
     {
-        _canvas.Nodes.Add(_node);
+        _canvas.AddNode(_node);
     }
 
     public void Undo()
     {
-        _canvas.Nodes.Remove(_node);
+        _canvas.RemoveNode(_node);
     }
 }

@@ -15,7 +15,7 @@ public class NodeGroupViewModel : ViewModelBase
     private bool _isCollapsed;
     private Color _color;
 
-    public NodeGroupViewModel(NodeGroup group)
+    public NodeGroupViewModel(NodeGroup group, NodeCanvasViewModel nodeCanvasViewModel)
     {
         _group = group;
         _name = group.Name;

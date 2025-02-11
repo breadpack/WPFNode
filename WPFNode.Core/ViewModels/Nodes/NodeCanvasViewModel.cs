@@ -2,6 +2,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using System.Linq;
+using System.Collections.Generic;
 using WPFNode.Core.Models;
 using WPFNode.Core.ViewModels.Base;
 using WPFNode.Core.Services;
@@ -19,16 +20,13 @@ namespace WPFNode.Core.ViewModels.Nodes;
 public partial class NodeCanvasViewModel : ObservableObject
 {
     private readonly NodeCanvas _canvas;
-    private readonly ObservableCollection<NodeViewModel> _nodes;
-    private readonly ObservableCollection<ConnectionViewModel> _connections;
-    private readonly ObservableCollection<NodeGroupViewModel> _groups;
     private readonly INodePluginService _pluginService;
     private readonly INodeCommandService _commandService;
     private readonly WPFNode.Core.Commands.CommandManager _commandManager;
 
-    public ObservableCollection<NodeViewModel> Nodes => _nodes;
-    public IReadOnlyList<ConnectionViewModel> Connections => _connections;
-    public IReadOnlyList<NodeGroupViewModel> Groups => _groups;
+    public ObservableCollection<NodeViewModel> Nodes { get; }
+    public ObservableCollection<ConnectionViewModel> Connections { get; }
+    public ObservableCollection<NodeGroupViewModel> Groups { get; }
 
     [ObservableProperty]
     private double _scale = 1.0;
@@ -58,12 +56,12 @@ public partial class NodeCanvasViewModel : ObservableObject
         _commandService = commandService;
         _commandManager = new WPFNode.Core.Commands.CommandManager();
         
-        _nodes = new ObservableCollection<NodeViewModel>(
+        Nodes = new ObservableCollection<NodeViewModel>(
             canvas.Nodes.Select(n => new NodeViewModel(n, commandService, this)));
         
-        _connections = new ObservableCollection<ConnectionViewModel>(
+        Connections = new ObservableCollection<ConnectionViewModel>(
             canvas.Connections.Select(c => new ConnectionViewModel(c, this)));
-        _groups = new ObservableCollection<NodeGroupViewModel>();
+        Groups = new ObservableCollection<NodeGroupViewModel>();
 
         AddNodeCommand = new RelayCommand<Type>(ExecuteAddNode);
         RemoveNodeCommand = new RelayCommand<NodeViewModel>(ExecuteRemoveNode);
@@ -74,141 +72,61 @@ public partial class NodeCanvasViewModel : ObservableObject
         UndoCommand = new RelayCommand(ExecuteUndo, CanExecuteUndo);
         RedoCommand = new RelayCommand(ExecuteRedo, CanExecuteRedo);
 
-        // Model 변경 감지
-        _canvas.Nodes.CollectionChanged += (s, e) =>
+        // Model 변경 감지를 위한 이벤트 핸들러 등록
+        SynchronizeWithModel();
+    }
+
+    private void SynchronizeWithModel()
+    {
+        // 노드 동기화
+        Nodes.Clear();
+        foreach (var node in _canvas.Nodes)
         {
-            switch (e.Action)
-            {
-                case NotifyCollectionChangedAction.Add:
-                    if (e.NewItems != null)
-                    {
-                        foreach (NodeBase node in e.NewItems)
-                        {
-                            _nodes.Add(new NodeViewModel(node, commandService, this));
-                        }
-                    }
-                    break;
+            Nodes.Add(new NodeViewModel(node, _commandService, this));
+        }
 
-                case NotifyCollectionChangedAction.Remove:
-                    if (e.OldItems != null)
-                    {
-                        foreach (NodeBase node in e.OldItems)
-                        {
-                            var vm = _nodes.FirstOrDefault(n => n.Model == node);
-                            if (vm != null)
-                            {
-                                _nodes.Remove(vm);
-                            }
-                        }
-                        ValidateConnections();
-                    }
-                    break;
-
-                case NotifyCollectionChangedAction.Replace:
-                    if (e.OldItems != null && e.NewItems != null)
-                    {
-                        for (int i = 0; i < e.OldItems.Count; i++)
-                        {
-                            var oldNode = (NodeBase)e.OldItems[i]!;
-                            var newNode = (NodeBase)e.NewItems[i]!;
-                            var oldVm = _nodes.FirstOrDefault(n => n.Model == oldNode);
-                            if (oldVm != null)
-                            {
-                                var index = _nodes.IndexOf(oldVm);
-                                _nodes[index] = new NodeViewModel(newNode, commandService, this);
-                            }
-                        }
-                        ValidateConnections();
-                    }
-                    break;
-
-                case NotifyCollectionChangedAction.Reset:
-                    _nodes.Clear();
-                    foreach (var node in _canvas.Nodes)
-                    {
-                        _nodes.Add(new NodeViewModel(node, commandService, this));
-                    }
-                    ValidateConnections();
-                    break;
-            }
-        };
-
-        _canvas.Connections.CollectionChanged += (s, e) =>
+        // 연결 동기화
+        Connections.Clear();
+        foreach (var connection in _canvas.Connections)
         {
-            switch (e.Action)
-            {
-                case NotifyCollectionChangedAction.Add:
-                    if (e.NewItems != null)
-                    {
-                        foreach (Connection conn in e.NewItems)
-                        {
-                            _connections.Add(new ConnectionViewModel(conn, this));
-                        }
-                    }
-                    break;
+            Connections.Add(new ConnectionViewModel(connection, this));
+        }
 
-                case NotifyCollectionChangedAction.Remove:
-                    if (e.OldItems != null)
-                    {
-                        foreach (Connection conn in e.OldItems)
-                        {
-                            var vm = _connections.FirstOrDefault(c => c.Model == conn);
-                            if (vm != null)
-                            {
-                                _connections.Remove(vm);
-                            }
-                        }
-                    }
-                    break;
-
-                case NotifyCollectionChangedAction.Replace:
-                    if (e.OldItems != null && e.NewItems != null)
-                    {
-                        for (int i = 0; i < e.OldItems.Count; i++)
-                        {
-                            var oldConn = (Connection)e.OldItems[i]!;
-                            var newConn = (Connection)e.NewItems[i]!;
-                            var oldVm = _connections.FirstOrDefault(c => c.Model == oldConn);
-                            if (oldVm != null)
-                            {
-                                var index = _connections.IndexOf(oldVm);
-                                _connections[index] = new ConnectionViewModel(newConn, this);
-                            }
-                        }
-                    }
-                    break;
-
-                case NotifyCollectionChangedAction.Reset:
-                    _connections.Clear();
-                    foreach (var conn in _canvas.Connections)
-                    {
-                        _connections.Add(new ConnectionViewModel(conn, this));
-                    }
-                    break;
-            }
-
-            // 연결이 변경될 때마다 유효성 검사 수행
-            ValidateConnections();
-        };
+        // 그룹 동기화
+        Groups.Clear();
+        foreach (var group in _canvas.Groups)
+        {
+            Groups.Add(new NodeGroupViewModel(group, this));
+        }
     }
 
     private void ExecuteAddNode(Type? nodeType)
     {
         if (nodeType == null) return;
+        
         var node = (NodeBase)_pluginService.CreateNode(nodeType);
+        node.Initialize();
+        
         var command = new AddNodeCommand(_canvas, node);
         _commandManager.Execute(command);
+        
+        SynchronizeWithModel();
     }
 
     private void ExecuteRemoveNode(NodeViewModel? nodeViewModel)
     {
         if (nodeViewModel == null) return;
+        
         var command = new RemoveNodeCommand(_canvas, nodeViewModel.Model);
         _commandManager.Execute(command);
+        
+        SynchronizeWithModel();
     }
 
     private bool IsValidConnection(NodePortViewModel sourcePort, NodePortViewModel targetPort)
     {
+        if (sourcePort == null || targetPort == null) return false;
+
         // 같은 노드의 포트인 경우 연결 불가
         var sourceNode = Nodes.FirstOrDefault(n => 
             n.InputPorts.Contains(sourcePort) || n.OutputPorts.Contains(sourcePort));
@@ -239,116 +157,87 @@ public partial class NodeCanvasViewModel : ObservableObject
 
         var (source, target) = ports;
         
-        // 입력 포트에 기존 연결이 있는지 확인
+        // 입력 포트에 기존 연결이 있는지 확인하고 제거
         var inputPort = source.IsInput ? source : target;
         var existingConnection = inputPort.Connections.FirstOrDefault()?.Model;
-
         if (existingConnection != null)
         {
-            var replaceCommand = new ReplaceConnectionCommand(_canvas, source.Model, target.Model, existingConnection);
-            _commandManager.Execute(replaceCommand);
+            _canvas.Disconnect(existingConnection);
         }
-        else
+
+        // 새 연결 생성
+        var connection = _canvas.Connect(source.Model, target.Model);
+        if (connection != null)
         {
-            var connectCommand = new ConnectCommand(_canvas, source.Model, target.Model);
-            _commandManager.Execute(connectCommand);
+            SynchronizeWithModel();
         }
     }
 
     private void ExecuteDisconnect((NodePortViewModel source, NodePortViewModel target) ports)
     {
-        var (sourcePort, targetPort) = ports;
-        if (sourcePort == null || targetPort == null) return;
+        var connection = Connections.FirstOrDefault(c =>
+            (c.Source == ports.source && c.Target == ports.target) ||
+            (c.Source == ports.target && c.Target == ports.source))?.Model;
 
-        var connection = sourcePort.Connections
-            .FirstOrDefault(c => c.Target.Id == targetPort.Id || c.Source.Id == targetPort.Id)?.Model;
-        
         if (connection != null)
         {
-            var command = new DisconnectCommand(_canvas, connection);
-            _commandManager.Execute(command);
+            _canvas.Disconnect(connection);
+            SynchronizeWithModel();
         }
     }
 
     private void ExecuteUndo()
     {
         _commandManager.Undo();
+        SynchronizeWithModel();
     }
 
     private void ExecuteRedo()
     {
         _commandManager.Redo();
+        SynchronizeWithModel();
     }
 
-    private bool CanExecuteUndo()
-    {
-        return _commandManager.CanUndo;
-    }
-
-    private bool CanExecuteRedo()
-    {
-        return _commandManager.CanRedo;
-    }
+    private bool CanExecuteUndo() => _commandManager.CanUndo;
+    private bool CanExecuteRedo() => _commandManager.CanRedo;
 
     private void AddGroup(NodeGroup? group)
     {
         if (group == null) return;
-        var command = new AddGroupCommand(_canvas, group.Name, group.Nodes);
-        _commandManager.Execute(command);
+        
+        var selectedNodes = Nodes
+            .Where(n => n.IsSelected)
+            .Select(n => n.Model)
+            .ToList();
+            
+        if (selectedNodes.Any())
+        {
+            var command = new AddGroupCommand(_canvas, group.Name, selectedNodes);
+            _commandManager.Execute(command);
+            SynchronizeWithModel();
+        }
     }
 
     private void RemoveGroup(NodeGroupViewModel? groupVM)
     {
-        if (groupVM == null) return;
+        if (groupVM?.Model == null) return;
+        
         var command = new RemoveGroupCommand(_canvas, groupVM.Model);
         _commandManager.Execute(command);
-    }
-
-    public IEnumerable<Type> SearchNodes(string searchText)
-    {
-        searchText = searchText.Trim().ToLower();
-        return _pluginService.NodeTypes
-            .Where(t => 
-            {
-                var node = _pluginService.CreateNode(t);
-                return node.Name.ToLower().Contains(searchText) ||
-                       node.Category.ToLower().Contains(searchText) ||
-                       node.Description.ToLower().Contains(searchText);
-            })
-            .ToList();
+        SynchronizeWithModel();
     }
 
     public NodePortViewModel? FindPortViewModel(IPort port)
     {
-        foreach (var node in _nodes)
+        foreach (var node in Nodes)
         {
-            var portVM = node.InputPorts.FirstOrDefault(p => p.Model == port) ??
-                        node.OutputPorts.FirstOrDefault(p => p.Model == port);
-            if (portVM != null)
-                return portVM;
+            var foundPort = node.InputPorts.FirstOrDefault(p => p.Model == port) ??
+                           node.OutputPorts.FirstOrDefault(p => p.Model == port);
+            if (foundPort != null)
+                return foundPort;
         }
         return null;
     }
 
     public NodeCanvas Model => _canvas;
-
-    private void ValidateConnections()
-    {
-        var invalidConnections = _canvas.Connections
-            .Where(c => !IsValidPort(c.Source) || !IsValidPort(c.Target))
-            .ToList();
-
-        foreach (var connection in invalidConnections)
-        {
-            var command = new DisconnectCommand(_canvas, connection);
-            _commandManager.Execute(command);
-        }
-    }
-
-    private bool IsValidPort(IPort port)
-    {
-        return _nodes.Any(n => 
-            n.InputPorts.Any(p => p.Model == port) || 
-            n.OutputPorts.Any(p => p.Model == port));
-    }
 } 

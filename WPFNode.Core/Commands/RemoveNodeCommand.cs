@@ -28,12 +28,12 @@ public class RemoveNodeCommand : ICommand
         {
             _canvas.Disconnect(connection);
         }
-        _canvas.Nodes.Remove(_node);
+        _canvas.RemoveNode(_node);
     }
 
     public void Undo()
     {
-        _canvas.Nodes.Add(_node);
+        _canvas.AddNode(_node);
         foreach (var connection in _connections)
         {
             _canvas.Connect(connection.Source, connection.Target);
