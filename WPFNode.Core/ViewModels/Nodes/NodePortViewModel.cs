@@ -134,7 +134,7 @@ public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
         return Id.GetHashCode();
     }
 
-    public static bool operator ==(NodePortViewModel? left, NodePortViewModel? right)
+    public static bool operator ==(NodePortViewModel left, NodePortViewModel? right)
     {
         if (ReferenceEquals(left, right)) return true;
         if (left is null || right is null) return false;

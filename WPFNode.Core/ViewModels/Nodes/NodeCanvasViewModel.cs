@@ -227,7 +227,7 @@ public partial class NodeCanvasViewModel : ObservableObject
         SynchronizeWithModel();
     }
 
-    public NodePortViewModel? FindPortViewModel(IPort port)
+    public NodePortViewModel FindPortViewModel(IPort port)
     {
         foreach (var node in Nodes)
         {

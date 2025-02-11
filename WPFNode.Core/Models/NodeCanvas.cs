@@ -1,7 +1,7 @@
 using System;
-using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Serialization;
 using WPFNode.Core.Commands;
 using WPFNode.Plugin.SDK;
 using WPFNode.Abstractions;
@@ -10,26 +10,48 @@ namespace WPFNode.Core.Models;
 
 public class NodeCanvas
 {
-    private readonly ObservableCollection<NodeBase> _nodes;
-    private readonly ObservableCollection<IConnection> _connections;
-    private readonly ObservableCollection<NodeGroup> _groups;
+    private readonly List<NodeBase> _nodes;
+    private readonly List<IConnection> _connections;
+    private readonly List<NodeGroup> _groups;
 
+    [JsonIgnore]
     public IReadOnlyList<NodeBase> Nodes => _nodes;
+    
+    [JsonIgnore]
     public IReadOnlyList<IConnection> Connections => _connections;
+    
+    [JsonIgnore]
     public IReadOnlyList<NodeGroup> Groups => _groups;
     
+    [JsonPropertyName("scale")]
     public double Scale { get; set; } = 1.0;
+    
+    [JsonPropertyName("offsetX")]
     public double OffsetX { get; set; }
+    
+    [JsonPropertyName("offsetY")]
     public double OffsetY { get; set; }
+    
+    [JsonIgnore]
     public CommandManager CommandManager { get; }
 
+    [JsonConstructor]
     public NodeCanvas()
     {
-        _nodes = new ObservableCollection<NodeBase>();
-        _connections = new ObservableCollection<IConnection>();
-        _groups = new ObservableCollection<NodeGroup>();
+        _nodes = new();
+        _connections = new();
+        _groups = new();
         CommandManager = new CommandManager();
     }
+
+    [JsonPropertyName("nodes")]
+    public List<NodeBase> SerializableNodes => _nodes;
+    
+    [JsonPropertyName("connections")]
+    public List<IConnection> SerializableConnections => _connections;
+    
+    [JsonPropertyName("groups")]
+    public List<NodeGroup> SerializableGroups => _groups;
 
     public void AddNode(NodeBase node)
     {

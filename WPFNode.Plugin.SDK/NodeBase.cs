@@ -5,17 +5,18 @@ using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using System.Reflection;
 using WPFNode.Abstractions;
+using WPFNode.Plugin.SDK.Attributes;
+using System.Text.Json.Serialization;
 
 namespace WPFNode.Plugin.SDK;
 
-public abstract class NodeBase : INode
+public abstract class NodeBase : INode, INotifyPropertyChanged
 {
     private string _name;
     private readonly string _category;
     private readonly string _description;
     private double _x;
     private double _y;
-    private bool _isSelected;
     private bool _isProcessing;
     private bool _isVisible = true;
     private readonly List<IPort> _inputPorts = new();
@@ -32,10 +33,12 @@ public abstract class NodeBase : INode
         _description = metadata.Description;
     }
 
+    [JsonPropertyName("id")]
+    public Guid Id { get; internal set; }
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public Guid Id { get; internal set; }
-    
+    [JsonPropertyName("name")]
     public string Name
     {
         get => _name;
@@ -45,22 +48,18 @@ public abstract class NodeBase : INode
     public string Category => _category;
     public string Description => _description;
     
+    [JsonPropertyName("x")]
     public double X
     {
         get => _x;
         set => SetProperty(ref _x, value);
     }
     
+    [JsonPropertyName("y")]
     public double Y
     {
         get => _y;
         set => SetProperty(ref _y, value);
-    }
-    
-    public bool IsSelected
-    {
-        get => _isSelected;
-        set => SetProperty(ref _isSelected, value);
     }
     
     public bool IsProcessing
@@ -75,7 +74,10 @@ public abstract class NodeBase : INode
         set => SetProperty(ref _isVisible, value);
     }
 
+    [JsonPropertyName("inputPorts")]
     public IReadOnlyList<IPort> InputPorts => _inputPorts;
+
+    [JsonPropertyName("outputPorts")]
     public IReadOnlyList<IPort> OutputPorts => _outputPorts;
 
     public abstract Task ProcessAsync();

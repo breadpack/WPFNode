@@ -1,6 +1,9 @@
+using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Text.Json.Serialization;
 using System.Windows.Media;
 using WPFNode.Plugin.SDK;
 
@@ -15,7 +18,9 @@ public class NodeGroup : INotifyPropertyChanged
     private double _height;
     private bool _isCollapsed;
     private Color _color;
+    private readonly List<NodeBase> _nodes = new();
 
+    [JsonConstructor]
     public NodeGroup(string id, string name)
     {
         Id = id;
@@ -29,10 +34,10 @@ public class NodeGroup : INotifyPropertyChanged
         Nodes.CollectionChanged += (s, e) => UpdateBounds();
     }
 
-    public event PropertyChangedEventHandler? PropertyChanged;
-
+    [JsonPropertyName("id")]
     public string Id { get; }
 
+    [JsonPropertyName("name")]
     public string Name
     {
         get => _name;
@@ -46,6 +51,7 @@ public class NodeGroup : INotifyPropertyChanged
         }
     }
 
+    [JsonPropertyName("x")]
     public double X
     {
         get => _x;
@@ -59,6 +65,7 @@ public class NodeGroup : INotifyPropertyChanged
         }
     }
 
+    [JsonPropertyName("y")]
     public double Y
     {
         get => _y;
@@ -72,6 +79,7 @@ public class NodeGroup : INotifyPropertyChanged
         }
     }
 
+    [JsonPropertyName("width")]
     public double Width
     {
         get => _width;
@@ -85,6 +93,7 @@ public class NodeGroup : INotifyPropertyChanged
         }
     }
 
+    [JsonPropertyName("height")]
     public double Height
     {
         get => _height;
@@ -98,6 +107,7 @@ public class NodeGroup : INotifyPropertyChanged
         }
     }
 
+    [JsonPropertyName("isCollapsed")]
     public bool IsCollapsed
     {
         get => _isCollapsed;
@@ -116,6 +126,7 @@ public class NodeGroup : INotifyPropertyChanged
         }
     }
 
+    [JsonPropertyName("color")]
     public Color Color
     {
         get => _color;
@@ -147,6 +158,7 @@ public class NodeGroup : INotifyPropertyChanged
         }
     }
 
+    [JsonPropertyName("nodes")]
     public ObservableCollection<NodeBase> Nodes { get; }
 
     private void UpdateBounds()
@@ -198,6 +210,8 @@ public class NodeGroup : INotifyPropertyChanged
 
         IsAutoSize = false;  // 수동 크기 조절 모드로 전환
     }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {

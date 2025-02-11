@@ -3,6 +3,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using WPFNode.Plugin.SDK;
+using WPFNode.Plugin.SDK.Attributes;
 
 namespace WPFNode.Tests.Models
 {

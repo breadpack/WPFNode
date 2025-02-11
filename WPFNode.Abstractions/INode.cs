@@ -13,7 +13,6 @@ public interface INode : INotifyPropertyChanged
     string Description { get; }
     double X { get; set; }
     double Y { get; set; }
-    bool IsSelected { get; set; }
     bool IsProcessing { get; }
     
     IReadOnlyList<IPort> InputPorts { get; }

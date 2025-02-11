@@ -27,7 +27,6 @@ public class NodeViewModel : ViewModelBase
         _commandService = commandService;
         _name = model.Name;
         _position = new Point(model.X, model.Y);
-        _isSelected = model.IsSelected;
         
         _inputPorts = new ObservableCollection<NodePortViewModel>(
             model.InputPorts.Select(p => new NodePortViewModel(p, canvas)));
@@ -57,9 +56,6 @@ public class NodeViewModel : ViewModelBase
                     break;
                 case nameof(NodeBase.Name):
                     Name = _model.Name;
-                    break;
-                case nameof(NodeBase.IsSelected):
-                    IsSelected = _model.IsSelected;
                     break;
             }
         };
@@ -95,13 +91,7 @@ public class NodeViewModel : ViewModelBase
     public bool IsSelected
     {
         get => _isSelected;
-        set
-        {
-            if (SetProperty(ref _isSelected, value))
-            {
-                _model.IsSelected = value;
-            }
-        }
+        set => SetProperty(ref _isSelected, value);
     }
 
     public IReadOnlyList<NodePortViewModel> InputPorts => _inputPorts;

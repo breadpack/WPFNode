@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using WPFNode.Abstractions;
 
 namespace WPFNode.Plugin.SDK;
@@ -13,7 +14,7 @@ public abstract class PortBase : IPort
     private          bool              _isConnected;
     private readonly List<IConnection> _connections = new();
 
-    public PortBase(string name, Type dataType, bool isInput)
+    protected PortBase(string name, Type dataType, bool isInput)
     {
         Id = Guid.NewGuid();
         _name = name;
@@ -23,8 +24,10 @@ public abstract class PortBase : IPort
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    [JsonPropertyName("id")]
     public Guid Id { get; internal set; }
     
+    [JsonPropertyName("name")]
     public string Name
     {
         get => _name;
@@ -38,9 +41,13 @@ public abstract class PortBase : IPort
         }
     }
 
+    [JsonPropertyName("dataType")]
     public Type DataType { get; }
+
+    [JsonPropertyName("isInput")]
     public bool IsInput { get; }
     
+    [JsonPropertyName("isConnected")]
     public bool IsConnected
     {
         get => _isConnected;
@@ -54,6 +61,7 @@ public abstract class PortBase : IPort
         }
     }
 
+    [JsonPropertyName("value")]
     public object? Value
     {
         get => _value;
@@ -71,6 +79,7 @@ public abstract class PortBase : IPort
         }
     }
 
+    [JsonPropertyName("connections")]
     public IReadOnlyList<IConnection> Connections => _connections;
 
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
