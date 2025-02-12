@@ -11,6 +11,10 @@
     <ProjectReference Include="..\WPFNode.Core\WPFNode.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Reference Include="System.Drawing.Common" />
+  </ItemGroup>
+
   <PropertyGroup>
     <DefaultWpfTheme>Generic</DefaultWpfTheme>
     <ThemeInherited>true</ThemeInherited>

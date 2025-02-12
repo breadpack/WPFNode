@@ -1,7 +1,6 @@
 using WPFNode.Core.ViewModels.Base;
 using System.Collections.ObjectModel;
 using System.Linq;
-using WPFNode.Plugin.SDK;
 using WPFNode.Abstractions;
 
 namespace WPFNode.Core.ViewModels.Nodes;

@@ -1,4 +1,4 @@
-﻿namespace WPFNode.Plugin.SDK.Attributes;
+﻿namespace WPFNode.Core.Attributes;
 
 [AttributeUsage(AttributeTargets.Class)]
 public class NodeCategoryAttribute : Attribute

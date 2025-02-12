@@ -6,7 +6,7 @@ using System.Linq;
 using Microsoft.Extensions.Logging;
 using WPFNode.Abstractions;
 using WPFNode.Core.Interfaces;
-using WPFNode.Plugin.SDK;
+using WPFNode.Core.Models;
 
 namespace WPFNode.Core.Services;
 
@@ -93,7 +93,7 @@ public class NodePluginService : INodePluginService
 
         try
         {
-            _nodeTypes[nodeType] = Plugin.SDK.NodeBase.GetNodeMetadata(nodeType);
+            _nodeTypes[nodeType] = NodeBase.GetNodeMetadata(nodeType);
             _logger?.LogInformation("노드 타입 등록 성공: {Type}", nodeType.Name);
         }
         catch (Exception ex)
@@ -113,7 +113,6 @@ public class NodePluginService : INodePluginService
         try
         {
             var node = (INode)Activator.CreateInstance(nodeType)!;
-            node.Initialize();
             return node;
         }
         catch (Exception ex)

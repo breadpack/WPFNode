@@ -6,18 +6,19 @@ using WPFNode.Core.ViewModels.Base;
 using CommunityToolkit.Mvvm.Input;
 using WPFNode.Core.Interfaces;
 using WPFNode.Core.Services;
-using WPFNode.Plugin.SDK;
 using System.Collections.Specialized;
+using System.Linq;
+using System.Reflection;
 
 namespace WPFNode.Core.ViewModels.Nodes;
 
 public class NodeViewModel : ViewModelBase
 {
-    private readonly NodeBase                                    _model;
-    private readonly INodeCommandService                     _commandService;
-    private          Point                                   _position;
-    private          string                                  _name;
-    private          bool                                    _isSelected;
+    private readonly NodeBase _model;
+    private readonly INodeCommandService _commandService;
+    private Point _position;
+    private string _name;
+    private bool _isSelected;
     private readonly ObservableCollection<NodePortViewModel> _inputPorts;
     private readonly ObservableCollection<NodePortViewModel> _outputPorts;
 
@@ -115,7 +116,6 @@ public class NodeViewModel : ViewModelBase
         }
     }
 
-    // 노드 타입별 커맨드 실행
     public bool ExecuteCommand(string commandName, object? parameter = null)
     {
         return _commandService.ExecuteCommand(_model.Id, commandName, parameter);
@@ -126,7 +126,6 @@ public class NodeViewModel : ViewModelBase
         return _commandService.CanExecuteCommand(_model.Id, commandName, parameter);
     }
 
-    // 노드 타입별 커맨드 조회
     public ICommand? GetCommand(string commandName)
     {
         return new RelayCommand(

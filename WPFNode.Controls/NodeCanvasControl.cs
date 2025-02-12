@@ -12,9 +12,9 @@ using WPFNode.Core.ViewModels.Nodes;
 using System.Reflection;
 using System.ComponentModel;
 using WPFNode.Abstractions;
-using WPFNode.Plugin.SDK;
 using System.IO;
 using System.Collections.Specialized;
+using WPFNode.Core.Models;
 
 namespace WPFNode.Controls;
 
@@ -35,39 +35,7 @@ public class NodeCanvasControl : Control
     public bool IsDraggingPort => _dragStartPort != null;
     public NodePortViewModel? DraggingPort => _dragStartPort;
 
-    private NodeCanvasViewModel? _previousViewModel;
-
-    public NodeCanvasViewModel? ViewModel
-    {
-        get => (NodeCanvasViewModel?)DataContext;
-        set
-        {
-            if (_previousViewModel != null)
-            {
-                _stateManager.Cleanup(_previousViewModel);
-            }
-
-            var newViewModel = (NodeCanvasViewModel?)value;
-            if (newViewModel != null)
-            {
-                _stateManager.Initialize(newViewModel);
-            }
-
-            _previousViewModel = newViewModel;
-            DataContext = value;
-        }
-    }
-
-    private static void OnViewModelChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-    {
-        if (d is NodeCanvasControl control) {
-            System.Diagnostics.Debug.WriteLine($"NodeCanvasControl ViewModel changed: {e.NewValue}");
-            if (e.NewValue is NodeCanvasViewModel viewModel)
-            {
-                System.Diagnostics.Debug.WriteLine($"Current node count: {viewModel.Nodes.Count}");
-            }
-        }
-    }
+    public NodeCanvasViewModel? ViewModel => DataContext as NodeCanvasViewModel;
 
     static NodeCanvasControl()
     {
@@ -110,7 +78,21 @@ public class NodeCanvasControl : Control
         }
         
         _stateManager = new NodeCanvasStateManager(this);
+        DataContextChanged += OnDataContextChanged;
         Initialize();
+    }
+
+    private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (e.OldValue is NodeCanvasViewModel oldViewModel)
+        {
+            _stateManager.Cleanup(oldViewModel);
+        }
+
+        if (e.NewValue is NodeCanvasViewModel newViewModel)
+        {
+            _stateManager.Initialize(newViewModel);
+        }
     }
 
     private void Initialize()

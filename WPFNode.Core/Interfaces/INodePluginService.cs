@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using WPFNode.Abstractions;
 using WPFNode.Core.Models;
-using WPFNode.Plugin.SDK;
 
 namespace WPFNode.Core.Interfaces;
 

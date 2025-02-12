@@ -9,7 +9,6 @@ using WPFNode.Core.Models;
 using WPFNode.Core.Services;
 using WPFNode.Core.ViewModels.Nodes;
 using WPFNode.Core.Interfaces;
-using WPFNode.Plugin.SDK;
 
 namespace WPFNode.Controls;
 

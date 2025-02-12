@@ -18,7 +18,6 @@
   <ItemGroup>
     <ProjectReference Include="..\WPFNode.Abstractions\WPFNode.Abstractions.csproj" />
     <ProjectReference Include="..\WPFNode.Core\WPFNode.Core.csproj" />
-    <ProjectReference Include="..\WPFNode.Plugin.SDK\WPFNode.Plugin.SDK.csproj" />
   </ItemGroup>
 
 </Project> 

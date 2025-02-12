@@ -1,11 +1,10 @@
-using System;
 using WPFNode.Abstractions;
 
-namespace WPFNode.Plugin.SDK;
+namespace WPFNode.Core.Models;
 
 public class OutputPort<T> : PortBase, IPort<T>
 {
-    public OutputPort(string name) : base(name, typeof(T), false)
+    public OutputPort(string name, INode node) : base(name, typeof(T), false, node)
     {
     }
 

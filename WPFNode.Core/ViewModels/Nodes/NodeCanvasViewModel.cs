@@ -12,7 +12,6 @@ using WPFNode.Core.Interfaces;
 using WPFNode.Abstractions;
 using WPFNode.Core.Commands;
 using IWpfCommand = System.Windows.Input.ICommand;
-using WPFNode.Plugin.SDK;
 using System.Collections.Specialized;
 
 namespace WPFNode.Core.ViewModels.Nodes;
@@ -57,7 +56,7 @@ public partial class NodeCanvasViewModel : ObservableObject
         _commandManager = new WPFNode.Core.Commands.CommandManager();
         
         Nodes = new ObservableCollection<NodeViewModel>(
-            canvas.Nodes.Select(n => new NodeViewModel(n, commandService, this)));
+            canvas.Nodes.Select(n => CreateNodeViewModel(n)));
         
         Connections = new ObservableCollection<ConnectionViewModel>(
             canvas.Connections.Select(c => new ConnectionViewModel(c, this)));
@@ -82,7 +81,7 @@ public partial class NodeCanvasViewModel : ObservableObject
         Nodes.Clear();
         foreach (var node in _canvas.Nodes)
         {
-            Nodes.Add(new NodeViewModel(node, _commandService, this));
+            Nodes.Add(CreateNodeViewModel(node));
         }
 
         // 연결 동기화
@@ -98,6 +97,11 @@ public partial class NodeCanvasViewModel : ObservableObject
         {
             Groups.Add(new NodeGroupViewModel(group, this));
         }
+    }
+
+    private NodeViewModel CreateNodeViewModel(NodeBase node)
+    {
+        return new NodeViewModel(node, _commandService, this);
     }
 
     private void ExecuteAddNode(Type? nodeType)

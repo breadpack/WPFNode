@@ -1,4 +1,4 @@
-﻿namespace WPFNode.Plugin.SDK.Attributes;
+﻿namespace WPFNode.Core.Attributes;
 
 [AttributeUsage(AttributeTargets.Property)]
 public class PortLabelAttribute : Attribute

@@ -1,6 +1,5 @@
 ﻿using WPFNode.Abstractions;
 using WPFNode.Core.Models;
-using WPFNode.Plugin.SDK;
 
 namespace WPFNode.Core.Commands;
 

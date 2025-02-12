@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Serialization;
 using WPFNode.Core.Commands;
-using WPFNode.Plugin.SDK;
 using WPFNode.Abstractions;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace WPFNode.Core.Models;
 
@@ -159,5 +160,81 @@ public class NodeCanvas
         if (!_groups.Contains(group)) return;
         
         _groups.Remove(group);
+    }
+
+    public async Task ExecuteAsync(CancellationToken cancellationToken = default)
+    {
+        var context = new ExecutionContext();
+        var executionOrder = GetExecutionOrder();
+        
+        foreach (var node in executionOrder)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                break;
+
+            try
+            {
+                context.SetNodeState(node, NodeExecutionState.Running);
+                await node.ProcessAsync();
+                context.SetNodeState(node, NodeExecutionState.Completed);
+            }
+            catch (Exception ex)
+            {
+                context.SetNodeState(node, NodeExecutionState.Failed);
+                throw new NodeExecutionException($"Node '{node.Name}' execution failed", ex);
+            }
+        }
+    }
+
+    private List<NodeBase> GetExecutionOrder()
+    {
+        var visited = new HashSet<Guid>();
+        var executionOrder = new List<NodeBase>();
+        var inProcess = new HashSet<Guid>();
+
+        foreach (var node in _nodes)
+        {
+            if (!visited.Contains(node.Id))
+            {
+                VisitNode(node, visited, inProcess, executionOrder);
+            }
+        }
+
+        return executionOrder;
+    }
+
+    private void VisitNode(NodeBase node, HashSet<Guid> visited, HashSet<Guid> inProcess, List<NodeBase> executionOrder)
+    {
+        if (inProcess.Contains(node.Id))
+            throw new InvalidOperationException("Circular dependency detected in node graph");
+
+        if (visited.Contains(node.Id))
+            return;
+
+        inProcess.Add(node.Id);
+
+        // Get all nodes that provide input to current node's input ports
+        var dependencies = _connections
+            .Where(c => c.Target.Node == node)
+            .Select(c => c.Source.Node as NodeBase)
+            .Where(n => n != null)
+            .Distinct();
+
+        foreach (var dependency in dependencies)
+        {
+            VisitNode(dependency!, visited, inProcess, executionOrder);
+        }
+
+        visited.Add(node.Id);
+        inProcess.Remove(node.Id);
+        executionOrder.Add(node);
+    }
+}
+
+public class NodeExecutionException : Exception
+{
+    public NodeExecutionException(string message, Exception innerException)
+        : base(message, innerException)
+    {
     }
 } 

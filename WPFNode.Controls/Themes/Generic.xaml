@@ -4,7 +4,10 @@
     xmlns:local="clr-namespace:WPFNode.Controls"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:nodes="clr-namespace:WPFNode.Core.ViewModels.Nodes;assembly=WPFNode.Core">
+    xmlns:nodes="clr-namespace:WPFNode.Core.ViewModels.Nodes;assembly=WPFNode.Core"
+    xmlns:behaviors="clr-namespace:WPFNode.Controls.Behaviors"
+    xmlns:commands="clr-namespace:WPFNode.Controls.Commands"
+    xmlns:media="clr-namespace:System.Windows.Media;assembly=PresentationCore">
 
     <Style TargetType="{x:Type local:NodeControl}">
         <Setter Property="Template">
@@ -300,5 +303,77 @@
     <local:BoolToAlignmentConverter x:Key="BoolToAlignmentConverter" TrueValue="Left" FalseValue="Right"/>
     <local:BoolToTextAlignmentConverter x:Key="BoolToTextAlignmentConverter" TrueValue="Left" FalseValue="Right"/>
     <local:BoolToMarginConverter x:Key="BoolToMarginConverter" TrueValue="4,0,0,0" FalseValue="0,0,4,0"/>
+
+    <DataTemplate x:Key="TextBoxTemplate">
+        <TextBox Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                 MinWidth="60"/>
+    </DataTemplate>
+
+    <DataTemplate x:Key="NumberBoxTemplate">
+        <Grid behaviors:NumberBoxCommandBehavior.CommandBindings="True">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBox Grid.Column="0"
+                     Text="{Binding Value, Mode=TwoWay, StringFormat={Binding Format}, UpdateSourceTrigger=PropertyChanged}"
+                     MinWidth="60"/>
+            <StackPanel Grid.Column="1" Orientation="Vertical" Width="16">
+                <Button Content="▲" Height="12" Padding="0" 
+                        Command="{x:Static commands:NumberBoxCommands.Increment}"
+                        CommandParameter="{Binding}"/>
+                <Button Content="▼" Height="12" Padding="0" 
+                        Command="{x:Static commands:NumberBoxCommands.Decrement}"
+                        CommandParameter="{Binding}"/>
+            </StackPanel>
+        </Grid>
+    </DataTemplate>
+
+    <DataTemplate x:Key="CheckBoxTemplate">
+        <CheckBox IsChecked="{Binding Value, Mode=TwoWay}"
+                  VerticalAlignment="Center"/>
+    </DataTemplate>
+
+    <DataTemplate x:Key="ColorPickerTemplate">
+        <ComboBox SelectedValue="{Binding Value, Mode=TwoWay}"
+                  MinWidth="60">
+            <ComboBox.ItemsSource>
+                <x:Array Type="media:Color">
+                    <media:Color>Red</media:Color>
+                    <media:Color>Green</media:Color>
+                    <media:Color>Blue</media:Color>
+                    <media:Color>Yellow</media:Color>
+                    <media:Color>Orange</media:Color>
+                    <media:Color>Purple</media:Color>
+                    <media:Color>Pink</media:Color>
+                    <media:Color>Brown</media:Color>
+                    <media:Color>Gray</media:Color>
+                    <media:Color>White</media:Color>
+                    <media:Color>Black</media:Color>
+                </x:Array>
+            </ComboBox.ItemsSource>
+            <ComboBox.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Orientation="Horizontal">
+                        <Rectangle Width="16" Height="16" Margin="0,0,4,0">
+                            <Rectangle.Fill>
+                                <SolidColorBrush Color="{Binding}"/>
+                            </Rectangle.Fill>
+                        </Rectangle>
+                        <TextBlock Text="{Binding}"/>
+                    </StackPanel>
+                </DataTemplate>
+            </ComboBox.ItemTemplate>
+        </ComboBox>
+    </DataTemplate>
+
+    <DataTemplate x:Key="MultilineTextTemplate">
+        <TextBox Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                 MinWidth="60"
+                 MinHeight="60"
+                 AcceptsReturn="True"
+                 TextWrapping="Wrap"
+                 VerticalScrollBarVisibility="Auto"/>
+    </DataTemplate>
 
 </ResourceDictionary> 

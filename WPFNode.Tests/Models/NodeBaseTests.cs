@@ -2,8 +2,8 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using WPFNode.Plugin.SDK;
-using WPFNode.Plugin.SDK.Attributes;
+using WPFNode.Core.Attributes;
+using WPFNode.Core.Models;
 
 namespace WPFNode.Tests.Models
 {
@@ -89,9 +89,9 @@ namespace WPFNode.Tests.Models
 
         public TestAdditionNode()
         {
-            _inputA = new InputPort<double>("A");
-            _inputB = new InputPort<double>("B");
-            _output = new OutputPort<double>("결과");
+            _inputA = new InputPort<double>("A", this);
+            _inputB = new InputPort<double>("B", this);
+            _output = new OutputPort<double>("결과", this);
         }
 
         protected override void InitializePorts()

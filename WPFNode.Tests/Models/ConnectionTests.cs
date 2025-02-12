@@ -2,21 +2,24 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using WPFNode.Abstractions;
 using WPFNode.Core.Models;
-using WPFNode.Plugin.SDK;
 
 namespace WPFNode.Tests.Models
 {
     [TestClass]
     public class ConnectionTests
     {
+        private TestNode _sourceNode;
+        private TestNode _targetNode;
         private IPort _sourcePort;
         private IPort _targetPort;
 
         [TestInitialize]
         public void Setup()
         {
-            _sourcePort = new OutputPort<double>("Source");
-            _targetPort = new InputPort<double>("Target");
+            _sourceNode = new TestNode();
+            _targetNode = new TestNode();
+            _sourcePort = _sourceNode.DoubleOutput;
+            _targetPort = _targetNode.DoubleInput;
         }
 
         [TestMethod]
@@ -62,8 +65,7 @@ namespace WPFNode.Tests.Models
         public void IsValid_IncompatibleTypes_ReturnsFalse()
         {
             // Arrange
-            var stringPort = new InputPort<string>("StringTarget");
-            var connection = new Connection(_sourcePort, stringPort);
+            var connection = new Connection(_sourcePort, _targetNode.StringInput);
             
             // Act & Assert
             Assert.IsFalse(connection.IsValid);

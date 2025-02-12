@@ -3,7 +3,6 @@ using System;
 using System.Linq;
 using WPFNode.Abstractions;
 using WPFNode.Core.Models;
-using WPFNode.Plugin.SDK;
 
 namespace WPFNode.Tests.Models
 {

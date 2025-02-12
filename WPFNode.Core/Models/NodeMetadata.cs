@@ -1,6 +1,4 @@
-using System;
-
-namespace WPFNode.Plugin.SDK;
+namespace WPFNode.Core.Models;
 
 public class NodeMetadata
 {

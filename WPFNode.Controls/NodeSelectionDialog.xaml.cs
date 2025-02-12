@@ -5,7 +5,6 @@ using System.Windows;
 using System.Windows.Controls;
 using WPFNode.Core.Interfaces;
 using WPFNode.Core.Models;
-using WPFNode.Plugin.SDK;
 
 namespace WPFNode.Controls
 {

@@ -5,12 +5,14 @@ using System.Windows.Media;
 using WPFNode.Core.Models;
 using WPFNode.Core.ViewModels.Nodes;
 using System.Windows.Markup;
-using WPFNode.Plugin.SDK;
+using WPFNode.Abstractions.Controls;
+using System.Reflection;
+using WPFNode.Core.Attributes;
 
 namespace WPFNode.Controls;
 
 [ContentProperty(nameof(Content))]
-public class NodeControl : Control
+public class NodeControl : ContentControl, INodeControl
 {
     private Point? _dragStart;
     private Point _nodeStartPosition;
@@ -35,10 +37,36 @@ public class NodeControl : Control
             typeof(NodeControl),
             new PropertyMetadata(null));
 
+    public static readonly DependencyProperty HeaderContentProperty =
+        DependencyProperty.Register(
+            nameof(HeaderContent),
+            typeof(object),
+            typeof(NodeControl),
+            new PropertyMetadata(null));
+
+    public static readonly DependencyProperty HeaderBackgroundProperty =
+        DependencyProperty.Register(
+            nameof(HeaderBackground),
+            typeof(Brush),
+            typeof(NodeControl),
+            new PropertyMetadata(null));
+
     public object? Content
     {
         get => GetValue(ContentProperty);
         set => SetValue(ContentProperty, value);
+    }
+
+    public object HeaderContent
+    {
+        get => GetValue(HeaderContentProperty);
+        set => SetValue(HeaderContentProperty, value);
+    }
+
+    public Brush HeaderBackground
+    {
+        get => (Brush)GetValue(HeaderBackgroundProperty);
+        set => SetValue(HeaderBackgroundProperty, value);
     }
 
     public NodeControl()
@@ -52,6 +80,7 @@ public class NodeControl : Control
         MouseMove += OnNodeDrag;
 
         InitializeContextMenu();
+        DataContextChanged += OnDataContextChanged;
     }
 
     private void InitializeContextMenu()
@@ -190,6 +219,47 @@ public class NodeControl : Control
             }
 
             e.Handled = true;
+        }
+    }
+
+    private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (e.NewValue is NodeViewModel viewModel)
+        {
+            var nodeType = viewModel.Model.GetType();
+            var styleAttribute = nodeType.GetCustomAttribute<NodeStyleAttribute>();
+            
+            if (styleAttribute != null)
+            {
+                var resourceKey = styleAttribute.StyleResourceKey;
+                Style? style = null;
+
+                // 1. 현재 컨트롤의 리소스에서 검색
+                style = TryFindResource(resourceKey) as Style;
+
+                // 2. 부모 요소들의 리소스에서 검색
+                if (style == null)
+                {
+                    var parent = this.GetParentOfType<NodeCanvasControl>();
+                    if (parent != null)
+                    {
+                        style = parent.TryFindResource(resourceKey) as Style;
+                    }
+                }
+
+                // 3. Application 리소스에서 검색
+                if (style == null)
+                {
+                    style = Application.Current.TryFindResource(resourceKey) as Style;
+                }
+
+                if (style != null)
+                {
+                    Style = style;
+                }
+            }
+
+            HeaderContent = viewModel.Model.Name;
         }
     }
 

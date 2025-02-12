@@ -1,0 +1,30 @@
+using System.Threading.Tasks;
+using WPFNode.Core.Attributes;
+using WPFNode.Plugins.Basic.Constants;
+using WPFNode.Plugins.Basic.Primitives.Base;
+
+namespace WPFNode.Plugins.Basic.Primitives;
+
+[NodeName("Double Input")]
+[NodeCategory("Primitives")]
+[NodeDescription("실수 값을 입력받는 노드입니다.")]
+[NodeStyle(StyleKeys.Input.Double)]
+public class DoubleInputNode : NumberInputNodeBase<double>
+{
+    [NodeProperty("Value", NodePropertyControlType.NumberBox, "F2")]
+    public override double Value
+    {
+        get => base.Value;
+        set => base.Value = value;
+    }
+
+    protected override void OnIncrement()
+    {
+        Value += 1.0;
+    }
+
+    protected override void OnDecrement()
+    {
+        Value -= 1.0;
+    }
+} 

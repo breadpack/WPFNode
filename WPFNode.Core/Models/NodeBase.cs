@@ -1,14 +1,11 @@
-using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
 using System.Reflection;
-using WPFNode.Abstractions;
-using WPFNode.Plugin.SDK.Attributes;
+using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
+using WPFNode.Abstractions;
+using WPFNode.Core.Attributes;
 
-namespace WPFNode.Plugin.SDK;
+namespace WPFNode.Core.Models;
 
 public abstract class NodeBase : INode, INotifyPropertyChanged
 {
@@ -101,10 +98,7 @@ public abstract class NodeBase : INode, INotifyPropertyChanged
         InitializePorts();
     }
 
-    protected virtual void InitializePorts()
-    {
-        // 파생 클래스에서 포트 초기화를 구현
-    }
+    protected abstract void InitializePorts();
 
     protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {

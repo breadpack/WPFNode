@@ -1,0 +1,102 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:abstractions="clr-namespace:WPFNode.Abstractions.Controls;assembly=WPFNode.Abstractions"
+    xmlns:commands="clr-namespace:WPFNode.Controls.Commands;assembly=WPFNode.Controls"
+    xmlns:controls="clr-namespace:WPFNode.Controls;assembly=WPFNode.Controls"
+    xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
+    xmlns:system="clr-namespace:System;assembly=System.Runtime">
+
+    <!-- 기본 입력 노드 스타일 -->
+    <Style x:Key="Basic.InputNode.Base"
+           TargetType="{x:Type controls:NodeControl}"
+           BasedOn="{StaticResource {x:Type controls:NodeControl}}">
+        <Setter Property="HeaderContent" Value="{Binding Model.Name}" />
+    </Style>
+
+    <!-- 정수 입력 노드 스타일 -->
+    <Style x:Key="Basic.InputNode.Integer"
+           BasedOn="{StaticResource Basic.InputNode.Base}"
+           TargetType="{x:Type controls:NodeControl}">
+        <Setter Property="HeaderBackground" Value="#FF3D3D50" />
+        <Setter Property="Content">
+            <Setter.Value>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition MinWidth="30"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <xctk:IntegerUpDown Grid.Column="0"
+                                        Value="{Binding Model.Value, UpdateSourceTrigger=PropertyChanged}"
+                                        Background="#FF2D2D30"
+                                        Foreground="White"
+                                        BorderBrush="#FF3D3D40"
+                                        Minimum="{x:Static system:Int32.MinValue}"
+                                        Maximum="{x:Static system:Int32.MaxValue}"
+                                        ShowButtonSpinner="True"
+                                        AllowSpin="True"
+                                        ButtonSpinnerLocation="Right"
+                                        Width="100"/>
+                </Grid>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 실수 입력 노드 스타일 -->
+    <Style x:Key="Basic.InputNode.Double"
+           BasedOn="{StaticResource Basic.InputNode.Base}"
+           TargetType="{x:Type controls:NodeControl}">
+        <Setter Property="HeaderBackground" Value="#FF3D3D50" />
+        <Setter Property="Content">
+            <Setter.Value>
+                <xctk:DoubleUpDown Value="{Binding Model.Value, UpdateSourceTrigger=PropertyChanged}"
+                                  Background="#FF2D2D30"
+                                  Foreground="White"
+                                  BorderBrush="#FF3D3D40"
+                                  Minimum="{x:Static system:Double.MinValue}"
+                                  Maximum="{x:Static system:Double.MaxValue}"
+                                  ShowButtonSpinner="True"
+                                  AllowSpin="True"
+                                  ButtonSpinnerLocation="Right"
+                                  FormatString="F2"
+                                  Width="100"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 문자열 입력 노드 스타일 -->
+    <Style x:Key="Basic.InputNode.String"
+           BasedOn="{StaticResource Basic.InputNode.Base}"
+           TargetType="{x:Type controls:NodeControl}">
+        <Setter Property="HeaderBackground" Value="#FF3D503D" />
+        <Setter Property="Content">
+            <Setter.Value>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0"
+                             Text="{Binding Model.Value, UpdateSourceTrigger=PropertyChanged}"
+                             Background="#FF2D3D2D"
+                             Foreground="White"
+                             BorderBrush="#FF3D4D3D"/>
+                </Grid>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 불리언 입력 노드 스타일 -->
+    <Style x:Key="Basic.InputNode.Boolean"
+           BasedOn="{StaticResource Basic.InputNode.Base}"
+           TargetType="{x:Type controls:NodeControl}">
+        <Setter Property="HeaderBackground" Value="#FF503D3D" />
+        <Setter Property="Content">
+            <Setter.Value>
+                <CheckBox IsChecked="{Binding Model.Value, UpdateSourceTrigger=PropertyChanged}"
+                          Foreground="White" />
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

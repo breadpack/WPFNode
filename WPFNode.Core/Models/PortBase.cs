@@ -1,11 +1,8 @@
-using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Collections.Generic;
-using System.Text.Json.Serialization;
 using WPFNode.Abstractions;
 
-namespace WPFNode.Plugin.SDK;
+namespace WPFNode.Core.Models;
 
 public abstract class PortBase : IPort
 {
@@ -13,21 +10,21 @@ public abstract class PortBase : IPort
     private          object?           _value;
     private          bool              _isConnected;
     private readonly List<IConnection> _connections = new();
+    private readonly INode             _node;
 
-    protected PortBase(string name, Type dataType, bool isInput)
+    protected PortBase(string name, Type dataType, bool isInput, INode node)
     {
         Id = Guid.NewGuid();
         _name = name;
         DataType = dataType;
         IsInput = isInput;
+        _node = node ?? throw new ArgumentNullException(nameof(node));
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    [JsonPropertyName("id")]
     public Guid Id { get; internal set; }
     
-    [JsonPropertyName("name")]
     public string Name
     {
         get => _name;
@@ -41,13 +38,10 @@ public abstract class PortBase : IPort
         }
     }
 
-    [JsonPropertyName("dataType")]
     public Type DataType { get; }
 
-    [JsonPropertyName("isInput")]
     public bool IsInput { get; }
     
-    [JsonPropertyName("isConnected")]
     public bool IsConnected
     {
         get => _isConnected;
@@ -61,7 +55,6 @@ public abstract class PortBase : IPort
         }
     }
 
-    [JsonPropertyName("value")]
     public object? Value
     {
         get => _value;
@@ -79,8 +72,9 @@ public abstract class PortBase : IPort
         }
     }
 
-    [JsonPropertyName("connections")]
     public IReadOnlyList<IConnection> Connections => _connections;
+
+    public INode Node => _node;
 
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
