@@ -16,7 +16,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\WPFNode.Abstractions\WPFNode.Abstractions.csproj" />
     <ProjectReference Include="..\WPFNode.Core\WPFNode.Core.csproj" />
   </ItemGroup>
 

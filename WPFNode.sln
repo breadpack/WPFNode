@@ -42,14 +42,14 @@ Global
 		{71DC9E67-05C3-4C78-9854-67F10384DB5D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{71DC9E67-05C3-4C78-9854-67F10384DB5D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{71DC9E67-05C3-4C78-9854-67F10384DB5D}.Release|Any CPU.Build.0 = Release|Any CPU
-		{5678E567-5678-5678-5678-567890134EFG}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{5678E567-5678-5678-5678-567890134EFG}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{5678E567-5678-5678-5678-567890134EFG}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{5678E567-5678-5678-5678-567890134EFG}.Release|Any CPU.Build.0 = Release|Any CPU
 		{9389CCC8-801C-4D41-8800-CACAB96D6803}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{9389CCC8-801C-4D41-8800-CACAB96D6803}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9389CCC8-801C-4D41-8800-CACAB96D6803}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9389CCC8-801C-4D41-8800-CACAB96D6803}.Release|Any CPU.Build.0 = Release|Any CPU
+		{00000000-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{00000000-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{00000000-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{00000000-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
