@@ -4,15 +4,7 @@
     <TargetFramework>net9.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
   </PropertyGroup>
-
-  <ItemGroup>
-    <Reference Include="PresentationCore">
-      <HintPath>..\..\..\Program Files\dotnet\shared\Microsoft.WindowsDesktop.App\9.0.1\PresentationCore.dll</HintPath>
-    </Reference>
-    <Reference Include="PresentationFramework">
-      <HintPath>..\..\..\Program Files\dotnet\shared\Microsoft.WindowsDesktop.App\9.0.1\PresentationFramework.dll</HintPath>
-    </Reference>
-  </ItemGroup>
 
 </Project> 

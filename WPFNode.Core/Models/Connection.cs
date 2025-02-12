@@ -9,7 +9,7 @@ public class Connection : IConnection
     private bool _isEnabled = true;
 
     [JsonConstructor]
-    public Connection(IPort source, IPort target)
+    public Connection(IOutputPort source, IInputPort target)
     {
         Source = source ?? throw new ArgumentNullException(nameof(source));
         Target = target ?? throw new ArgumentNullException(nameof(target));
@@ -20,10 +20,10 @@ public class Connection : IConnection
     public Guid Id { get; }
     
     [JsonPropertyName("source")]
-    public IPort Source { get; }
+    public IOutputPort Source { get; }
     
     [JsonPropertyName("target")]
-    public IPort Target { get; }
+    public IInputPort Target { get; }
     
     [JsonPropertyName("isEnabled")]
     public bool IsEnabled 

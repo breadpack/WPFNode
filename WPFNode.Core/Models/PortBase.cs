@@ -62,11 +62,10 @@ public abstract class PortBase : IPort
         {
             if (_value != value)
             {
-                if (value != null && !DataType.IsAssignableFrom(value.GetType()))
+                if (!TrySetValue(value))
                 {
-                    throw new ArgumentException($"값의 타입이 일치하지 않습니다. 예상: {DataType.Name}, 실제: {value.GetType().Name}");
+                    throw new ArgumentException($"값의 타입이 일치하지 않습니다. 예상: {DataType.Name}, 실제: {value?.GetType().Name ?? "null"}");
                 }
-                _value = value;
                 OnPropertyChanged();
             }
         }
@@ -76,9 +75,43 @@ public abstract class PortBase : IPort
 
     public INode Node => _node;
 
+    protected virtual bool CanAcceptConnection(IPort sourcePort)
+    {
+        // 입력 포트가 아니면 연결 불가
+        if (!IsInput) return false;
+
+        // 자기 자신과는 연결 불가
+        if (sourcePort == this) return false;
+
+        // 같은 노드의 포트와는 연결 불가
+        if (sourcePort.Node == Node) return false;
+
+        // 이미 연결된 포트가 있으면 연결 불가 (입력 포트는 하나의 연결만 허용)
+        if (IsConnected) return false;
+
+        return true;
+    }
+
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    protected virtual bool TrySetValue(object? value)
+    {
+        if (value == null)
+        {
+            _value = null;
+            return true;
+        }
+
+        if (DataType.IsInstanceOfType(value))
+        {
+            _value = value;
+            return true;
+        }
+
+        return false;
     }
 
     public void AddConnection(IConnection connection)

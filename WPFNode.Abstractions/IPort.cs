@@ -16,7 +16,13 @@ public interface IPort : INotifyPropertyChanged
     INode Node { get; }
 }
 
-public interface IPort<T> : IPort
+public interface IInputPort : IPort
 {
-    new T? Value { get; set; }
-} 
+    bool CanAcceptType(Type type);
+}
+
+public interface IOutputPort : IPort {
+    bool CanConnectTo(IInputPort targetPort);
+    void SetValue(object value);
+    object? GetValue();
+}

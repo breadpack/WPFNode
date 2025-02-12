@@ -18,7 +18,7 @@ public abstract class InputNodeBase<T> : NodeBase
             if (!EqualityComparer<T>.Default.Equals(_value, value))
             {
                 _value = value;
-                _output.Value = value;
+                _output.SetValue(value);
                 OnPropertyChanged();
             }
         }
@@ -30,7 +30,7 @@ public abstract class InputNodeBase<T> : NodeBase
 
     public override Task ProcessAsync()
     {
-        _output.Value = _value;
+        _output.SetValue(_value);
         return Task.CompletedTask;
     }
 } 

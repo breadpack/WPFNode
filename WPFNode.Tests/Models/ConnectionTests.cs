@@ -10,8 +10,8 @@ namespace WPFNode.Tests.Models
     {
         private TestNode _sourceNode;
         private TestNode _targetNode;
-        private IPort _sourcePort;
-        private IPort _targetPort;
+        private IOutputPort _sourcePort;
+        private IInputPort _targetPort;
 
         [TestInitialize]
         public void Setup()

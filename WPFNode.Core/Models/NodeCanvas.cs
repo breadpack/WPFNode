@@ -87,16 +87,17 @@ public class NodeCanvas
         if (target == null) throw new ArgumentNullException(nameof(target));
         if (source.IsInput == target.IsInput) return null;
         
-        IPort actualSource = source.IsInput ? target : source;
-        IPort actualTarget = source.IsInput ? source : target;
+        var actualSource = (source.IsInput ? target : source) as IOutputPort;
+        var actualTarget = (source.IsInput ? source : target) as IInputPort;
         
-        // 타입 호환성 검사 (암시적 변환 고려)
-        if (!IsTypeCompatible(actualSource.DataType, actualTarget.DataType))
-            return null;
-
+        if(actualSource == null || actualTarget == null) return null;
+        
         // 이미 연결이 존재하는지 확인
         if (_connections.Any(c => c.Source == actualSource && c.Target == actualTarget))
             return null;
+
+        // 연결 가능 여부 확인
+        if (!actualSource.CanConnectTo(actualTarget)) return null;
 
         var connection = new Connection(actualSource, actualTarget);
         
