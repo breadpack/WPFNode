@@ -8,6 +8,9 @@ using System.Windows.Markup;
 using WPFNode.Abstractions.Controls;
 using System.Reflection;
 using WPFNode.Core.Attributes;
+using System.Collections.Generic;
+using WPFNode.Core.Interfaces;
+using WPFNode.Core.Services;
 
 namespace WPFNode.Controls;
 
@@ -226,40 +229,15 @@ public class NodeControl : ContentControl, INodeControl
     {
         if (e.NewValue is NodeViewModel viewModel)
         {
-            var nodeType = viewModel.Model.GetType();
-            var styleAttribute = nodeType.GetCustomAttribute<NodeStyleAttribute>();
-            
-            if (styleAttribute != null)
-            {
-                var resourceKey = styleAttribute.StyleResourceKey;
-                Style? style = null;
-
-                // 1. 현재 컨트롤의 리소스에서 검색
-                style = TryFindResource(resourceKey) as Style;
-
-                // 2. 부모 요소들의 리소스에서 검색
-                if (style == null)
-                {
-                    var parent = this.GetParentOfType<NodeCanvasControl>();
-                    if (parent != null)
-                    {
-                        style = parent.TryFindResource(resourceKey) as Style;
-                    }
-                }
-
-                // 3. Application 리소스에서 검색
-                if (style == null)
-                {
-                    style = Application.Current.TryFindResource(resourceKey) as Style;
-                }
-
-                if (style != null)
-                {
-                    Style = style;
-                }
-            }
-
             HeaderContent = viewModel.Model.Name;
+
+            // NodeServices를 통해 PluginService 접근
+            var style = NodeServices.PluginService.FindNodeStyle(viewModel.Model.GetType());
+            if (style != null)
+            {
+                // 스타일을 복제하여 사용
+                Style = new Style(typeof(NodeControl), style);
+            }
         }
     }
 

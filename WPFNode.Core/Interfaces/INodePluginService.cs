@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Windows;
 using WPFNode.Abstractions;
 using WPFNode.Core.Models;
 
@@ -18,4 +19,5 @@ public interface INodePluginService
     NodeMetadata GetNodeMetadata(Type nodeType);
     IEnumerable<NodeMetadata> GetNodeMetadataByCategory(string category);
     IEnumerable<NodeMetadata> GetAllNodeMetadata();
+    Style? FindNodeStyle(Type nodeType);
 } 

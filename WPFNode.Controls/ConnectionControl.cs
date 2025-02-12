@@ -9,7 +9,9 @@ namespace WPFNode.Controls;
 public class ConnectionControl : Control
 {
     private Path? _path;
-    private PathGeometry? _lastPathGeometry;
+    private Path? _arrow;
+    private PathFigure? _pathFigure;
+    private BezierSegment? _bezierSegment;
 
     static ConnectionControl()
     {
@@ -32,40 +34,29 @@ public class ConnectionControl : Control
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
+
         _path = GetTemplateChild("PART_Path") as Path;
-        UpdateConnectionPath();
+        _arrow = GetTemplateChild("PART_Arrow") as Path;
+        _pathFigure = GetTemplateChild("PART_PathFigure") as PathFigure;
+        _bezierSegment = GetTemplateChild("PART_BezierSegment") as BezierSegment;
+
+        UpdateConnection();
+    }
+
+    protected override void OnRender(DrawingContext drawingContext)
+    {
+        base.OnRender(drawingContext);
+        UpdateConnection();
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         System.Diagnostics.Debug.WriteLine($"ConnectionControl OnLoaded: {ViewModel?.Source?.Name} -> {ViewModel?.Target?.Name}");
-        var canvas = this.GetParentOfType<NodeCanvasControl>();
-        if (canvas != null)
-        {
-            canvas.LayoutUpdated += OnCanvasLayoutUpdated;
-            System.Diagnostics.Debug.WriteLine($"LayoutUpdated 이벤트 구독 성공");
-        }
-        else
-        {
-            System.Diagnostics.Debug.WriteLine($"NodeCanvasControl을 찾을 수 없음");
-        }
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
         System.Diagnostics.Debug.WriteLine($"ConnectionControl OnUnloaded: {ViewModel?.Source?.Name} -> {ViewModel?.Target?.Name}");
-        var canvas = this.GetParentOfType<NodeCanvasControl>();
-        if (canvas != null)
-        {
-            canvas.LayoutUpdated -= OnCanvasLayoutUpdated;
-            System.Diagnostics.Debug.WriteLine($"LayoutUpdated 이벤트 구독 해제");
-        }
-    }
-
-    private void OnCanvasLayoutUpdated(object? sender, EventArgs e)
-    {
-        System.Diagnostics.Debug.WriteLine($"ConnectionControl LayoutUpdated: {ViewModel?.Source?.Name} -> {ViewModel?.Target?.Name}");
-        UpdateConnectionPath();
     }
 
     private Point GetPortCenterPosition(PortControl port)
@@ -89,72 +80,54 @@ public class ConnectionControl : Control
         return new Point(x, y);
     }
 
-    private void UpdateConnectionPath()
-    {
-        if (ViewModel == null) return;
-
-        var sourcePort = GetPortControl(ViewModel.Source);
-        var targetPort = GetPortControl(ViewModel.Target);
-
-        if (sourcePort == null || targetPort == null) return;
-
-        var sourceCenter = GetPortCenterPosition(sourcePort);
-        var targetCenter = GetPortCenterPosition(targetPort);
-
-        // Ellipse 가장자리 위치 계산
-        var startPoint = GetPortEdgePosition(sourceCenter, targetCenter);
-        var endPoint = GetPortEdgePosition(targetCenter, sourceCenter);
-
-        var pathGeometry = new PathGeometry();
-        var pathFigure = new PathFigure { StartPoint = startPoint };
-
-        // 제어점 계산 (시작점과 끝점의 x 차이를 이용하여 곡률 조정)
-        var deltaX = Math.Abs(endPoint.X - startPoint.X);
-        var control1 = new Point(startPoint.X + deltaX * 0.5, startPoint.Y);
-        var control2 = new Point(endPoint.X - deltaX * 0.5, endPoint.Y);
-
-        var segment = new BezierSegment(control1, control2, endPoint, true);
-        pathFigure.Segments.Add(segment);
-        pathGeometry.Figures.Add(pathFigure);
-
-        // 이전 Geometry와 비교하여 변경이 있을 때만 업데이트
-        if (_path != null && !GeometriesEqual(_lastPathGeometry, pathGeometry))
-        {
-            System.Diagnostics.Debug.WriteLine($"ConnectionControl Path 업데이트: {ViewModel?.Source?.Name} -> {ViewModel?.Target?.Name}");
-            _path.Data = pathGeometry;
-            _lastPathGeometry = pathGeometry;
-        }
-    }
-
-    private bool GeometriesEqual(PathGeometry? g1, PathGeometry? g2)
-    {
-        if (g1 == null || g2 == null) return false;
-        if (g1.Figures.Count != g2.Figures.Count) return false;
-
-        for (int i = 0; i < g1.Figures.Count; i++)
-        {
-            var f1 = g1.Figures[i];
-            var f2 = g2.Figures[i];
-
-            if (f1.StartPoint != f2.StartPoint) return false;
-            if (f1.Segments.Count != f2.Segments.Count) return false;
-
-            for (int j = 0; j < f1.Segments.Count; j++)
-            {
-                if (f1.Segments[j] is BezierSegment b1 && f2.Segments[j] is BezierSegment b2)
-                {
-                    if (b1.Point1 != b2.Point1 || b1.Point2 != b2.Point2 || b1.Point3 != b2.Point3)
-                        return false;
-                }
-                else return false;
-            }
-        }
-        return true;
-    }
-
     private PortControl? GetPortControl(NodePortViewModel port)
     {
         var canvas = this.GetParentOfType<NodeCanvasControl>();
         return canvas?.FindPortControl(port);
+    }
+
+    internal void UpdateConnection()
+    {
+        if (ViewModel == null || _pathFigure == null || _bezierSegment == null || _arrow == null)
+            return;
+
+        var sourcePort = GetPortControl(ViewModel.Source);
+        var targetPort = GetPortControl(ViewModel.Target);
+
+        if (sourcePort == null || targetPort == null) 
+            return;
+
+        var sourceCenter = GetPortCenterPosition(sourcePort);
+        var targetCenter = GetPortCenterPosition(targetPort);
+            
+        // Ellipse 가장자리 위치 계산
+        var startPoint = GetPortEdgePosition(sourceCenter, targetCenter);
+        var endPoint = GetPortEdgePosition(targetCenter, sourceCenter);
+
+        // 베지어 곡선의 제어점 계산
+        var deltaX = Math.Abs(endPoint.X - startPoint.X);
+        var controlPoint1 = new Point(startPoint.X + deltaX * 0.5, startPoint.Y);
+        var controlPoint2 = new Point(endPoint.X - deltaX * 0.5, endPoint.Y);
+
+        // 연결선 업데이트
+        _pathFigure.StartPoint = startPoint;
+        _bezierSegment.Point1 = controlPoint1;
+        _bezierSegment.Point2 = controlPoint2;
+        _bezierSegment.Point3 = endPoint;
+
+        // 화살표 위치와 각도 계산
+        var arrowPosition = endPoint;
+        var direction = new Vector(
+            controlPoint2.X - endPoint.X,
+            controlPoint2.Y - endPoint.Y);
+                
+        direction.Normalize();
+        var angle = Math.Atan2(direction.Y, direction.X) * 180 / Math.PI;
+
+        // 화살표 변환 설정
+        var arrowTransform = new TransformGroup();
+        arrowTransform.Children.Add(new TranslateTransform(arrowPosition.X, arrowPosition.Y));
+        arrowTransform.Children.Add(new RotateTransform(angle + 180));
+        _arrow.RenderTransform = arrowTransform;
     }
 } 

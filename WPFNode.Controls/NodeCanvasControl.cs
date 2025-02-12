@@ -28,6 +28,7 @@ public class NodeCanvasControl : Control
     private SearchPanel? _searchPanel;
     
     private readonly NodeCanvasStateManager _stateManager;
+    private bool _isUpdatingLayout;
 
     public INodePluginService PluginService { get; }
     public INodeCommandService CommandService { get; }
@@ -45,15 +46,16 @@ public class NodeCanvasControl : Control
 
     private class DesignTimeNodePluginService : INodePluginService 
     {
-        public IReadOnlyCollection<Type> NodeTypes => new List<Type>();
-        public IEnumerable<NodeMetadata> GetAllNodeMetadata() => Enumerable.Empty<NodeMetadata>();
-        public IEnumerable<string> GetCategories() => Enumerable.Empty<string>();
-        public void LoadPlugins(string pluginPath) { }
-        public INode CreateNode(Type nodeType) => throw new NotImplementedException();
-        public void RegisterNodeType(Type nodeType) { }
-        public IEnumerable<Type> GetNodeTypesByCategory(string category) => Enumerable.Empty<Type>();
-        public NodeMetadata GetNodeMetadata(Type nodeType) => throw new NotImplementedException();
-        public IEnumerable<NodeMetadata> GetNodeMetadataByCategory(string category) => Enumerable.Empty<NodeMetadata>();
+        public IReadOnlyCollection<Type> NodeTypes                                    => new List<Type>();
+        public IEnumerable<NodeMetadata> GetAllNodeMetadata()                         => Enumerable.Empty<NodeMetadata>();
+        public Style?                    FindNodeStyle(Type nodeType)                 => null;
+        public IEnumerable<string>       GetCategories()                              => Enumerable.Empty<string>();
+        public void                      LoadPlugins(string               pluginPath) { }
+        public INode                     CreateNode(Type                  nodeType)   => throw new NotImplementedException();
+        public void                      RegisterNodeType(Type            nodeType)   { }
+        public IEnumerable<Type>         GetNodeTypesByCategory(string    category)   => Enumerable.Empty<Type>();
+        public NodeMetadata              GetNodeMetadata(Type             nodeType)   => throw new NotImplementedException();
+        public IEnumerable<NodeMetadata> GetNodeMetadataByCategory(string category)   => Enumerable.Empty<NodeMetadata>();
     }
 
     private class DesignTimeNodeCommandService : INodeCommandService 
@@ -139,6 +141,35 @@ public class NodeCanvasControl : Control
         {
             _searchPanel.DataContext = DataContext;
             _searchPanel.PluginService = PluginService;
+        }
+
+        if (_dragCanvas != null)
+        {
+            _dragCanvas.LayoutUpdated += OnCanvasLayoutUpdated;
+        }
+    }
+
+    private void OnCanvasLayoutUpdated(object? sender, EventArgs e)
+    {
+        if (!_isUpdatingLayout)
+        {
+            try
+            {
+                _isUpdatingLayout = true;
+                UpdateAllConnections();
+            }
+            finally
+            {
+                _isUpdatingLayout = false;
+            }
+        }
+    }
+
+    private void UpdateAllConnections()
+    {
+        foreach (var connection in this.GetVisualDescendants().OfType<ConnectionControl>())
+        {
+            connection.UpdateConnection();
         }
     }
 

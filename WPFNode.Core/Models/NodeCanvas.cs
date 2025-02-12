@@ -90,7 +90,8 @@ public class NodeCanvas
         IPort actualSource = source.IsInput ? target : source;
         IPort actualTarget = source.IsInput ? source : target;
         
-        if (!actualTarget.DataType.IsAssignableFrom(actualSource.DataType))
+        // 타입 호환성 검사 (암시적 변환 고려)
+        if (!IsTypeCompatible(actualSource.DataType, actualTarget.DataType))
             return null;
 
         // 이미 연결이 존재하는지 확인
@@ -120,6 +121,97 @@ public class NodeCanvas
         // 포트에서 연결 제거
         ((PortBase)connection.Source).RemoveConnection(connection);
         ((PortBase)connection.Target).RemoveConnection(connection);
+    }
+
+    private bool IsTypeCompatible(Type sourceType, Type targetType)
+    {
+        // 동일한 타입이면 호환됨
+        if (targetType.IsAssignableFrom(sourceType))
+            return true;
+
+        // 숫자 타입 간의 암시적 변환 체크
+        if (IsNumericType(sourceType) && IsNumericType(targetType))
+        {
+            // 암시적 변환이 가능한지 확인
+            var method = sourceType.GetMethod("op_Implicit", new[] { sourceType });
+            if (method != null && method.ReturnType == targetType)
+                return true;
+
+            // 기본 숫자 타입 간의 암시적 변환 규칙 적용
+            return IsImplicitNumericConversion(sourceType, targetType);
+        }
+
+        return false;
+    }
+
+    private bool IsNumericType(Type type)
+    {
+        if (type == null) return false;
+
+        switch (Type.GetTypeCode(type))
+        {
+            case TypeCode.Byte:
+            case TypeCode.SByte:
+            case TypeCode.UInt16:
+            case TypeCode.UInt32:
+            case TypeCode.UInt64:
+            case TypeCode.Int16:
+            case TypeCode.Int32:
+            case TypeCode.Int64:
+            case TypeCode.Decimal:
+            case TypeCode.Double:
+            case TypeCode.Single:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private bool IsImplicitNumericConversion(Type source, Type target)
+    {
+        // 기본 숫자 타입 간의 암시적 변환 규칙
+        var sourceCode = Type.GetTypeCode(source);
+        var targetCode = Type.GetTypeCode(target);
+
+        switch (sourceCode)
+        {
+            case TypeCode.SByte:
+                return targetCode == TypeCode.Int16 || targetCode == TypeCode.Int32 || 
+                       targetCode == TypeCode.Int64 || targetCode == TypeCode.Single || 
+                       targetCode == TypeCode.Double || targetCode == TypeCode.Decimal;
+            case TypeCode.Byte:
+                return targetCode == TypeCode.Int16 || targetCode == TypeCode.UInt16 || 
+                       targetCode == TypeCode.Int32 || targetCode == TypeCode.UInt32 ||
+                       targetCode == TypeCode.Int64 || targetCode == TypeCode.UInt64 || 
+                       targetCode == TypeCode.Single || targetCode == TypeCode.Double || 
+                       targetCode == TypeCode.Decimal;
+            case TypeCode.Int16:
+                return targetCode == TypeCode.Int32 || targetCode == TypeCode.Int64 || 
+                       targetCode == TypeCode.Single || targetCode == TypeCode.Double || 
+                       targetCode == TypeCode.Decimal;
+            case TypeCode.UInt16:
+                return targetCode == TypeCode.Int32 || targetCode == TypeCode.UInt32 ||
+                       targetCode == TypeCode.Int64 || targetCode == TypeCode.UInt64 ||
+                       targetCode == TypeCode.Single || targetCode == TypeCode.Double ||
+                       targetCode == TypeCode.Decimal;
+            case TypeCode.Int32:
+                return targetCode == TypeCode.Int64 || targetCode == TypeCode.Single ||
+                       targetCode == TypeCode.Double || targetCode == TypeCode.Decimal;
+            case TypeCode.UInt32:
+                return targetCode == TypeCode.Int64 || targetCode == TypeCode.UInt64 ||
+                       targetCode == TypeCode.Single || targetCode == TypeCode.Double ||
+                       targetCode == TypeCode.Decimal;
+            case TypeCode.Int64:
+                return targetCode == TypeCode.Single || targetCode == TypeCode.Double ||
+                       targetCode == TypeCode.Decimal;
+            case TypeCode.UInt64:
+                return targetCode == TypeCode.Single || targetCode == TypeCode.Double ||
+                       targetCode == TypeCode.Decimal;
+            case TypeCode.Single:
+                return targetCode == TypeCode.Double;
+            default:
+                return false;
+        }
     }
 
     public NodeGroup CreateGroup(IEnumerable<NodeBase> nodes, string name = "New Group")
@@ -164,77 +256,9 @@ public class NodeCanvas
 
     public async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        var context = new ExecutionContext();
-        var executionOrder = GetExecutionOrder();
-        
-        foreach (var node in executionOrder)
-        {
-            if (cancellationToken.IsCancellationRequested)
-                break;
-
-            try
-            {
-                context.SetNodeState(node, NodeExecutionState.Running);
-                await node.ProcessAsync();
-                context.SetNodeState(node, NodeExecutionState.Completed);
-            }
-            catch (Exception ex)
-            {
-                context.SetNodeState(node, NodeExecutionState.Failed);
-                throw new NodeExecutionException($"Node '{node.Name}' execution failed", ex);
-            }
-        }
-    }
-
-    private List<NodeBase> GetExecutionOrder()
-    {
-        var visited = new HashSet<Guid>();
-        var executionOrder = new List<NodeBase>();
-        var inProcess = new HashSet<Guid>();
-
-        foreach (var node in _nodes)
-        {
-            if (!visited.Contains(node.Id))
-            {
-                VisitNode(node, visited, inProcess, executionOrder);
-            }
-        }
-
-        return executionOrder;
-    }
-
-    private void VisitNode(NodeBase node, HashSet<Guid> visited, HashSet<Guid> inProcess, List<NodeBase> executionOrder)
-    {
-        if (inProcess.Contains(node.Id))
-            throw new InvalidOperationException("Circular dependency detected in node graph");
-
-        if (visited.Contains(node.Id))
-            return;
-
-        inProcess.Add(node.Id);
-
-        // Get all nodes that provide input to current node's input ports
-        var dependencies = _connections
-            .Where(c => c.Target.Node == node)
-            .Select(c => c.Source.Node as NodeBase)
-            .Where(n => n != null)
-            .Distinct();
-
-        foreach (var dependency in dependencies)
-        {
-            VisitNode(dependency!, visited, inProcess, executionOrder);
-        }
-
-        visited.Add(node.Id);
-        inProcess.Remove(node.Id);
-        executionOrder.Add(node);
+        var executionPlan = ExecutionPlan.Create(_nodes, _connections);
+        await executionPlan.ExecuteAsync(cancellationToken);
     }
 }
 
-public class NodeExecutionException : Exception
-{
-    public NodeExecutionException(string message, Exception innerException)
-        : base(message, innerException)
-    {
-    }
-} 
+// NodeExecutionException을 ExecutionPlan.cs로 이동 

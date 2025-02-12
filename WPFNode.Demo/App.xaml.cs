@@ -17,10 +17,10 @@ public partial class App : Application
         var pluginService = NodeServices.PluginService;
 
         // 기본 플러그인의 리소스를 Application.Resources에 추가
-        var basicPlugin = new BasicNodePlugin();
-        foreach (var resourceDictionary in basicPlugin.GetNodeStyles())
-        {
-            Application.Current.Resources.MergedDictionaries.Add(resourceDictionary);
-        }
+        // var basicPlugin = new BasicNodePlugin();
+        // foreach (var resourceDictionary in basicPlugin.GetNodeStyles())
+        // {
+        //     Application.Current.Resources.MergedDictionaries.Add(resourceDictionary);
+        // }
     }
 } 

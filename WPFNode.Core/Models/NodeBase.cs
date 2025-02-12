@@ -23,11 +23,15 @@ public abstract class NodeBase : INode, INotifyPropertyChanged
     {
         Id = Guid.NewGuid();
 
-        // 메타데이터 초기화
-        var metadata = GetNodeMetadata(GetType());
-        _name = metadata.Name;
-        _category = metadata.Category;
-        _description = metadata.Description;
+        // 어트리뷰트에서 직접 값을 가져옴
+        var type = GetType();
+        var nameAttr = type.GetCustomAttribute<NodeNameAttribute>();
+        var categoryAttr = type.GetCustomAttribute<NodeCategoryAttribute>();
+        var descriptionAttr = type.GetCustomAttribute<NodeDescriptionAttribute>();
+
+        _name = nameAttr?.Name ?? type.Name;
+        _category = categoryAttr?.Category ?? "Basic";
+        _description = descriptionAttr?.Description ?? string.Empty;
     }
 
     [JsonPropertyName("id")]
@@ -70,6 +74,8 @@ public abstract class NodeBase : INode, INotifyPropertyChanged
         get => _isVisible;
         set => SetProperty(ref _isVisible, value);
     }
+
+    public bool IsOutputNode => GetType().GetCustomAttribute<OutputNodeAttribute>() != null;
 
     [JsonPropertyName("inputPorts")]
     public IReadOnlyList<IPort> InputPorts => _inputPorts;
@@ -135,25 +141,5 @@ public abstract class NodeBase : INode, INotifyPropertyChanged
         copy.Initialize();
 
         return copy;
-    }
-
-    // 메타데이터를 가져오는 정적 메서드
-    public static NodeMetadata GetNodeMetadata(Type nodeType)
-    {
-        if (nodeType == null)
-            throw new ArgumentNullException(nameof(nodeType));
-
-        if (!typeof(NodeBase).IsAssignableFrom(nodeType))
-            throw new ArgumentException($"타입이 NodeBase를 상속하지 않습니다: {nodeType.Name}");
-
-        var nameAttr = nodeType.GetCustomAttribute<NodeNameAttribute>();
-        var categoryAttr = nodeType.GetCustomAttribute<NodeCategoryAttribute>();
-        var descriptionAttr = nodeType.GetCustomAttribute<NodeDescriptionAttribute>();
-        
-        return new NodeMetadata(
-            nodeType,
-            nameAttr?.Name ?? nodeType.Name,
-            categoryAttr?.Category ?? "Basic",
-            descriptionAttr?.Description ?? string.Empty);
     }
 } 

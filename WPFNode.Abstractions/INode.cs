@@ -14,6 +14,7 @@ public interface INode : INotifyPropertyChanged
     double X { get; set; }
     double Y { get; set; }
     bool IsProcessing { get; }
+    bool IsOutputNode { get; }
     
     IReadOnlyList<IPort> InputPorts { get; }
     IReadOnlyList<IPort> OutputPorts { get; }

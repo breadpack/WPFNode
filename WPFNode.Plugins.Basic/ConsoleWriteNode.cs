@@ -1,0 +1,26 @@
+﻿using WPFNode.Core.Attributes;
+using WPFNode.Core.Models;
+
+namespace WPFNode.Plugins.Basic;
+
+[NodeName("Console Write")]
+[NodeCategory("Basic")]
+[NodeDescription("콘솔에 문자열을 출력하는 노드입니다.")]
+[OutputNode]
+public class ConsoleWriteNode : NodeBase {
+    private readonly InputPort<string> _input;
+    
+    public ConsoleWriteNode() {
+        _input = new InputPort<string>("Text", this);
+    }
+
+    public override Task ProcessAsync()
+    {
+        Console.WriteLine(_input.Value);
+        return Task.CompletedTask;
+    }
+
+    protected override void InitializePorts() {
+        RegisterInputPort(_input);
+    }
+}
