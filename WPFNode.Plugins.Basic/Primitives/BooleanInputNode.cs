@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using WPFNode.Abstractions;
 using WPFNode.Core.Attributes;
 using WPFNode.Core.Models;
 using WPFNode.Plugins.Basic.Constants;
@@ -11,6 +12,8 @@ namespace WPFNode.Plugins.Basic.Primitives;
 [NodeStyle(StyleKeys.Input.Boolean)]
 public class BooleanInputNode : InputNodeBase<bool>
 {
+    public BooleanInputNode(INodeCanvas canvas) : base(canvas) { }
+
     [NodeProperty("Value", NodePropertyControlType.CheckBox)]
     public override bool Value
     {

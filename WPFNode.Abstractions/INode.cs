@@ -15,9 +15,10 @@ public interface INode : INotifyPropertyChanged
     double Y { get; set; }
     bool IsProcessing { get; }
     bool IsOutputNode { get; }
+    bool IsInitialized { get; }
     
-    IReadOnlyList<IPort> InputPorts { get; }
-    IReadOnlyList<IPort> OutputPorts { get; }
+    IReadOnlyList<IInputPort> InputPorts { get; }
+    IReadOnlyList<IOutputPort> OutputPorts { get; }
     
     Task ProcessAsync();
     bool CanExecuteCommand(string commandName, object? parameter = null);

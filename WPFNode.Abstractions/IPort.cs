@@ -11,7 +11,6 @@ public interface IPort : INotifyPropertyChanged
     Type DataType { get; }
     bool IsInput { get; }
     bool IsConnected { get; }
-    object? Value { get; set; }
     IReadOnlyList<IConnection> Connections { get; }
     INode Node { get; }
 }
@@ -19,10 +18,12 @@ public interface IPort : INotifyPropertyChanged
 public interface IInputPort : IPort
 {
     bool CanAcceptType(Type type);
+    object? Value { get; }
 }
 
 public interface IOutputPort : IPort {
     bool CanConnectTo(IInputPort targetPort);
-    void SetValue(object value);
-    object? GetValue();
+    object? Value { get; set; }
+    IConnection Connect(IInputPort target);
+    void Disconnect();
 }

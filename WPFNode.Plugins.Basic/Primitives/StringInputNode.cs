@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using WPFNode.Abstractions;
 using WPFNode.Core.Attributes;
 using WPFNode.Core.Models;
 using WPFNode.Plugins.Basic.Constants;
@@ -11,7 +12,7 @@ namespace WPFNode.Plugins.Basic.Primitives;
 [NodeStyle(StyleKeys.Input.String)]
 public class StringInputNode : InputNodeBase<string>
 {
-    public StringInputNode() => _value = string.Empty;
+    public StringInputNode(INodeCanvas canvas) : base(canvas) => _value = string.Empty;
 
     [NodeProperty("Value", NodePropertyControlType.TextBox)]
     public override string Value

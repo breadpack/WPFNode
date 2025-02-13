@@ -1,4 +1,5 @@
-﻿using WPFNode.Core.Attributes;
+﻿using WPFNode.Abstractions;
+using WPFNode.Core.Attributes;
 using WPFNode.Core.Models;
 
 namespace WPFNode.Plugins.Basic;
@@ -10,7 +11,7 @@ namespace WPFNode.Plugins.Basic;
 public class ConsoleWriteNode : NodeBase {
     private readonly InputPort<string> _input;
     
-    public ConsoleWriteNode() {
+    public ConsoleWriteNode(INodeCanvas canvas) : base(canvas) {
         _input = new InputPort<string>("Text", this);
     }
 

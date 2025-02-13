@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using WPFNode.Abstractions;
 using WPFNode.Core.Attributes;
 using WPFNode.Core.Models;
 
@@ -13,11 +14,10 @@ public class AdditionNode : NodeBase
     private readonly InputPort<double> _inputB;
     private readonly OutputPort<double> _output;
 
-    public AdditionNode()
-    {
-        _inputA = new InputPort<double>("A", this);
-        _inputB = new InputPort<double>("B", this);
-        _output = new OutputPort<double>("결과", this);
+    public AdditionNode(INodeCanvas canvas) : base(canvas) {
+        _inputA = CreateInputPort<double>("A");
+        _inputB = CreateInputPort<double>("B");
+        _output = CreateOutputPort<double>("결과");
     }
 
     protected override void InitializePorts()

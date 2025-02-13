@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using WPFNode.Abstractions;
 using WPFNode.Core.Attributes;
 using WPFNode.Plugins.Basic.Constants;
 using WPFNode.Plugins.Basic.Primitives.Base;
@@ -11,6 +12,8 @@ namespace WPFNode.Plugins.Basic.Primitives;
 [NodeStyle(StyleKeys.Input.Double)]
 public class DoubleInputNode : NumberInputNodeBase<double>
 {
+    public DoubleInputNode(INodeCanvas canvas) : base(canvas) { }
+
     [NodeProperty("Value", NodePropertyControlType.NumberBox, "F2")]
     public override double Value
     {

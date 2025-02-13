@@ -46,6 +46,8 @@ public partial class NodeCanvasViewModel : ObservableObject
     public IWpfCommand UndoCommand { get; }
     public IWpfCommand RedoCommand { get; }
     public IWpfCommand ExecuteCommand { get; }
+    public IWpfCommand CopyCommand { get; }
+    public IWpfCommand PasteCommand { get; }
 
     public NodeCanvasViewModel(
         NodeCanvas canvas,
@@ -73,6 +75,8 @@ public partial class NodeCanvasViewModel : ObservableObject
         UndoCommand = new RelayCommand(ExecuteUndo, CanExecuteUndo);
         RedoCommand = new RelayCommand(ExecuteRedo, CanExecuteRedo);
         ExecuteCommand = new RelayCommand(ExecuteNodes);
+        CopyCommand = new RelayCommand(CopySelectedNodes);
+        PasteCommand = new RelayCommand(PasteNodes);
 
         // Model 변경 감지를 위한 이벤트 핸들러 등록
         SynchronizeWithModel();
@@ -102,19 +106,19 @@ public partial class NodeCanvasViewModel : ObservableObject
         }
     }
 
-    private NodeViewModel CreateNodeViewModel(NodeBase node)
+    private NodeViewModel CreateNodeViewModel(INode node)
     {
-        return new NodeViewModel(node, _commandService, this);
+        if (node is not NodeBase nodeBase)
+            throw new ArgumentException("노드는 NodeBase 타입이어야 합니다.");
+            
+        return new NodeViewModel(nodeBase, _commandService, this);
     }
 
     private void ExecuteAddNode(Type? nodeType)
     {
         if (nodeType == null) return;
         
-        var node = (NodeBase)_pluginService.CreateNode(nodeType);
-        node.Initialize();
-        
-        var command = new AddNodeCommand(_canvas, node);
+        var command = new AddNodeCommand(_canvas, nodeType);
         _commandManager.Execute(command);
         
         SynchronizeWithModel();
@@ -214,7 +218,7 @@ public partial class NodeCanvasViewModel : ObservableObject
         
         var selectedNodes = Nodes
             .Where(n => n.IsSelected)
-            .Select(n => n.Model)
+            .Select(n => (NodeBase)n.Model)
             .ToList();
             
         if (selectedNodes.Any())
@@ -257,6 +261,34 @@ public partial class NodeCanvasViewModel : ObservableObject
         catch (Exception ex)
         {
             MessageBox.Show($"노드 실행 중 오류 발생: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void CopySelectedNodes()
+    {
+        var selectedNodes = Nodes.Where(n => n.IsSelected).ToList();
+        if (selectedNodes.Any())
+        {
+            var nodeDataList = selectedNodes.Select(n => ((NodeBase)n.Model).CreateCopy()).ToList();
+            System.Windows.Clipboard.SetDataObject(nodeDataList);
+        }
+    }
+
+    private void PasteNodes()
+    {
+        var dataObject = System.Windows.Clipboard.GetDataObject();
+        if (dataObject?.GetData(typeof(List<NodeBase>)) is List<NodeBase> nodeDataList)
+        {
+            foreach (var node in nodeDataList)
+            {
+                var newNode = _canvas.CreateNode(node.GetType(), node.X + 20, node.Y + 20);
+                // 필요한 속성들을 복사
+                if (newNode is NodeBase nodeBase)
+                {
+                    nodeBase.Name = node.Name;
+                }
+            }
+            SynchronizeWithModel();
         }
     }
 } 

@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using WPFNode.Abstractions;
 using WPFNode.Core.Attributes;
 using WPFNode.Plugins.Basic.Constants;
 using WPFNode.Plugins.Basic.Primitives.Base;
@@ -11,6 +12,8 @@ namespace WPFNode.Plugins.Basic.Primitives;
 [NodeStyle(StyleKeys.Input.Integer)]
 public class IntegerInputNode : NumberInputNodeBase<int>
 {
+    public IntegerInputNode(INodeCanvas canvas) : base(canvas) { }
+
     [NodeProperty("Value", NodePropertyControlType.NumberBox)]
     public override int Value
     {

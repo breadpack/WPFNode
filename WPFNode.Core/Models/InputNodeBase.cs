@@ -1,3 +1,5 @@
+using WPFNode.Abstractions;
+
 namespace WPFNode.Core.Models;
 
 public abstract class InputNodeBase<T> : NodeBase
@@ -5,9 +7,10 @@ public abstract class InputNodeBase<T> : NodeBase
     protected readonly OutputPort<T> _output;
     protected T _value;
 
-    protected InputNodeBase()
+    protected InputNodeBase(INodeCanvas canvas) : base(canvas)
     {
         _output = new OutputPort<T>("Value", this);
+        _value = default!;
     }
 
     public virtual T Value
@@ -18,7 +21,7 @@ public abstract class InputNodeBase<T> : NodeBase
             if (!EqualityComparer<T>.Default.Equals(_value, value))
             {
                 _value = value;
-                _output.SetValue(value);
+                _output.Value = value;
                 OnPropertyChanged();
             }
         }
@@ -30,7 +33,7 @@ public abstract class InputNodeBase<T> : NodeBase
 
     public override Task ProcessAsync()
     {
-        _output.SetValue(_value);
+        _output.Value = _value;
         return Task.CompletedTask;
     }
 } 

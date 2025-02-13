@@ -9,6 +9,7 @@ using WPFNode.Core.Services;
 using System.Collections.Specialized;
 using System.Linq;
 using System.Reflection;
+using WPFNode.Abstractions;
 
 namespace WPFNode.Core.ViewModels.Nodes;
 
@@ -133,5 +134,5 @@ public class NodeViewModel : ViewModelBase
             () => CanExecuteCommand(commandName));
     }
 
-    public NodeBase Model => _model;
+    public INode Model => _model;
 } 

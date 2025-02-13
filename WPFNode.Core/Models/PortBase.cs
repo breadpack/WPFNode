@@ -7,7 +7,6 @@ namespace WPFNode.Core.Models;
 public abstract class PortBase : IPort
 {
     private          string            _name;
-    private          object?           _value;
     private          bool              _isConnected;
     private readonly List<IConnection> _connections = new();
     private readonly INode             _node;
@@ -55,22 +54,6 @@ public abstract class PortBase : IPort
         }
     }
 
-    public object? Value
-    {
-        get => _value;
-        set
-        {
-            if (_value != value)
-            {
-                if (!TrySetValue(value))
-                {
-                    throw new ArgumentException($"값의 타입이 일치하지 않습니다. 예상: {DataType.Name}, 실제: {value?.GetType().Name ?? "null"}");
-                }
-                OnPropertyChanged();
-            }
-        }
-    }
-
     public IReadOnlyList<IConnection> Connections => _connections;
 
     public INode Node => _node;
@@ -95,23 +78,6 @@ public abstract class PortBase : IPort
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
-
-    protected virtual bool TrySetValue(object? value)
-    {
-        if (value == null)
-        {
-            _value = null;
-            return true;
-        }
-
-        if (DataType.IsInstanceOfType(value))
-        {
-            _value = value;
-            return true;
-        }
-
-        return false;
     }
 
     public void AddConnection(IConnection connection)

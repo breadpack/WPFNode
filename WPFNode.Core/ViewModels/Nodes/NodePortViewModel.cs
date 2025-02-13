@@ -2,6 +2,7 @@ using WPFNode.Core.ViewModels.Base;
 using System.Collections.ObjectModel;
 using System.Linq;
 using WPFNode.Abstractions;
+using System;
 
 namespace WPFNode.Core.ViewModels.Nodes;
 
@@ -9,7 +10,6 @@ public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
 {
     private readonly IPort _port;
     private string _name;
-    private object? _value;
     private bool _isSelected;
     private readonly ObservableCollection<ConnectionViewModel> _connections;
     private readonly NodeCanvasViewModel _canvas;
@@ -19,7 +19,6 @@ public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
         _port = port;
         _canvas = canvas;
         _name = port.Name;
-        _value = port.Value;
         _connections = new ObservableCollection<ConnectionViewModel>();
 
         // 초기 연결 상태 설정
@@ -32,9 +31,6 @@ public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
             {
                 case nameof(IPort.Name):
                     Name = _port.Name;
-                    break;
-                case nameof(IPort.Value):
-                    Value = _port.Value;
                     break;
                 case nameof(IPort.Connections):
                     UpdateConnections();
@@ -72,12 +68,21 @@ public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
 
     public object? Value
     {
-        get => _value;
+        get
+        {
+            return _port switch
+            {
+                IInputPort inputPort => inputPort.Value,
+                IOutputPort outputPort => outputPort.Value,
+                _ => throw new InvalidOperationException($"[{Name}] 알 수 없는 포트 타입입니다.")
+            };
+        }
         set
         {
-            if (SetProperty(ref _value, value))
+            if (_port is IOutputPort outputPort)
             {
-                _port.Value = value;
+                outputPort.Value = value;
+                OnPropertyChanged();
             }
         }
     }

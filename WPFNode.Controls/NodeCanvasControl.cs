@@ -420,25 +420,13 @@ public class NodeCanvasControl : Control
     private void CopySelectedNodes()
     {
         if (ViewModel == null) return;
-        var selectedNodes = ViewModel.Nodes.Where(n => n.IsSelected).ToList();
-        if (selectedNodes.Any())
-        {
-            var nodeDataList = selectedNodes.Select(n => n.Model.CreateCopy()).ToList();
-            System.Windows.Clipboard.SetDataObject(nodeDataList);
-        }
+        ViewModel.CopyCommand.Execute(null);
     }
 
     private void PasteNodes()
     {
         if (ViewModel == null) return;
-        var dataObject = System.Windows.Clipboard.GetDataObject();
-        if (dataObject?.GetData(typeof(List<NodeBase>)) is List<NodeBase> nodeDataList)
-        {
-            foreach (var node in nodeDataList)
-            {
-                ViewModel.AddNodeCommand.Execute(node);
-            }
-        }
+        ViewModel.PasteCommand.Execute(null);
     }
 
     private void DeleteSelectedNodes()

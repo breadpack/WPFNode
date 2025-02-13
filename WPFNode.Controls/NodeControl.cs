@@ -166,7 +166,7 @@ public class NodeControl : ContentControl, INodeControl
         var selectedNodes = canvas.ViewModel.Nodes.Where(n => n.IsSelected).ToList();
         if (selectedNodes.Any())
         {
-            var nodeDataList = selectedNodes.Select(n => n.Model.CreateCopy()).ToList();
+            var nodeDataList = selectedNodes.Select(n => ((NodeBase)n.Model).CreateCopy()).ToList();
             Clipboard.SetData("NodeEditorNodes", nodeDataList);
         }
     }

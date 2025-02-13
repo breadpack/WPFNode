@@ -9,85 +9,114 @@ using WPFNode.Core.Interfaces;
 using WPFNode.Core.Models;
 using WPFNode.Core.Attributes;
 using System.Windows;
+using System.Collections.Concurrent;
 
 namespace WPFNode.Core.Services;
 
-public class NodePluginService : INodePluginService
+public class NodePluginService : INodePluginService, IDisposable
 {
-    private readonly Dictionary<Type, NodeMetadata> _nodeTypes = new();
+    private readonly ConcurrentDictionary<Type, NodeMetadata> _nodeTypes = new();
+    private readonly ConcurrentDictionary<string, HashSet<string>> _categoryCache = new();
+    private readonly ConcurrentDictionary<string, ResourceDictionary> _resourceCache = new();
     private readonly ILogger<NodePluginService>? _logger;
+    private bool _isDisposed;
     
     public NodePluginService(ILogger<NodePluginService>? logger = null)
     {
         _logger = logger;
-        RegisterDefaultNodes();
+        LoadAllAssemblies();
     }
 
-    public IReadOnlyCollection<Type> NodeTypes => _nodeTypes.Keys;
-
-    public Style? FindNodeStyle(Type nodeType)
+    private void LoadAllAssemblies()
     {
         try
         {
-            var styleAttribute = nodeType.GetCustomAttribute<NodeStyleAttribute>();
-            if (styleAttribute == null) return null;
+            var assemblies = AppDomain.CurrentDomain.GetAssemblies()
+                .Where(IsValidAssembly)
+                .ToList();
 
-            var resourceKey = styleAttribute.StyleResourceKey;
-            _logger?.LogDebug("스타일 검색 시작 - 노드: {NodeType}, 리소스키: {ResourceKey}", nodeType.Name, resourceKey);
-            
-            // 1. Application 리소스에서 검색
-            var style = Application.Current.TryFindResource(resourceKey) as Style;
-            if (style != null)
+            foreach (var assembly in assemblies)
             {
-                _logger?.LogDebug("스타일을 Application 리소스에서 찾음: {ResourceKey}", resourceKey);
-                _logger?.LogDebug("Application 리소스 개수: {Count}", Application.Current.Resources.MergedDictionaries.Count);
-                return style;
+                LoadNodesFromAssembly(assembly);
             }
-
-            // 2. 플러그인 어셈블리의 리소스에서 검색
-            var assembly = nodeType.Assembly;
-            var assemblyName = assembly.GetName().Name;
-            try
-            {
-                var resourceFile = styleAttribute.ResourceFile;
-                var uri = new Uri($"pack://application:,,,/{assemblyName};component/{resourceFile}", UriKind.Absolute);
-                _logger?.LogDebug("리소스 딕셔너리 로드 시도: {Uri}", uri);
-                
-                var resourceDictionary = new ResourceDictionary { Source = uri };
-                _logger?.LogDebug("리소스 딕셔너리 로드 완료 - 리소스 개수: {Count}", resourceDictionary.Count);
-                
-                foreach (var key in resourceDictionary.Keys)
-                {
-                    _logger?.LogDebug("로드된 리소스 키: {Key}", key);
-                }
-                
-                if (resourceDictionary.Contains(resourceKey))
-                {
-                    _logger?.LogDebug("스타일을 플러그인 리소스에서 찾음: {ResourceKey} in {ResourceFile}", resourceKey, resourceFile);
-                    var foundStyle = resourceDictionary[resourceKey] as Style;
-                    _logger?.LogDebug("찾은 스타일 정보 - Type: {StyleType}, BasedOn: {BasedOn}", 
-                        foundStyle?.TargetType.Name, 
-                        foundStyle?.BasedOn?.TargetType.Name);
-                    return foundStyle;
-                }
-                else
-                {
-                    _logger?.LogWarning("리소스 딕셔너리에서 스타일을 찾을 수 없음: {ResourceKey} in {ResourceFile}", resourceKey, resourceFile);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "플러그인 리소스 로드 실패: {Assembly}, {Uri}", assemblyName, $"pack://application:,,,/{assemblyName};component/{styleAttribute.ResourceFile}");
-            }
-
-            _logger?.LogWarning("스타일을 찾을 수 없음: {ResourceKey}", resourceKey);
-            return null;
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "노드 스타일 검색 중 오류 발생: {NodeType}", nodeType.Name);
-            return null;
+            _logger?.LogError(ex, "어셈블리 로드 중 오류 발생");
         }
+    }
+
+    private bool IsValidAssembly(Assembly assembly)
+    {
+        if (assembly == null) return false;
+        
+        // 시스템 어셈블리 제외
+        if (assembly.IsDynamic || 
+            assembly.GlobalAssemblyCache ||
+            assembly.FullName?.StartsWith("System.") == true ||
+            assembly.FullName?.StartsWith("Microsoft.") == true)
+            return false;
+
+        // WPFNode 관련 어셈블리만 포함
+        var assemblyName = assembly.GetName().Name;
+        return assemblyName?.StartsWith("WPFNode") == true;
+    }
+
+    private void LoadNodesFromAssembly(Assembly assembly)
+    {
+        try
+        {
+            _logger?.LogInformation("어셈블리 검사 중: {Assembly}", assembly.FullName);
+
+            var nodeTypes = assembly.GetTypes()
+                .Where(IsValidNodeType)
+                .ToList();
+
+            foreach (var nodeType in nodeTypes)
+            {
+                try
+                {
+                    RegisterNodeType(nodeType);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "노드 타입 등록 실패: {Type}", nodeType.FullName);
+                }
+            }
+        }
+        catch (ReflectionTypeLoadException ex)
+        {
+            _logger?.LogError(ex, "어셈블리 타입 로드 실패: {Assembly}", assembly.FullName);
+            LogLoaderExceptions(ex);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "어셈블리 처리 중 오류 발생: {Assembly}", assembly.FullName);
+        }
+    }
+
+    private void LogLoaderExceptions(ReflectionTypeLoadException ex)
+    {
+        foreach (var loaderException in ex.LoaderExceptions)
+        {
+            if (loaderException != null)
+            {
+                _logger?.LogError(loaderException, "로더 예외");
+            }
+        }
+    }
+
+    private bool IsValidNodeType(Type type)
+    {
+        if (type == null) return false;
+        
+        var hasValidConstructor = type.GetConstructor(Type.EmptyTypes) != null ||
+                                type.GetConstructor(new[] { typeof(INodeCanvas) }) != null;
+        
+        return typeof(INode).IsAssignableFrom(type) && 
+               !type.IsInterface && 
+               !type.IsAbstract &&
+               hasValidConstructor;
     }
 
     public void LoadPlugins(string pluginPath)
@@ -103,34 +132,59 @@ public class NodePluginService : INodePluginService
             try
             {
                 var assembly = Assembly.LoadFrom(dllFile);
-                var nodeTypes = assembly.GetTypes()
-                    .Where(t => typeof(INode).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
-
-                foreach (var nodeType in nodeTypes)
+                if (IsValidAssembly(assembly))
                 {
-                    try
-                    {
-                        // 노드 타입이 매개변수 없는 생성자를 가지고 있는지 확인
-                        var constructor = nodeType.GetConstructor(Type.EmptyTypes);
-                        if (constructor == null)
-                        {
-                            _logger?.LogWarning("매개변수 없는 생성자가 없습니다: {Type}", nodeType.Name);
-                            continue;
-                        }
-
-                        RegisterNodeType(nodeType);
-                        _logger?.LogInformation("노드 타입 등록 성공: {Type}", nodeType.Name);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogError(ex, "노드 타입 등록 실패: {Type}", nodeType.FullName);
-                    }
+                    LoadNodesFromAssembly(assembly);
                 }
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "플러그인 어셈블리 로드 실패: {Path}", dllFile);
+                _logger?.LogError(ex, "외부 플러그인 어셈블리 로드 실패: {Path}", dllFile);
             }
+        }
+    }
+
+    public IReadOnlyCollection<Type> NodeTypes => _nodeTypes.Keys.ToList();
+
+    public Style? FindNodeStyle(Type nodeType)
+    {
+        if (nodeType == null) return null;
+
+        try
+        {
+            var styleAttribute = nodeType.GetCustomAttribute<NodeStyleAttribute>();
+            if (styleAttribute == null) return null;
+
+            var resourceKey = styleAttribute.StyleResourceKey;
+            
+            // 1. Application 리소스에서 검색
+            var style = Application.Current.TryFindResource(resourceKey) as Style;
+            if (style != null) return style;
+
+            // 2. 캐시된 리소스에서 검색
+            var assembly = nodeType.Assembly;
+            var assemblyName = assembly.GetName().Name;
+            var resourceFile = styleAttribute.ResourceFile;
+            var cacheKey = $"{assemblyName}|{resourceFile}";
+
+            return _resourceCache.GetOrAdd(cacheKey, key =>
+            {
+                try
+                {
+                    var uri = new Uri($"pack://application:,,,/{assemblyName};component/{resourceFile}", UriKind.Absolute);
+                    return new ResourceDictionary { Source = uri };
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "리소스 딕셔너리 로드 실패: {Assembly}, {ResourceFile}", assemblyName, resourceFile);
+                    return null;
+                }
+            })?[resourceKey] as Style;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "노드 스타일 검색 중 오류 발생: {NodeType}", nodeType.Name);
+            return null;
         }
     }
 
@@ -139,33 +193,21 @@ public class NodePluginService : INodePluginService
         if (nodeType == null)
             throw new ArgumentNullException(nameof(nodeType));
 
-        if (!typeof(INode).IsAssignableFrom(nodeType))
-            throw new ArgumentException($"타입이 INode를 구현하지 않습니다: {nodeType.Name}");
+        if (!IsValidNodeType(nodeType))
+            throw new ArgumentException($"유효하지 않은 노드 타입입니다: {nodeType.Name}");
 
-        if (nodeType.IsInterface || nodeType.IsAbstract)
-            throw new ArgumentException($"인터페이스나 추상 클래스는 등록할 수 없습니다: {nodeType.Name}");
-
-        var constructor = nodeType.GetConstructor(Type.EmptyTypes);
-        if (constructor == null)
-            throw new ArgumentException($"매개변수 없는 생성자가 필요합니다: {nodeType.Name}");
-
-        if (_nodeTypes.ContainsKey(nodeType))
-        {
-            _logger?.LogWarning("이미 등록된 노드 타입입니다: {Type}", nodeType.Name);
-            return;
-        }
-
-        try
-        {
-            var metadata = CreateNodeMetadata(nodeType);
-            _nodeTypes.Add(nodeType, metadata);
-            _logger?.LogInformation("노드 타입 등록 성공: {Type}", nodeType.Name);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "노드 타입 등록 실패: {Type}", nodeType.Name);
-            throw;
-        }
+        _nodeTypes.TryAdd(nodeType, CreateNodeMetadata(nodeType));
+        
+        // 카테고리 캐시 업데이트
+        var metadata = GetNodeMetadata(nodeType);
+        _categoryCache.AddOrUpdate(
+            metadata.Category,
+            new HashSet<string> { nodeType.FullName ?? nodeType.Name },
+            (_, types) =>
+            {
+                types.Add(nodeType.FullName ?? nodeType.Name);
+                return types;
+            });
     }
 
     public INode CreateNode(Type nodeType)
@@ -178,6 +220,7 @@ public class NodePluginService : INodePluginService
         try
         {
             var node = (INode)Activator.CreateInstance(nodeType)!;
+            node.Initialize();
             return node;
         }
         catch (Exception ex)
@@ -196,39 +239,12 @@ public class NodePluginService : INodePluginService
 
     public IEnumerable<string> GetCategories()
     {
-        return _nodeTypes.Values
-            .Select(info => info.Category)
-            .Distinct();
-    }
-
-    private void RegisterDefaultNodes()
-    {
-        // 기본 노드들 등록
-        var defaultNodeTypes = Assembly.GetExecutingAssembly().GetTypes()
-            .Where(t => typeof(INode).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
-
-        foreach (var nodeType in defaultNodeTypes)
-        {
-            try
-            {
-                RegisterNodeType(nodeType);
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "기본 노드 타입 등록 실패: {Type}", nodeType.Name);
-            }
-        }
+        return _categoryCache.Keys;
     }
 
     public NodeMetadata GetNodeMetadata(Type nodeType)
     {
-        if (!_nodeTypes.TryGetValue(nodeType, out var metadata))
-        {
-            metadata = CreateNodeMetadata(nodeType);
-            _nodeTypes[nodeType] = metadata;
-        }
-
-        return metadata;
+        return _nodeTypes.GetOrAdd(nodeType, CreateNodeMetadata);
     }
 
     private static NodeMetadata CreateNodeMetadata(Type nodeType)
@@ -262,5 +278,21 @@ public class NodePluginService : INodePluginService
     public IEnumerable<NodeMetadata> GetAllNodeMetadata()
     {
         return _nodeTypes.Values;
+    }
+
+    public void Dispose()
+    {
+        if (_isDisposed) return;
+        
+        foreach (var resourceDict in _resourceCache.Values)
+        {
+            resourceDict?.Clear();
+        }
+        _resourceCache.Clear();
+        _nodeTypes.Clear();
+        _categoryCache.Clear();
+        
+        _isDisposed = true;
+        GC.SuppressFinalize(this);
     }
 } 

@@ -16,11 +16,14 @@ public abstract class NodeBase : INode, INotifyPropertyChanged
     private double _y;
     private bool _isProcessing;
     private bool _isVisible = true;
-    private readonly List<IPort> _inputPorts = new();
-    private readonly List<IPort> _outputPorts = new();
+    private readonly List<IInputPort> _inputPorts = new();
+    private readonly List<IOutputPort> _outputPorts = new();
+    private bool _isInitialized;
+    private readonly INodeCanvas _canvas;
 
-    protected NodeBase()
+    protected NodeBase(INodeCanvas canvas)
     {
+        _canvas = canvas ?? throw new ArgumentNullException(nameof(canvas));
         Id = Guid.NewGuid();
 
         // 어트리뷰트에서 직접 값을 가져옴
@@ -34,12 +37,10 @@ public abstract class NodeBase : INode, INotifyPropertyChanged
         _description = descriptionAttr?.Description ?? string.Empty;
     }
 
-    [JsonPropertyName("id")]
     public Guid Id { get; internal set; }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    [JsonPropertyName("name")]
     public string Name
     {
         get => _name;
@@ -49,14 +50,12 @@ public abstract class NodeBase : INode, INotifyPropertyChanged
     public string Category => _category;
     public string Description => _description;
     
-    [JsonPropertyName("x")]
     public double X
     {
         get => _x;
         set => SetProperty(ref _x, value);
     }
     
-    [JsonPropertyName("y")]
     public double Y
     {
         get => _y;
@@ -77,31 +76,21 @@ public abstract class NodeBase : INode, INotifyPropertyChanged
 
     public bool IsOutputNode => GetType().GetCustomAttribute<OutputNodeAttribute>() != null;
 
-    [JsonPropertyName("inputPorts")]
-    public IReadOnlyList<IPort> InputPorts => _inputPorts;
+    public IReadOnlyList<IInputPort> InputPorts => _inputPorts;
 
-    [JsonPropertyName("outputPorts")]
-    public IReadOnlyList<IPort> OutputPorts => _outputPorts;
+    public IReadOnlyList<IOutputPort> OutputPorts => _outputPorts;
 
-    public abstract Task ProcessAsync();
+    public bool IsInitialized => _isInitialized;
 
-    protected void RegisterInputPort(IPort port)
-    {
-        if (!port.IsInput)
-            throw new ArgumentException("입력 포트가 아닙니다.");
-        _inputPorts.Add(port);
-    }
-
-    protected void RegisterOutputPort(IPort port)
-    {
-        if (port.IsInput)
-            throw new ArgumentException("출력 포트가 아닙니다.");
-        _outputPorts.Add(port);
-    }
+    internal INodeCanvas Canvas => _canvas;
 
     public void Initialize()
     {
+        if (_isInitialized)
+            return;
+
         InitializePorts();
+        _isInitialized = true;
     }
 
     protected abstract void InitializePorts();
@@ -142,4 +131,34 @@ public abstract class NodeBase : INode, INotifyPropertyChanged
 
         return copy;
     }
+
+    protected InputPort<T> CreateInputPort<T>(string name)
+    {
+        var port = new InputPort<T>(name, this);
+        RegisterInputPort(port);
+        return port;
+    }
+
+    protected OutputPort<T> CreateOutputPort<T>(string name)
+    {
+        var port = new OutputPort<T>(name, this);
+        RegisterOutputPort(port);
+        return port;
+    }
+
+    protected void RegisterInputPort(IInputPort port)
+    {
+        if (port == null)
+            throw new ArgumentNullException(nameof(port));
+        _inputPorts.Add(port);
+    }
+
+    protected void RegisterOutputPort(IOutputPort port)
+    {
+        if (port == null)
+            throw new ArgumentNullException(nameof(port));
+        _outputPorts.Add(port);
+    }
+
+    public abstract Task ProcessAsync();
 } 

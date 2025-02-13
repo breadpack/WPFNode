@@ -97,7 +97,7 @@ public class InputPort<T>(string name, INode node) : PortBase(name, typeof(T), t
         return CanAcceptType(targetPort.DataType);
     }
 
-    public new T? Value
+    public object? Value
     {
         get
         {
@@ -112,7 +112,7 @@ public class InputPort<T>(string name, INode node) : PortBase(name, typeof(T), t
                 throw new InvalidOperationException($"[{Name}] 연결된 출력 포트를 찾을 수 없습니다.");
             }
 
-            var value = outputPort.GetValue();
+            var value = outputPort.Value;
             return ConvertValue(value);
         }
     }
@@ -122,15 +122,20 @@ public class InputPort<T>(string name, INode node) : PortBase(name, typeof(T), t
         if (!IsConnected)
             return defaultValue;
 
-        return Value ?? defaultValue;
+        try
+        {
+            var value = Value;
+            return value != null ? (T)ConvertValue(value)! : defaultValue;
+        }
+        catch
+        {
+            return defaultValue;
+        }
     }
 
     public T GetValueOrDefault()
     {
-        if (!IsConnected)
-            return default!;
-
-        return Value ?? default!;
+        return GetValueOrDefault(default!);
     }
 
     public bool TryGetValue(out T? value)
@@ -143,13 +148,19 @@ public class InputPort<T>(string name, INode node) : PortBase(name, typeof(T), t
 
         try
         {
-            value = Value;
-            return value != null;
+            var rawValue = Value;
+            if (rawValue != null)
+            {
+                value = ConvertValue(rawValue);
+                return value != null;
+            }
         }
         catch
         {
-            value = default;
-            return false;
+            // 변환 실패 시 기본값 반환
         }
+
+        value = default;
+        return false;
     }
 } 

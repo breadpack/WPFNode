@@ -1,10 +1,15 @@
 using System.Windows;
 using System.Windows.Input;
 using WPFNode.Controls.Commands;
-using WPFNode.Core.Models;
 using WPFNode.Core.ViewModels.Nodes;
 
 namespace WPFNode.Controls.Behaviors;
+
+public interface INumberInputNode
+{
+    void Increment();
+    void Decrement();
+}
 
 public static class NumberBoxCommandBehavior
 {
@@ -31,8 +36,8 @@ public static class NumberBoxCommandBehavior
         {
             var bindings = new CommandBindingCollection
             {
-                new CommandBinding(NumberBoxCommands.Increment, OnIncrement),
-                new CommandBinding(NumberBoxCommands.Decrement, OnDecrement)
+                new CommandBinding(NumberBoxCommands.Increment, OnIncrement, OnCanExecuteNumberCommand),
+                new CommandBinding(NumberBoxCommands.Decrement, OnDecrement, OnCanExecuteNumberCommand)
             };
 
             element.CommandBindings.Clear();
@@ -43,33 +48,29 @@ public static class NumberBoxCommandBehavior
         }
     }
 
-    private static void OnIncrement(object sender, ExecutedRoutedEventArgs e)
+    private static void OnCanExecuteNumberCommand(object sender, CanExecuteRoutedEventArgs e)
     {
         if (e.Parameter is NodeViewModel viewModel)
         {
-            if (viewModel.Model is InputNodeBase<int> intNode)
-            {
-                intNode.Value++;
-            }
-            else if (viewModel.Model is InputNodeBase<double> doubleNode)
-            {
-                doubleNode.Value += 1.0;
-            }
+            e.CanExecute = viewModel.Model is INumberInputNode;
+        }
+    }
+
+    private static void OnIncrement(object sender, ExecutedRoutedEventArgs e)
+    {
+        if (e.Parameter is NodeViewModel viewModel && 
+            viewModel.Model is INumberInputNode node)
+        {
+            node.Increment();
         }
     }
 
     private static void OnDecrement(object sender, ExecutedRoutedEventArgs e)
     {
-        if (e.Parameter is NodeViewModel viewModel)
+        if (e.Parameter is NodeViewModel viewModel && 
+            viewModel.Model is INumberInputNode node)
         {
-            if (viewModel.Model is InputNodeBase<int> intNode)
-            {
-                intNode.Value--;
-            }
-            else if (viewModel.Model is InputNodeBase<double> doubleNode)
-            {
-                doubleNode.Value -= 1.0;
-            }
+            node.Decrement();
         }
     }
 } 

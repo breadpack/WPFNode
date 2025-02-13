@@ -6,17 +6,32 @@ using WPFNode.Core.Commands;
 using WPFNode.Abstractions;
 using System.Threading;
 using System.Threading.Tasks;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using WPFNode.Core.Services;
+using WPFNode.Core.Interfaces;
 
 namespace WPFNode.Core.Models;
 
-public class NodeCanvas
+public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
 {
     private readonly List<NodeBase> _nodes;
     private readonly List<IConnection> _connections;
     private readonly List<NodeGroup> _groups;
+    private readonly INodePluginService _pluginService;
+    private double _scale = 1.0;
+    private double _offsetX;
+    private double _offsetY;
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 
     [JsonIgnore]
-    public IReadOnlyList<NodeBase> Nodes => _nodes;
+    public IReadOnlyList<INode> Nodes => _nodes;
     
     [JsonIgnore]
     public IReadOnlyList<IConnection> Connections => _connections;
@@ -24,14 +39,44 @@ public class NodeCanvas
     [JsonIgnore]
     public IReadOnlyList<NodeGroup> Groups => _groups;
     
-    [JsonPropertyName("scale")]
-    public double Scale { get; set; } = 1.0;
+    public double Scale
+    {
+        get => _scale;
+        set
+        {
+            if (_scale != value)
+            {
+                _scale = value;
+                OnPropertyChanged();
+            }
+        }
+    }
     
-    [JsonPropertyName("offsetX")]
-    public double OffsetX { get; set; }
+    public double OffsetX
+    {
+        get => _offsetX;
+        set
+        {
+            if (_offsetX != value)
+            {
+                _offsetX = value;
+                OnPropertyChanged();
+            }
+        }
+    }
     
-    [JsonPropertyName("offsetY")]
-    public double OffsetY { get; set; }
+    public double OffsetY
+    {
+        get => _offsetY;
+        set
+        {
+            if (_offsetY != value)
+            {
+                _offsetY = value;
+                OnPropertyChanged();
+            }
+        }
+    }
     
     [JsonIgnore]
     public CommandManager CommandManager { get; }
@@ -39,33 +84,74 @@ public class NodeCanvas
     [JsonConstructor]
     public NodeCanvas()
     {
+        _pluginService = NodeServices.PluginService ?? throw new ArgumentNullException("Services.PluginService");
         _nodes = new();
         _connections = new();
         _groups = new();
         CommandManager = new CommandManager();
     }
 
-    [JsonPropertyName("nodes")]
-    public List<NodeBase> SerializableNodes => _nodes;
+    public List<NodeBase> SerializableNodes
+    {
+        get => _nodes;
+        set
+        {
+            _nodes.Clear();
+            if (value != null)
+            {
+                foreach (var node in value)
+                {
+                    AddNodeInternal(node);
+                }
+            }
+        }
+    }
     
-    [JsonPropertyName("connections")]
     public List<IConnection> SerializableConnections => _connections;
     
-    [JsonPropertyName("groups")]
     public List<NodeGroup> SerializableGroups => _groups;
+
+    public T CreateNode<T>(double x = 0, double y = 0) where T : INode
+    {
+        var nodeType = typeof(T);
+        var node = (T)CreateNode(nodeType, x, y);
+        return node;
+    }
+
+    public INode CreateNode(Type nodeType, double x = 0, double y = 0)
+    {
+        if (!typeof(NodeBase).IsAssignableFrom(nodeType))
+            throw new ArgumentException($"노드 타입은 NodeBase를 상속해야 합니다: {nodeType.Name}");
+
+        // 생성자에 Canvas를 전달하여 노드 생성
+        var node = (NodeBase)Activator.CreateInstance(nodeType, this)!;
+        node.X = x;
+        node.Y = y;
+        node.Initialize();
+        
+        AddNodeInternal(node);
+        return node;
+    }
+
+    private void AddNodeInternal(NodeBase node)
+    {
+        if (node == null)
+            throw new ArgumentNullException(nameof(node));
+
+        _nodes.Add(node);
+        OnPropertyChanged(nameof(Nodes));
+    }
 
     public void AddNode(NodeBase node)
     {
-        if (node == null) throw new ArgumentNullException(nameof(node));
-        if (_nodes.Contains(node)) return;
-        
-        _nodes.Add(node);
+        AddNodeInternal(node);
     }
 
-    public void RemoveNode(NodeBase node)
+    public void RemoveNode(INode node)
     {
         if (node == null) throw new ArgumentNullException(nameof(node));
-        if (!_nodes.Contains(node)) return;
+        if (node is not NodeBase nodeBase) return;
+        if (!_nodes.Contains(nodeBase)) return;
 
         // 노드와 관련된 모든 연결 제거
         var connectionsToRemove = _connections
@@ -78,36 +164,28 @@ public class NodeCanvas
             Disconnect(connection);
         }
 
-        _nodes.Remove(node);
+        _nodes.Remove(nodeBase);
+        OnPropertyChanged(nameof(Nodes));
     }
 
-    public Connection? Connect(IPort source, IPort target)
+    public IConnection Connect(IPort source, IPort target)
     {
-        if (source == null) throw new ArgumentNullException(nameof(source));
-        if (target == null) throw new ArgumentNullException(nameof(target));
-        if (source.IsInput == target.IsInput) return null;
-        
-        var actualSource = (source.IsInput ? target : source) as IOutputPort;
-        var actualTarget = (source.IsInput ? source : target) as IInputPort;
-        
-        if(actualSource == null || actualTarget == null) return null;
-        
-        // 이미 연결이 존재하는지 확인
-        if (_connections.Any(c => c.Source == actualSource && c.Target == actualTarget))
+        if (source is not IOutputPort outputPort)
+            throw new ArgumentException("소스는 출력 포트여야 합니다.", nameof(source));
+        if (target is not IInputPort inputPort)
+            throw new ArgumentException("타겟은 입력 포트여야 합니다.", nameof(target));
+        if (!outputPort.CanConnectTo(inputPort))
+            throw new InvalidOperationException("포트를 연결할 수 없습니다.");
+
+        // 중복 연결 체크
+        if (_connections.Any(c => c.Source == source && c.Target == target))
             return null;
 
-        // 연결 가능 여부 확인
-        if (!actualSource.CanConnectTo(actualTarget)) return null;
-
-        var connection = new Connection(actualSource, actualTarget);
-        
-        // 포트에 연결 추가
-        ((PortBase)actualSource).AddConnection(connection);
-        ((PortBase)actualTarget).AddConnection(connection);
-        
-        // Canvas의 Connections 컬렉션에 추가
+        var connection = new Connection(outputPort, inputPort);
+        ((PortBase)source).AddConnection(connection);
+        ((PortBase)target).AddConnection(connection);
         _connections.Add(connection);
-        
+        OnPropertyChanged(nameof(Connections));
         return connection;
     }
 
@@ -122,6 +200,8 @@ public class NodeCanvas
         // 포트에서 연결 제거
         ((PortBase)connection.Source).RemoveConnection(connection);
         ((PortBase)connection.Target).RemoveConnection(connection);
+        
+        OnPropertyChanged(nameof(Connections));
     }
 
     private bool IsTypeCompatible(Type sourceType, Type targetType)
@@ -259,6 +339,11 @@ public class NodeCanvas
     {
         var executionPlan = ExecutionPlan.Create(_nodes, _connections);
         await executionPlan.ExecuteAsync(cancellationToken);
+    }
+
+    internal Connection CreateConnection(IOutputPort source, IInputPort target)
+    {
+        return new Connection(source, target);
     }
 }
 
