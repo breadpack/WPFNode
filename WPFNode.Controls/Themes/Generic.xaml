@@ -2,6 +2,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="clr-namespace:WPFNode.Controls"
+    xmlns:converters="clr-namespace:WPFNode.Controls.Converters"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:nodes="clr-namespace:WPFNode.Core.ViewModels.Nodes;assembly=WPFNode.Core"
@@ -206,54 +207,72 @@
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}">
                         <Grid>
-                            <Canvas x:Name="PART_Canvas"
-                                    Background="Transparent"
-                                    ClipToBounds="True">
-                                <Canvas.RenderTransform>
-                                    <TransformGroup>
-                                        <TranslateTransform X="{Binding OffsetX}"
-                                                          Y="{Binding OffsetY}"/>
-                                        <ScaleTransform ScaleX="{Binding Scale}"
-                                                      ScaleY="{Binding Scale}"/>
-                                    </TransformGroup>
-                                </Canvas.RenderTransform>
+                            <ScrollViewer x:Name="PART_ScrollViewer"
+                                        HorizontalScrollBarVisibility="Auto"
+                                        VerticalScrollBarVisibility="Auto">
+                                <Canvas x:Name="PART_Canvas"
+                                        Background="Transparent"
+                                        ClipToBounds="True"
+                                        Width="4000" Height="4000">
+                                    <Canvas.RenderTransform>
+                                        <TransformGroup>
+                                            <ScaleTransform ScaleX="{Binding Scale}"
+                                                          ScaleY="{Binding Scale}"/>
+                                        </TransformGroup>
+                                    </Canvas.RenderTransform>
 
-                                <!-- 연결선 -->
-                                <ItemsControl ItemsSource="{Binding Connections}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <Canvas IsItemsHost="True" ZIndex="1"
-                                                    VirtualizingPanel.IsVirtualizing="False"
-                                                    VirtualizingPanel.VirtualizationMode="Standard"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <local:ConnectionControl DataContext="{Binding}"/>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                    <!-- 연결선 -->
+                                    <ItemsControl ItemsSource="{Binding Connections}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <Canvas IsItemsHost="True" ZIndex="1"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <local:ConnectionControl DataContext="{Binding}"/>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
 
-                                <!-- 노드 -->
-                                <ItemsControl ItemsSource="{Binding Nodes}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <Canvas IsItemsHost="True" ZIndex="0"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <local:NodeControl DataContext="{Binding}"/>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                    <ItemsControl.ItemContainerStyle>
-                                        <Style TargetType="ContentPresenter">
-                                            <Setter Property="Canvas.Left" Value="{Binding Model.X}"/>
-                                            <Setter Property="Canvas.Top" Value="{Binding Model.Y}"/>
-                                        </Style>
-                                    </ItemsControl.ItemContainerStyle>
-                                </ItemsControl>
-                            </Canvas>
+                                    <!-- 노드 -->
+                                    <ItemsControl ItemsSource="{Binding Nodes}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <Canvas IsItemsHost="True" ZIndex="0"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <local:NodeControl DataContext="{Binding}"/>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                        <ItemsControl.ItemContainerStyle>
+                                            <Style TargetType="ContentPresenter">
+                                                <Style.Resources>
+                                                    <converters:CenterOffsetConverter x:Key="LocalCenterOffsetConverter"/>
+                                                </Style.Resources>
+                                                <Setter Property="Canvas.Left">
+                                                    <Setter.Value>
+                                                        <MultiBinding Converter="{StaticResource LocalCenterOffsetConverter}">
+                                                            <Binding Path="Model.X"/>
+                                                            <Binding ElementName="PART_Canvas" Path="Width"/>
+                                                        </MultiBinding>
+                                                    </Setter.Value>
+                                                </Setter>
+                                                <Setter Property="Canvas.Top">
+                                                    <Setter.Value>
+                                                        <MultiBinding Converter="{StaticResource LocalCenterOffsetConverter}">
+                                                            <Binding Path="Model.Y"/>
+                                                            <Binding ElementName="PART_Canvas" Path="Height"/>
+                                                        </MultiBinding>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </ItemsControl.ItemContainerStyle>
+                                    </ItemsControl>
+                                </Canvas>
+                            </ScrollViewer>
                             
                             <local:SearchPanel x:Name="PART_SearchPanel"
                                              Visibility="Collapsed"
@@ -335,11 +354,7 @@
     <local:ColorToBrushConverter x:Key="ColorToBrushConverter"/>
 
     <!-- Value Converters -->
-    <local:BoolToColumnConverter x:Key="BoolToColumnConverter" TrueValue="0" FalseValue="1"/>
-    <local:BoolToColumnConverter x:Key="BoolToInverseColumnConverter" TrueValue="1" FalseValue="0"/>
-    <local:BoolToAlignmentConverter x:Key="BoolToAlignmentConverter" TrueValue="Left" FalseValue="Right"/>
-    <local:BoolToTextAlignmentConverter x:Key="BoolToTextAlignmentConverter" TrueValue="Left" FalseValue="Right"/>
-    <local:BoolToMarginConverter x:Key="BoolToMarginConverter" TrueValue="4,0,0,0" FalseValue="0,0,4,0"/>
+    <converters:CenterOffsetConverter x:Key="CenterOffsetConverter"/>
 
     <DataTemplate x:Key="TextBoxTemplate">
         <TextBox Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"

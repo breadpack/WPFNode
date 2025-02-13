@@ -20,6 +20,7 @@ public class NodeControl : ContentControl, INodeControl
     private Point? _dragStart;
     private Point _nodeStartPosition;
     private ContextMenu? _contextMenu;
+    private Canvas? _parentCanvas;
 
     static NodeControl()
     {
@@ -31,6 +32,41 @@ public class NodeControl : ContentControl, INodeControl
     {
         get => (NodeViewModel?)DataContext;
         set => DataContext = value;
+    }
+
+    private double CanvasWidth => ParentCanvas?.ActualWidth ?? 4000;
+    private double CanvasHeight => ParentCanvas?.ActualHeight ?? 4000;
+
+    public static readonly DependencyProperty CenteredXProperty =
+        DependencyProperty.Register(
+            nameof(CenteredX),
+            typeof(double),
+            typeof(NodeControl),
+            new FrameworkPropertyMetadata(0.0, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty CenteredYProperty =
+        DependencyProperty.Register(
+            nameof(CenteredY),
+            typeof(double),
+            typeof(NodeControl),
+            new FrameworkPropertyMetadata(0.0, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public double CenteredX
+    {
+        get => (double)GetValue(CenteredXProperty);
+        private set => SetValue(CenteredXProperty, value);
+    }
+
+    public double CenteredY
+    {
+        get => (double)GetValue(CenteredYProperty);
+        private set => SetValue(CenteredYProperty, value);
+    }
+
+    private void UpdateCenteredPosition()
+    {
+        CenteredX = (ViewModel?.Model.X ?? 0) + CanvasWidth / 2;
+        CenteredY = (ViewModel?.Model.Y ?? 0) + CanvasHeight / 2;
     }
 
     public static readonly DependencyProperty ContentProperty =
@@ -84,6 +120,21 @@ public class NodeControl : ContentControl, INodeControl
 
         InitializeContextMenu();
         DataContextChanged += OnDataContextChanged;
+        Loaded += OnControlLoaded;
+    }
+
+    private void OnControlLoaded(object sender, RoutedEventArgs e)
+    {
+        if (ParentCanvas != null)
+        {
+            ParentCanvas.SizeChanged += OnCanvasSizeChanged;
+        }
+        UpdateCenteredPosition();
+    }
+
+    private void OnCanvasSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        UpdateCenteredPosition();
     }
 
     private void InitializeContextMenu()
@@ -192,6 +243,7 @@ public class NodeControl : ContentControl, INodeControl
                             _nodeStartPosition.Y + totalDelta.Y);
                     }
                 }
+                UpdateCenteredPosition();
             }
 
             _dragStart = null;
@@ -219,6 +271,7 @@ public class NodeControl : ContentControl, INodeControl
                             _nodeStartPosition.Y + delta.Y);
                     }
                 }
+                UpdateCenteredPosition();
             }
 
             e.Handled = true;
@@ -227,9 +280,15 @@ public class NodeControl : ContentControl, INodeControl
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
+        if (e.OldValue is NodeViewModel oldViewModel)
+        {
+            oldViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        }
+
         if (e.NewValue is NodeViewModel viewModel)
         {
             HeaderContent = viewModel.Model.Name;
+            viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
             // NodeServices를 통해 PluginService 접근
             var style = NodeServices.PluginService.FindNodeStyle(viewModel.Model.GetType());
@@ -238,6 +297,32 @@ public class NodeControl : ContentControl, INodeControl
                 // 스타일을 복제하여 사용
                 Style = new Style(typeof(NodeControl), style);
             }
+
+            UpdateCenteredPosition();
+        }
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(NodeViewModel.Position))
+        {
+            UpdateCenteredPosition();
+        }
+    }
+
+    private Canvas? ParentCanvas
+    {
+        get
+        {
+            if (_parentCanvas == null)
+            {
+                var canvas = this.GetParentOfType<NodeCanvasControl>();
+                if (canvas != null)
+                {
+                    _parentCanvas = canvas.GetDragCanvas();
+                }
+            }
+            return _parentCanvas;
         }
     }
 

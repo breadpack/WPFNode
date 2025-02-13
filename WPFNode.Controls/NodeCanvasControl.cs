@@ -25,6 +25,7 @@ public class NodeCanvasControl : Control
     private NodePortViewModel? _dragStartPort;
     private Line? _dragLine;
     private Canvas? _dragCanvas;
+    private ScrollViewer? _scrollViewer;
     private SearchPanel? _searchPanel;
     
     private readonly NodeCanvasStateManager _stateManager;
@@ -81,6 +82,7 @@ public class NodeCanvasControl : Control
         
         _stateManager = new NodeCanvasStateManager(this);
         DataContextChanged += OnDataContextChanged;
+        Loaded += OnControlLoaded;
         Initialize();
     }
 
@@ -94,6 +96,37 @@ public class NodeCanvasControl : Control
         if (e.NewValue is NodeCanvasViewModel newViewModel)
         {
             _stateManager.Initialize(newViewModel);
+        }
+    }
+
+    private void OnControlLoaded(object sender, RoutedEventArgs e)
+    {
+        var window = Window.GetWindow(this);
+        if (window != null)
+        {
+            UpdateCanvasSize(window);
+            window.SizeChanged += OnWindowSizeChanged;
+        }
+
+        // 스크롤 위치를 중앙으로 초기화
+        if (_scrollViewer != null && _dragCanvas != null)
+        {
+            bool isInitialized = false;
+            EventHandler? layoutUpdatedHandler = null;
+            layoutUpdatedHandler = (s, args) =>
+            {
+                if (!isInitialized && _scrollViewer.ViewportWidth > 0)
+                {
+                    _scrollViewer.ScrollToHorizontalOffset((_dragCanvas.Width - _scrollViewer.ViewportWidth) / 2);
+                    _scrollViewer.ScrollToVerticalOffset((_dragCanvas.Height - _scrollViewer.ViewportHeight) / 2);
+                    isInitialized = true;
+
+                    // 한 번만 실행되도록 이벤트 핸들러 제거
+                    if (layoutUpdatedHandler != null)
+                        LayoutUpdated -= layoutUpdatedHandler;
+                }
+            };
+            LayoutUpdated += layoutUpdatedHandler;
         }
     }
 
@@ -122,12 +155,6 @@ public class NodeCanvasControl : Control
         // 키보드 이벤트 처리
         KeyDown += OnKeyDown;
 
-        // 크기 설정
-        Width = 800;
-        Height = 600;
-        HorizontalAlignment = HorizontalAlignment.Stretch;
-        VerticalAlignment = VerticalAlignment.Stretch;
-
         System.Diagnostics.Debug.WriteLine($"NodeCanvasControl created: {Width}x{Height}");
     }
 
@@ -135,6 +162,7 @@ public class NodeCanvasControl : Control
     {
         base.OnApplyTemplate();
         _dragCanvas = GetTemplateChild("PART_Canvas") as Canvas;
+        _scrollViewer = GetTemplateChild("PART_ScrollViewer") as ScrollViewer;
         _searchPanel = GetTemplateChild("PART_SearchPanel") as SearchPanel;
         
         if (_searchPanel != null)
@@ -146,6 +174,23 @@ public class NodeCanvasControl : Control
         if (_dragCanvas != null)
         {
             _dragCanvas.LayoutUpdated += OnCanvasLayoutUpdated;
+        }
+    }
+
+    private void UpdateCanvasSize(Window window)
+    {
+        if (_dragCanvas == null) return;
+        _dragCanvas.Width = window.ActualWidth * 4;
+        _dragCanvas.Height = window.ActualHeight * 4;
+        
+        System.Diagnostics.Debug.WriteLine($"Canvas size updated: {_dragCanvas.Width}x{_dragCanvas.Height} (Window: {window.ActualWidth}x{window.ActualHeight})");
+    }
+
+    private void OnWindowSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (sender is Window window)
+        {
+            UpdateCanvasSize(window);
         }
     }
 
@@ -290,11 +335,13 @@ public class NodeCanvasControl : Control
             _dragNode.Model.Y += delta.Y;
             e.Handled = true;
         }
-        // 캔버스 드래그
-        else if (e.Source == this && ViewModel != null)
+        // 캔버스 드래그 (스크롤 조정)
+        else if (e.Source == this && _scrollViewer != null)
         {
-            ViewModel.OffsetX += delta.X;
-            ViewModel.OffsetY += delta.Y;
+            // 스크롤 위치 조정
+            _scrollViewer.ScrollToHorizontalOffset(_scrollViewer.HorizontalOffset - delta.X);
+            _scrollViewer.ScrollToVerticalOffset(_scrollViewer.VerticalOffset - delta.Y);
+            
             e.Handled = true;
         }
 
@@ -305,18 +352,24 @@ public class NodeCanvasControl : Control
     {
         if (ViewModel == null) return;
 
-        var zoomCenter = e.GetPosition(this);
+        var zoomCenter = e.GetPosition(_dragCanvas);
         var delta = e.Delta * 0.001;
         var newScale = ViewModel.Scale + delta;
-        newScale = Math.Max(0.1, Math.Min(2.0, newScale));
+        newScale = Math.Max(0.25, Math.Min(2.0, newScale));
 
         // 줌 중심점 기준으로 스케일 조정
-        var dx = zoomCenter.X - ViewModel.OffsetX;
-        var dy = zoomCenter.Y - ViewModel.OffsetY;
+        var scrollX = _scrollViewer?.HorizontalOffset ?? 0;
+        var scrollY = _scrollViewer?.VerticalOffset ?? 0;
         
-        ViewModel.OffsetX = zoomCenter.X - dx * (newScale / ViewModel.Scale);
-        ViewModel.OffsetY = zoomCenter.Y - dy * (newScale / ViewModel.Scale);
         ViewModel.Scale = newScale;
+
+        if (_scrollViewer != null)
+        {
+            // 줌 후 스크롤 위치 조정
+            var scaleChange = newScale / ViewModel.Scale;
+            _scrollViewer.ScrollToHorizontalOffset(scrollX * scaleChange);
+            _scrollViewer.ScrollToVerticalOffset(scrollY * scaleChange);
+        }
     }
 
     private void OnKeyDown(object sender, KeyEventArgs e)
