@@ -7,10 +7,9 @@ public abstract class InputNodeBase<T> : NodeBase
     protected readonly OutputPort<T> _output;
     protected T _value;
 
-    protected InputNodeBase(INodeCanvas canvas) : base(canvas)
-    {
-        _output = new OutputPort<T>("Value", this);
-        _value = default!;
+    protected InputNodeBase(INodeCanvas canvas) : base(canvas) {
+        _output = CreateOutputPort<T>("Value");
+        _value  = default!;
     }
 
     public virtual T Value
@@ -28,7 +27,6 @@ public abstract class InputNodeBase<T> : NodeBase
     }
 
     protected override void InitializePorts() {
-        RegisterOutputPort(_output);
     }
 
     public override Task ProcessAsync()

@@ -22,9 +22,6 @@ public class AdditionNode : NodeBase
 
     protected override void InitializePorts()
     {
-        RegisterInputPort(_inputA);
-        RegisterInputPort(_inputB);
-        RegisterOutputPort(_output);
     }
 
     public override async Task ProcessAsync()

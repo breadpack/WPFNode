@@ -146,14 +146,14 @@ public abstract class NodeBase : INode, INotifyPropertyChanged
         return port;
     }
 
-    protected void RegisterInputPort(IInputPort port)
+    private void RegisterInputPort(IInputPort port)
     {
         if (port == null)
             throw new ArgumentNullException(nameof(port));
         _inputPorts.Add(port);
     }
 
-    protected void RegisterOutputPort(IOutputPort port)
+    private void RegisterOutputPort(IOutputPort port)
     {
         if (port == null)
             throw new ArgumentNullException(nameof(port));

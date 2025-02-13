@@ -10,18 +10,15 @@ namespace WPFNode.Plugins.Basic;
 [OutputNode]
 public class ConsoleWriteNode : NodeBase {
     private readonly InputPort<string> _input;
-    
+
     public ConsoleWriteNode(INodeCanvas canvas) : base(canvas) {
-        _input = new InputPort<string>("Text", this);
+        _input = CreateInputPort<string>("Text");
     }
 
-    public override Task ProcessAsync()
-    {
+    public override Task ProcessAsync() {
         Console.WriteLine(_input.Value);
         return Task.CompletedTask;
     }
 
-    protected override void InitializePorts() {
-        RegisterInputPort(_input);
-    }
+    protected override void InitializePorts() { }
 }
