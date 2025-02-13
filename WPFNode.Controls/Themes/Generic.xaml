@@ -17,7 +17,8 @@
                     <Border Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="3">
+                            CornerRadius="3"
+                            Effect="{TemplateBinding Effect}">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -73,8 +74,16 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                            <Setter Property="BorderBrush" Value="Orange"/>
+                            <Setter Property="BorderBrush" Value="#FF007ACC"/>
                             <Setter Property="BorderThickness" Value="2"/>
+                            <Setter Property="Effect">
+                                <Setter.Value>
+                                    <DropShadowEffect Color="#FF007ACC" 
+                                                    BlurRadius="8" 
+                                                    ShadowDepth="0" 
+                                                    Opacity="0.5"/>
+                                </Setter.Value>
+                            </Setter>
                         </DataTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
