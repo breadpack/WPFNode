@@ -18,6 +18,11 @@ public class TestNode : NodeBase
 
     public override Task ProcessAsync()
     {
+        // 연결된 입력 포트의 값을 출력 포트로 전달
+        if (DoubleInput.IsConnected)
+        {
+            DoubleOutput.Value = DoubleInput.Value;
+        }
         return Task.CompletedTask;
     }
 

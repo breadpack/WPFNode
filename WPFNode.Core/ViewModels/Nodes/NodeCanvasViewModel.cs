@@ -13,6 +13,7 @@ using WPFNode.Abstractions;
 using WPFNode.Core.Commands;
 using IWpfCommand = System.Windows.Input.ICommand;
 using System.Collections.Specialized;
+using System.Windows;
 
 namespace WPFNode.Core.ViewModels.Nodes;
 
@@ -44,6 +45,7 @@ public partial class NodeCanvasViewModel : ObservableObject
     public IWpfCommand RemoveGroupCommand { get; }
     public IWpfCommand UndoCommand { get; }
     public IWpfCommand RedoCommand { get; }
+    public IWpfCommand ExecuteCommand { get; }
 
     public NodeCanvasViewModel(
         NodeCanvas canvas,
@@ -70,6 +72,7 @@ public partial class NodeCanvasViewModel : ObservableObject
         RemoveGroupCommand = new RelayCommand<NodeGroupViewModel>(RemoveGroup);
         UndoCommand = new RelayCommand(ExecuteUndo, CanExecuteUndo);
         RedoCommand = new RelayCommand(ExecuteRedo, CanExecuteRedo);
+        ExecuteCommand = new RelayCommand(ExecuteNodes);
 
         // Model 변경 감지를 위한 이벤트 핸들러 등록
         SynchronizeWithModel();
@@ -244,4 +247,16 @@ public partial class NodeCanvasViewModel : ObservableObject
     }
 
     public NodeCanvas Model => _canvas;
+
+    private async void ExecuteNodes()
+    {
+        try
+        {
+            await _canvas.ExecuteAsync();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"노드 실행 중 오류 발생: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
 } 

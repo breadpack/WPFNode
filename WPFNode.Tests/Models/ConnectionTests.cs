@@ -2,6 +2,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using WPFNode.Abstractions;
 using WPFNode.Core.Models;
+using System.Threading.Tasks;
 
 namespace WPFNode.Tests.Models
 {
@@ -18,6 +19,8 @@ namespace WPFNode.Tests.Models
         {
             _sourceNode = new TestNode();
             _targetNode = new TestNode();
+            _sourceNode.Initialize();
+            _targetNode.Initialize();
             _sourcePort = _sourceNode.DoubleOutput;
             _targetPort = _targetNode.DoubleInput;
         }
@@ -85,6 +88,21 @@ namespace WPFNode.Tests.Models
             
             // Assert
             Assert.IsFalse(connection.IsEnabled);
+        }
+
+        [TestMethod]
+        public async Task ValuePropagation_ConnectedPorts_PropagatesValue()
+        {
+            // Arrange
+            var connection = new Connection(_sourcePort, _targetPort);
+            _sourceNode.DoubleOutput.Value = 42.0;
+            
+            // Act
+            await _sourceNode.ProcessAsync();
+            await _targetNode.ProcessAsync();
+
+            // Assert
+            Assert.AreEqual(42.0, _targetNode.DoubleOutput.Value);
         }
     }
 } 

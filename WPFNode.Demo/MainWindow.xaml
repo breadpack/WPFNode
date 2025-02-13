@@ -19,6 +19,13 @@
         </Grid.RowDefinitions>
 
         <ToolBar Grid.Row="0">
+            <Button Command="{Binding NodeCanvasViewModel.ExecuteCommand}">
+                <StackPanel Orientation="Horizontal">
+                    <Path Data="M8,5 L19,12 L8,19 Z" Fill="#FF1E90FF" Stretch="Uniform" Width="16" Height="16" Margin="0,0,4,0"/>
+                    <TextBlock Text="실행하기"/>
+                </StackPanel>
+            </Button>
+            <Separator/>
             <Button Content="자동 정렬" Command="{Binding NodeCanvasViewModel.AutoLayoutCommand}"/>
             <Separator/>
             <Button Content="실행 취소" Command="{Binding NodeCanvasViewModel.UndoCommand}"/>

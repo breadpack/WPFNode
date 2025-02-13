@@ -40,6 +40,44 @@ public class InputPort<T>(string name, INode node) : PortBase(name, typeof(T), t
         return false;
     }
 
+    private T? ConvertValue(object? value)
+    {
+        if (value == null)
+            return default;
+
+        var valueType = value.GetType();
+        if(typeof(T) == typeof(string)) 
+            return (T?)(object?)value.ToString();
+
+        // 등록된 타입 변환기를 찾아서 실행
+        if (_typeConverters.TryGetValue(valueType, out var converter))
+        {
+            var result = converter(value);
+            if (result != null)
+                return result;
+            throw new InvalidOperationException($"[{Name}] 타입 변환 실패: {valueType.Name} -> {typeof(T).Name}, 변환 결과가 null");
+        }
+
+        // 암시적 캐스팅 시도
+        try
+        {
+            if (CanImplicitlyCast(valueType))
+            {
+                if (typeof(T).IsAssignableFrom(valueType))
+                    return (T?)value;
+
+                var convertedValue = Convert.ChangeType(value, typeof(T));
+                return (T?)convertedValue;
+            }
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"[{Name}] 암시적 변환 실패: {valueType.Name} -> {typeof(T).Name}", ex);
+        }
+
+        throw new InvalidOperationException($"[{Name}] 타입 변환기 없음: {valueType.Name} -> {typeof(T).Name}");
+    }
+
     public bool CanAcceptType(Type type)
     {
         if (typeof(T) == typeof(string)) {
@@ -61,78 +99,57 @@ public class InputPort<T>(string name, INode node) : PortBase(name, typeof(T), t
 
     public new T? Value
     {
-        get => base.Value == null ? default : (T)base.Value;
-        set => base.Value = value;
-    }
-
-    protected override bool TrySetValue(object? value)
-    {
-        if (value == null)
+        get
         {
-            base.Value = default(T);
-            return true;
-        }
-
-        var valueType = value.GetType();
-        if(typeof(T) == typeof(string)) 
-        {
-            base.Value = value.ToString();
-            return true;
-        }
-
-        // 등록된 타입 변환기를 찾아서 실행
-        if (_typeConverters.TryGetValue(valueType, out var converter))
-        {
-            var result = converter(value);
-            if (result != null)
+            if (!IsConnected)
             {
-                base.Value = result;
-                return true;
+                throw new InvalidOperationException($"[{Name}] 연결되지 않은 입력 포트의 값을 읽을 수 없습니다.");
             }
-            throw new InvalidOperationException($"[{Name}] 타입 변환 실패: {valueType.Name} -> {typeof(T).Name}, 변환 결과가 null");
-        }
 
-        // 암시적 캐스팅 시도
-        try
-        {
-            if (CanImplicitlyCast(valueType))
+            var outputPort = Connections.FirstOrDefault()?.Source as IOutputPort;
+            if (outputPort == null)
             {
-                if (typeof(T).IsAssignableFrom(valueType))
-                {
-                    base.Value = value;
-                    return true;
-                }
-
-                var convertedValue = Convert.ChangeType(value, typeof(T));
-                base.Value = convertedValue;
-                return true;
+                throw new InvalidOperationException($"[{Name}] 연결된 출력 포트를 찾을 수 없습니다.");
             }
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException($"[{Name}] 암시적 변환 실패: {valueType.Name} -> {typeof(T).Name}", ex);
-        }
 
-        throw new InvalidOperationException($"[{Name}] 타입 변환기 없음: {valueType.Name} -> {typeof(T).Name}");
+            var value = outputPort.GetValue();
+            return ConvertValue(value);
+        }
     }
 
     public T GetValueOrDefault(T defaultValue)
     {
+        if (!IsConnected)
+            return defaultValue;
+
         return Value ?? defaultValue;
     }
 
     public T GetValueOrDefault()
     {
-        return Value ?? default(T)!;
+        if (!IsConnected)
+            return default!;
+
+        return Value ?? default!;
     }
 
     public bool TryGetValue(out T? value)
     {
-        value = default;
-        if (!IsConnected || base.Value == null)
+        if (!IsConnected)
+        {
+            value = default;
             return false;
+        }
 
-        value = (T)base.Value;
-        return true;
+        try
+        {
+            value = Value;
+            return value != null;
+        }
+        catch
+        {
+            value = default;
+            return false;
+        }
     }
 } 

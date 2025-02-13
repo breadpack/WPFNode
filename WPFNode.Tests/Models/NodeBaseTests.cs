@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using WPFNode.Core.Attributes;
 using WPFNode.Core.Models;
+using WPFNode.Tests.Models.Primitives;
+using WPFNode.Abstractions;
 
 namespace WPFNode.Tests.Models
 {
@@ -15,18 +17,27 @@ namespace WPFNode.Tests.Models
         {
             // Arrange
             var node = new TestAdditionNode();
+            var inputNodeA = new DoubleInputNode();
+            var inputNodeB = new DoubleInputNode();
             node.Initialize();
+            inputNodeA.Initialize();
+            inputNodeB.Initialize();
             
-            var inputA = node.InputPorts.First(p => p.Name == "A") as InputPort<double>;
-            var inputB = node.InputPorts.First(p => p.Name == "B") as InputPort<double>;
-            var output = node.OutputPorts.First(p => p.Name == "결과") as OutputPort<double>;
+            // 입력 노드와 덧셈 노드 연결
+            var connection1 = new Connection(
+                inputNodeA.OutputPorts.First() as IOutputPort,
+                node.InputPorts.First(p => p.Name == "A") as IInputPort);
+            var connection2 = new Connection(
+                inputNodeB.OutputPorts.First() as IOutputPort,
+                node.InputPorts.First(p => p.Name == "B") as IInputPort);
             
             // Act
-            inputA.Value = 5;
-            inputB.Value = 3;
+            inputNodeA.Value = 5;
+            inputNodeB.Value = 3;
             await node.ProcessAsync();
             
             // Assert
+            var output = node.OutputPorts.First(p => p.Name == "결과") as OutputPort<double>;
             Assert.AreEqual(8, output.Value);
         }
 
@@ -64,16 +75,21 @@ namespace WPFNode.Tests.Models
         {
             // Arrange
             var node = new TestAdditionNode();
+            var inputNodeA = new DoubleInputNode();
             node.Initialize();
+            inputNodeA.Initialize();
             
-            var inputA = node.InputPorts.First(p => p.Name == "A") as InputPort<double>;
-            var output = node.OutputPorts.First(p => p.Name == "결과") as OutputPort<double>;
+            // 입력 노드와 덧셈 노드 연결
+            var connection = new Connection(
+                inputNodeA.OutputPorts.First() as IOutputPort,
+                node.InputPorts.First(p => p.Name == "A") as IInputPort);
             
             // Act
-            inputA.Value = 5; // B는 설정하지 않음
+            inputNodeA.Value = 5; // B는 연결하지 않음
             await node.ProcessAsync();
             
             // Assert
+            var output = node.OutputPorts.First(p => p.Name == "결과") as OutputPort<double>;
             Assert.AreEqual(5, output.Value); // B는 기본값 0을 사용
         }
     }

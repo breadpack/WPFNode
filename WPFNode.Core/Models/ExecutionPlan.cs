@@ -59,6 +59,8 @@ public class ExecutionPlan
             }
         }
 
+        executionLevels.Reverse();
+
         return new ExecutionPlan(executionLevels);
     }
 
