@@ -11,7 +11,6 @@ public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
     private readonly IPort _port;
     private string _name;
     private bool _isSelected;
-    private readonly ObservableCollection<ConnectionViewModel> _connections;
     private readonly NodeCanvasViewModel _canvas;
 
     public NodePortViewModel(IPort port, NodeCanvasViewModel canvas)
@@ -19,10 +18,6 @@ public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
         _port = port;
         _canvas = canvas;
         _name = port.Name;
-        _connections = new ObservableCollection<ConnectionViewModel>();
-
-        // 초기 연결 상태 설정
-        UpdateConnections();
 
         // Model 속성 변경 감지
         _port.PropertyChanged += (s, e) =>
@@ -33,23 +28,11 @@ public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
                     Name = _port.Name;
                     break;
                 case nameof(IPort.Connections):
-                    UpdateConnections();
+                    OnPropertyChanged(nameof(Connections));
+                    OnPropertyChanged(nameof(IsConnected));
                     break;
             }
         };
-    }
-
-    private void UpdateConnections()
-    {
-        _connections.Clear();
-        foreach (var connection in _port.Connections)
-        {
-            var vm = _canvas.Connections.FirstOrDefault(c => c.Model == connection);
-            if (vm != null)
-            {
-                _connections.Add(vm);
-            }
-        }
     }
 
     public Guid Id => _port.Id;
@@ -96,7 +79,12 @@ public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
     public bool IsInput => _port.IsInput;
     public Type DataType => _port.DataType;
     public bool IsConnected => _port.IsConnected;
-    public IReadOnlyList<ConnectionViewModel> Connections => _connections;
+    public IReadOnlyList<ConnectionViewModel> Connections => 
+        _port.Connections
+            .Select(c => _canvas.Connections.FirstOrDefault(vm => vm.Model == c))
+            .Where(vm => vm != null)
+            .Cast<ConnectionViewModel>()
+            .ToList();
 
     public bool CanConnectTo(NodePortViewModel other)
     {

@@ -8,7 +8,8 @@
         xmlns:vm="clr-namespace:WPFNode.Demo.ViewModels"
         mc:Ignorable="d"
         Title="Node Editor" Height="450" Width="800"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        Closing="Window_Closing">
     <Window.DataContext>
         <vm:MainWindowViewModel/>
     </Window.DataContext>
@@ -30,6 +31,9 @@
             <Separator/>
             <Button Content="실행 취소" Command="{Binding NodeCanvasViewModel.UndoCommand}"/>
             <Button Content="다시 실행" Command="{Binding NodeCanvasViewModel.RedoCommand}"/>
+            <Separator/>
+            <Button Content="저장" Command="{Binding SaveCommand}"/>
+            <Button Content="불러오기" Command="{Binding LoadCommand}"/>
         </ToolBar>
 
         <controls:NodeCanvasControl

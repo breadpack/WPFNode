@@ -21,38 +21,14 @@ namespace WPFNode.Tests.Models;
 [TestClass]
 public class NodeCanvasSerializationTests : IDisposable
 {
-    private readonly string _testFilePath;
-    private readonly IServiceProvider _serviceProvider;
-    private readonly NodePluginService _pluginService;
-    private readonly NodeCanvas _canvas;
+    private readonly string                _testFilePath;
+    private readonly NodePluginService     _pluginService;
+    private readonly NodeCanvas            _canvas;
     private readonly JsonSerializerOptions _jsonOptions;
 
     public NodeCanvasSerializationTests()
     {
         _testFilePath = Path.Combine(Path.GetTempPath(), $"nodecanvas_test_{Guid.NewGuid()}.json");
-        
-        // 서비스 설정
-        var services = new ServiceCollection();
-        services.AddLogging(builder => builder.AddProvider(NullLoggerProvider.Instance));
-        
-        // NodePluginService를 먼저 생성하고 등록
-        _pluginService = new NodePluginService();
-        services.AddSingleton<NodePluginService>(_pluginService);
-        
-        _serviceProvider = services.BuildServiceProvider();
-
-        // 플러그인 어셈블리 로드
-        var pluginAssembly = Assembly.GetAssembly(typeof(DoubleInputNode));
-        if (pluginAssembly != null)
-        {
-            foreach (var type in pluginAssembly.GetTypes())
-            {
-                if (typeof(INode).IsAssignableFrom(type) && !type.IsInterface && !type.IsAbstract)
-                {
-                    _pluginService.RegisterNodeType(type);
-                }
-            }
-        }
 
         _canvas = new NodeCanvas();
 
@@ -63,7 +39,7 @@ public class NodeCanvasSerializationTests : IDisposable
             PropertyNameCaseInsensitive = true,
             PropertyNamingPolicy = null  // 속성 이름을 그대로 유지
         };
-        _jsonOptions.Converters.Add(new NodeCanvasJsonConverter(_serviceProvider));
+        _jsonOptions.Converters.Add(new NodeCanvasJsonConverter());
     }
 
     [TestMethod]
@@ -317,6 +293,24 @@ public class NodeCanvasSerializationTests : IDisposable
         // 남은 노드가 MultiplicationNode인지 확인
         var remainingNode = loadedCanvas.Nodes[0];
         Assert.IsInstanceOfType(remainingNode, typeof(MultiplicationNode));
+    }
+    
+    [TestMethod]
+    public async Task SaveAndLoad_ConsoleNode_ShouldWorkCorrectly()
+    {
+        // 콘솔 출력 노드 테스트
+        var numberNode  = _canvas.CreateNode<DoubleInputNode>(100, 100);
+        var consoleNode = _canvas.CreateNode<ConsoleWriteNode>(100, 100);
+        consoleNode.Name = "콘솔 출력 노드";
+
+        numberNode.OutputPorts[0].Connect(consoleNode.InputPorts[0]);
+
+        var json         = _canvas.ToJson();
+        var loadedCanvas = JsonSerializer.Deserialize<NodeCanvas>(json, _jsonOptions);
+
+        Assert.IsNotNull(loadedCanvas);
+        Assert.AreEqual(2, loadedCanvas.Nodes.Count);
+        Assert.AreEqual(1, loadedCanvas.Connections.Count);
     }
 
     public void Dispose()

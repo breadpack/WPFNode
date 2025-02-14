@@ -26,9 +26,6 @@ public abstract class InputNodeBase<T> : NodeBase
         }
     }
 
-    protected override void InitializePorts() {
-    }
-
     public override Task ProcessAsync()
     {
         _output.Value = _value;

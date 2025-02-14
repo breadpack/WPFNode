@@ -1,24 +1,18 @@
-using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Collections.Generic;
-using System.Linq;
 using WPFNode.Core.Services;
-using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
+using WPFNode.Core.Interfaces;
 
 namespace WPFNode.Core.Models.Serialization;
 
 public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
 {
-    private readonly IServiceProvider _serviceProvider;
-    private readonly NodePluginService _pluginService;
+    private readonly INodePluginService _pluginService;
     private readonly List<NodeBase> _nodes = new();
 
-    public NodeCanvasJsonConverter(IServiceProvider serviceProvider)
-    {
-        _serviceProvider = serviceProvider;
-        _pluginService = serviceProvider.GetRequiredService<NodePluginService>();
+    public NodeCanvasJsonConverter() {
+        _pluginService = NodeServices.PluginService;
     }
 
     [JsonPropertyName("nodes")]
@@ -74,17 +68,39 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
         }
 
         // 연결 복원
-        foreach (var conn in connections)
+        while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
         {
-            if (nodeDict.TryGetValue(conn.sourceNodeId, out var sourceNode) &&
-                nodeDict.TryGetValue(conn.targetNodeId, out var targetNode))
+            if (reader.TokenType != JsonTokenType.PropertyName)
             {
-                if (sourceNode.OutputPorts.Count > conn.sourcePortIndex &&
-                    targetNode.InputPorts.Count > conn.targetPortIndex)
+                throw new JsonException("Expected PropertyName token");
+            }
+
+            var propertyName = reader.GetString();
+            reader.Read();
+
+            switch (propertyName?.ToLower())
+            {
+                case "connections":
+                    ReadConnections(ref reader, connections);
+                    break;
+                default:
+                    reader.Skip();
+                    break;
+            }
+        }
+
+        // 연결 생성
+        foreach (var (sourceNodeId, sourcePortIndex, targetNodeId, targetPortIndex) in connections)
+        {
+            if (nodeDict.TryGetValue(sourceNodeId, out var sourceNode) &&
+                nodeDict.TryGetValue(targetNodeId, out var targetNode))
+            {
+                var sourcePort = sourceNode.OutputPorts.ElementAtOrDefault(sourcePortIndex);
+                var targetPort = targetNode.InputPorts.ElementAtOrDefault(targetPortIndex);
+
+                if (sourcePort != null && targetPort != null)
                 {
-                    canvas.Connect(
-                        sourceNode.OutputPorts[conn.sourcePortIndex],
-                        targetNode.InputPorts[conn.targetPortIndex]);
+                    canvas.Connect(sourcePort, targetPort);
                 }
             }
         }
@@ -110,8 +126,8 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                 throw new JsonException("Expected StartObject token for node");
             }
 
-            var nodeTypeProperty = "";
-            var nodeId = Guid.Empty;
+            string? typeString = null;
+            Guid nodeId = Guid.Empty;
             double x = 0, y = 0;
             var properties = new Dictionary<string, JsonElement>();
 
@@ -125,104 +141,126 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                 var propertyName = reader.GetString();
                 reader.Read();
 
-                switch (propertyName)
+                switch (propertyName?.ToLower())
                 {
                     case "$type":
-                        nodeTypeProperty = reader.GetString() ?? "";
+                        typeString = reader.GetString();
                         break;
-                    case "Id":
-                        nodeId = reader.GetGuid();
+                    case "id":
+                        nodeId = Guid.Parse(reader.GetString() ?? throw new JsonException("Node Id cannot be null"));
                         break;
-                    case "X":
+                    case "x":
                         x = reader.GetDouble();
                         break;
-                    case "Y":
+                    case "y":
                         y = reader.GetDouble();
                         break;
                     default:
-                        // 다른 속성들은 나중에 처리하기 위해 저장
-                        properties[propertyName ?? ""] = JsonElement.ParseValue(ref reader);
+                        properties[propertyName ?? string.Empty] = JsonElement.ParseValue(ref reader);
                         break;
                 }
             }
 
-            // 필수 필드 검증
-            if (string.IsNullOrEmpty(nodeTypeProperty))
+            if (string.IsNullOrEmpty(typeString))
             {
-                throw new JsonException("Node type information ($type) is missing");
-            }
-            if (nodeId == Guid.Empty)
-            {
-                throw new JsonException("Node Id is missing or invalid");
+                throw new JsonException("Node type information is missing");
             }
 
-            // 노드 타입 찾기
-            var nodeType = Type.GetType(nodeTypeProperty);
+            var nodeType = Type.GetType(typeString);
             if (nodeType == null)
             {
-                // 플러그인 서비스에서 등록된 타입 중에서 찾기
-                var typeName = nodeTypeProperty.Split(',')[0].Trim();
-                nodeType = _pluginService.NodeTypes.FirstOrDefault(t => t.FullName == typeName);
-                
-                if (nodeType == null)
-                {
-                    throw new JsonException($"Cannot find type: {nodeTypeProperty}");
-                }
+                throw new JsonException($"Could not find type {typeString}");
             }
 
-            var createdNode = canvas.CreateNode(nodeType, x, y);
-            ((NodeBase)createdNode).Id = nodeId;
-            nodeDict[nodeId] = (NodeBase)createdNode;
-
-            // 노드 초기화
-            createdNode.Initialize();
-
-            // Value 속성을 먼저 설정
-            // 1. Value 속성은 출력 포트의 값과 직접적으로 연결되어 있음
-            //    - InputNodeBase<T>의 Value 속성이 변경될 때 _output.Value도 함께 업데이트됨
-            //    - 다른 속성들을 먼저 설정하면 Value 설정 시 출력 포트 값이 덮어써질 수 있음
-            // 2. 다른 속성들이 Value에 의존할 수 있음
-            //    - 노드의 표시 상태나 계산된 속성들이 Value를 기반으로 결정될 수 있음
-            //    - Value를 먼저 설정하여 다른 속성들이 올바른 초기 상태를 가질 수 있도록 함
-            // 3. 초기화 순서의 중요성
-            //    - 노드 그래프의 직렬화/역직렬화 시 상태가 정확하게 복원되어야 함
-            //    - Value와 출력 포트의 동기화가 중요함
-            if (properties.TryGetValue("value", out var valueElement))
+            try
             {
-                var valueProperty = nodeType.GetProperty("Value", BindingFlags.Public | BindingFlags.Instance);
-                if (valueProperty != null)
+                var node = (NodeBase)canvas.CreateNode(nodeType, x, y);
+                node.Id = nodeId;
+
+                // Value 속성을 먼저 설정
+                if (properties.TryGetValue("value", out var valueElement))
                 {
-                    try
+                    var valueProperty = nodeType.GetProperty("Value", BindingFlags.Public | BindingFlags.Instance);
+                    if (valueProperty != null)
                     {
-                        var value = JsonSerializer.Deserialize(valueElement.GetRawText(), valueProperty.PropertyType, options);
-                        valueProperty.SetValue(createdNode, value);
-                        properties.Remove("value");
-                    }
-                    catch (JsonException ex)
-                    {
-                        throw new JsonException($"Failed to set Value property on node type {nodeType.Name}", ex);
+                        try
+                        {
+                            var value = JsonSerializer.Deserialize(valueElement.GetRawText(), valueProperty.PropertyType, options);
+                            valueProperty.SetValue(node, value);
+                            properties.Remove("value");
+                        }
+                        catch (JsonException ex)
+                        {
+                            throw new JsonException($"Failed to set Value property on node type {nodeType.Name}", ex);
+                        }
                     }
                 }
+
+                // 나머지 속성 설정
+                foreach (var prop in properties)
+                {
+                    var property = nodeType.GetProperty(prop.Key, BindingFlags.Public | BindingFlags.Instance);
+                    if (property != null && property.CanWrite)
+                    {
+                        try
+                        {
+                            var value = JsonSerializer.Deserialize(prop.Value.GetRawText(), property.PropertyType, options);
+                            property.SetValue(node, value);
+                        }
+                        catch (JsonException ex)
+                        {
+                            throw new JsonException($"Failed to set property {prop.Key} on node type {nodeType.Name}", ex);
+                        }
+                    }
+                }
+
+                // 포트 정보 복원
+                if (properties.TryGetValue("InputPorts", out var inputPortsElement))
+                {
+                    var inputPorts = JsonSerializer.Deserialize<List<PortInfo>>(inputPortsElement.GetRawText(), options);
+                    if (inputPorts != null)
+                    {
+                        foreach (var portInfo in inputPorts)
+                        {
+                            var port = node.InputPorts.FirstOrDefault(p => p.Id == portInfo.Id);
+                            if (port != null)
+                            {
+                                port.Name = portInfo.Name;
+                            }
+                        }
+                    }
+                }
+
+                if (properties.TryGetValue("OutputPorts", out var outputPortsElement))
+                {
+                    var outputPorts = JsonSerializer.Deserialize<List<PortInfo>>(outputPortsElement.GetRawText(), options);
+                    if (outputPorts != null)
+                    {
+                        foreach (var portInfo in outputPorts)
+                        {
+                            var port = node.OutputPorts.FirstOrDefault(p => p.Id == portInfo.Id);
+                            if (port != null)
+                            {
+                                port.Name = portInfo.Name;
+                            }
+                        }
+                    }
+                }
+
+                nodeDict[nodeId] = node;
             }
-
-            // 나머지 속성 설정
-            foreach (var prop in properties)
+            catch (Exception ex)
             {
-                var property = nodeType.GetProperty(prop.Key, BindingFlags.Public | BindingFlags.Instance);
-                if (property != null && property.CanWrite)
-                {
-                    try
-                    {
-                        var value = JsonSerializer.Deserialize(prop.Value.GetRawText(), property.PropertyType, options);
-                        property.SetValue(createdNode, value);
-                    }
-                    catch (JsonException ex)
-                    {
-                        throw new JsonException($"Failed to set property {prop.Key} on node type {nodeType.Name}", ex);
-                    }
-                }
+                throw new JsonException($"Failed to create node of type {nodeType.Name}", ex);
             }
         }
+    }
+
+    private class PortInfo
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string DataType { get; set; } = string.Empty;
     }
 
     private void ReadConnections(
@@ -293,7 +331,7 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
 
         // 노드 직렬화
         writer.WriteStartArray("Nodes");
-        foreach (var node in canvas.Nodes)
+        foreach (var node in canvas.SerializableNodes)
         {
             writer.WriteStartObject();
             
@@ -301,6 +339,30 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
             writer.WriteString("Id", node.Id.ToString());
             writer.WriteNumber("X", node.X);
             writer.WriteNumber("Y", node.Y);
+
+            // 입력 포트 직렬화
+            writer.WriteStartArray("InputPorts");
+            foreach (var port in node.InputPorts)
+            {
+                writer.WriteStartObject();
+                writer.WriteString("Id", port.Id.ToString());
+                writer.WriteString("Name", port.Name);
+                writer.WriteString("DataType", port.DataType.AssemblyQualifiedName);
+                writer.WriteEndObject();
+            }
+            writer.WriteEndArray();
+
+            // 출력 포트 직렬화
+            writer.WriteStartArray("OutputPorts");
+            foreach (var port in node.OutputPorts)
+            {
+                writer.WriteStartObject();
+                writer.WriteString("Id", port.Id.ToString());
+                writer.WriteString("Name", port.Name);
+                writer.WriteString("DataType", port.DataType.AssemblyQualifiedName);
+                writer.WriteEndObject();
+            }
+            writer.WriteEndArray();
 
             // 노드의 추가 속성들 직렬화
             foreach (var prop in node.GetType().GetProperties())
@@ -312,7 +374,14 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                 if (value != null)
                 {
                     writer.WritePropertyName(prop.Name);
-                    JsonSerializer.Serialize(writer, value, prop.PropertyType, options);
+                    if (prop.Name == "Value" && node is InputNodeBase<double> doubleInputNode)
+                    {
+                        writer.WriteNumberValue(doubleInputNode.Value);
+                    }
+                    else
+                    {
+                        JsonSerializer.Serialize(writer, value, prop.PropertyType, options);
+                    }
                 }
             }
 

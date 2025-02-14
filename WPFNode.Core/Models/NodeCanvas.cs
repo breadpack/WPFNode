@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using WPFNode.Core.Commands;
 using WPFNode.Abstractions;
@@ -10,6 +11,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using WPFNode.Core.Services;
 using WPFNode.Core.Interfaces;
+using WPFNode.Core.Models.Serialization;
 
 namespace WPFNode.Core.Models;
 
@@ -81,6 +83,18 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
     [JsonIgnore]
     public CommandManager CommandManager { get; }
 
+    private static readonly JsonSerializerOptions DefaultJsonOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = null
+    };
+
+    static NodeCanvas()
+    {
+        DefaultJsonOptions.Converters.Add(new NodeCanvasJsonConverter());
+    }
+
     [JsonConstructor]
     public NodeCanvas()
     {
@@ -140,11 +154,6 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
 
         _nodes.Add(node);
         OnPropertyChanged(nameof(Nodes));
-    }
-
-    public void AddNode(NodeBase node)
-    {
-        AddNodeInternal(node);
     }
 
     public void RemoveNode(INode node)
@@ -344,6 +353,19 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
     internal Connection CreateConnection(IOutputPort source, IInputPort target)
     {
         return new Connection(source, target);
+    }
+
+    public string ToJson()
+    {
+        return JsonSerializer.Serialize(this, DefaultJsonOptions);
+    }
+
+    public static NodeCanvas FromJson(string json)
+    {
+        var canvas = JsonSerializer.Deserialize<NodeCanvas>(json, DefaultJsonOptions);
+        if (canvas == null)
+            throw new JsonException("Failed to deserialize NodeCanvas from JSON");
+        return canvas;
     }
 }
 

@@ -89,11 +89,8 @@ public abstract class NodeBase : INode, INotifyPropertyChanged
         if (_isInitialized)
             return;
 
-        InitializePorts();
         _isInitialized = true;
     }
-
-    protected abstract void InitializePorts();
 
     protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {

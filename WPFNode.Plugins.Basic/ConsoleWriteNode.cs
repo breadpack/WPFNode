@@ -19,6 +19,4 @@ public class ConsoleWriteNode : NodeBase {
         Console.WriteLine(_input.Value);
         return Task.CompletedTask;
     }
-
-    protected override void InitializePorts() { }
 }

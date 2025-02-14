@@ -20,10 +20,6 @@ public class SubtractionNode : NodeBase
         _output = CreateOutputPort<double>("결과");
     }
 
-    protected override void InitializePorts()
-    {
-    }
-
     public override async Task ProcessAsync()
     {
         var a = _inputA.GetValueOrDefault(0.0);
