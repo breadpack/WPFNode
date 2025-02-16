@@ -18,7 +18,7 @@ public class MultiplicationNode : NodeBase
     public InputPort<double> InputB => _inputB;
     public OutputPort<double> Result => _output;
 
-    public MultiplicationNode(INodeCanvas canvas) : base(canvas) {
+    public MultiplicationNode(INodeCanvas canvas, Guid id) : base(canvas, id) {
         _inputA = CreateInputPort<double>("A");
         _inputB = CreateInputPort<double>("B");
         _output = CreateOutputPort<double>("결과");

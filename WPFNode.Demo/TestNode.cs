@@ -12,59 +12,51 @@ namespace WPFNode.Demo;
 [NodeName("테스트 노드")]
 [NodeCategory("테스트")]
 [NodeDescription("속성 그리드 테스트를 위한 노드입니다.")]
-public class TestNode : NodeBase
-{
-    private string _textValue = string.Empty;
-    private double _numberValue;
-    private bool _boolValue;
-    private string _multilineText = string.Empty;
-    private Color _colorValue = Colors.White;
-    
+public class TestNode : NodeBase {
     public OutputPort<string> Output { get; }
 
-    public TestNode(INodeCanvas canvas) : base(canvas) {
+    public TestNode(INodeCanvas canvas, Guid id) : base(canvas, id) {
         Output = CreateOutputPort<string>("출력");
 
-        AddProperty(
+        TextProperty = CreateProperty<string>(
             "TextValue",
             "텍스트",
-            NodePropertyControlType.TextBox,
-            () => _textValue,
-            value => _textValue = value);
+            NodePropertyControlType.TextBox);
 
-        AddProperty(
+        NumberProperty = CreateProperty<double>(
             "NumberValue",
             "숫자",
             NodePropertyControlType.NumberBox,
-            () => _numberValue,
-            value => _numberValue = value,
             "F2");
 
-        AddProperty(
+        BooleanProperty = CreateProperty<bool>(
             "BoolValue",
             "참/거짓",
-            NodePropertyControlType.CheckBox,
-            () => _boolValue,
-            value => _boolValue = value);
+            NodePropertyControlType.CheckBox);
 
-        AddProperty(
+        MultilineTextProperty = CreateProperty<string>(
             "MultilineText",
             "여러 줄 텍스트",
-            NodePropertyControlType.MultilineText,
-            () => _multilineText,
-            value => _multilineText = value);
+            NodePropertyControlType.MultilineText);
 
-        AddProperty(
+        ColorProperty = CreateProperty<Color>(
             "ColorValue",
             "색상",
-            NodePropertyControlType.ColorPicker,
-            () => _colorValue,
-            value => _colorValue = value);
+            NodePropertyControlType.ColorPicker);
     }
 
-    public override Task ProcessAsync()
-    {
-        Output.Value = $"Text: {_textValue}, Number: {_numberValue}, Bool: {_boolValue}, Multiline: {_multilineText}, Color: {_colorValue}";
+    public NodeProperty<Color> ColorProperty { get; }
+
+    public NodeProperty<string> MultilineTextProperty { get; }
+
+    public NodeProperty<bool> BooleanProperty { get; }
+
+    public NodeProperty<double> NumberProperty { get; }
+
+    public NodeProperty<string> TextProperty { get; }
+
+    public override Task ProcessAsync() {
+        Output.Value = $"Text: {TextProperty.Value}, Number: {NumberProperty.Value}, Bool: {BooleanProperty.Value}, Multiline: {MultilineTextProperty.Value}, Color: {ColorProperty.Value}";
         return Task.CompletedTask;
     }
-} 
+}

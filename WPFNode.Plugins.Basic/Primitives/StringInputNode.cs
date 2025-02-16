@@ -13,18 +13,16 @@ namespace WPFNode.Plugins.Basic.Primitives;
 [NodeStyle(StyleKeys.Input.String)]
 public class StringInputNode : InputNodeBase<string>
 {
-    public StringInputNode(INodeCanvas canvas) : base(canvas) => _value = string.Empty;
+    public StringInputNode(INodeCanvas canvas, Guid id) : base(canvas, id)
+    {
+        // 기본값 설정
+        Value = string.Empty;
+    }
 
     [NodeProperty("Value", NodePropertyControlType.TextBox)]
     public override string Value
     {
         get => base.Value;
         set => base.Value = value;
-    }
-
-    public override Task ProcessAsync()
-    {
-        _output.Value = _value;
-        return Task.CompletedTask;
     }
 } 

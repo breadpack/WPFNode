@@ -21,9 +21,6 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
     private readonly List<IConnection> _connections;
     private readonly List<NodeGroup> _groups;
     private readonly INodePluginService _pluginService;
-    private double _scale = 1.0;
-    private double _offsetX;
-    private double _offsetY;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -41,53 +38,14 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
     [JsonIgnore]
     public IReadOnlyList<NodeGroup> Groups => _groups;
     
-    public double Scale
-    {
-        get => _scale;
-        set
-        {
-            if (_scale != value)
-            {
-                _scale = value;
-                OnPropertyChanged();
-            }
-        }
-    }
-    
-    public double OffsetX
-    {
-        get => _offsetX;
-        set
-        {
-            if (_offsetX != value)
-            {
-                _offsetX = value;
-                OnPropertyChanged();
-            }
-        }
-    }
-    
-    public double OffsetY
-    {
-        get => _offsetY;
-        set
-        {
-            if (_offsetY != value)
-            {
-                _offsetY = value;
-                OnPropertyChanged();
-            }
-        }
-    }
-    
     [JsonIgnore]
     public CommandManager CommandManager { get; }
 
     private static readonly JsonSerializerOptions DefaultJsonOptions = new()
     {
         WriteIndented = true,
-        PropertyNameCaseInsensitive = true,
-        PropertyNamingPolicy = null
+        PropertyNamingPolicy = null,
+        PropertyNameCaseInsensitive = true
     };
 
     static NodeCanvas()
@@ -138,7 +96,7 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
             throw new ArgumentException($"노드 타입은 NodeBase를 상속해야 합니다: {nodeType.Name}");
 
         // 생성자에 Canvas를 전달하여 노드 생성
-        var node = (NodeBase)Activator.CreateInstance(nodeType, this)!;
+        var node = (NodeBase)Activator.CreateInstance(nodeType, this, Guid.NewGuid())!;
         node.X = x;
         node.Y = y;
         node.Initialize();
@@ -185,10 +143,24 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
             throw new ArgumentException("타겟은 입력 포트여야 합니다.", nameof(target));
         if (!outputPort.CanConnectTo(inputPort))
             throw new InvalidOperationException("포트를 연결할 수 없습니다.");
+        if (source.Node == null || target.Node == null)
+            throw new InvalidOperationException("포트는 노드에 연결되어 있어야 합니다.");
+
+        var sourcePortId = new PortId(
+            source.Node.Id,
+            false,
+            source.Node.OutputPorts.ToList().IndexOf(outputPort));
+            
+        var targetPortId = new PortId(
+            target.Node.Id,
+            true,
+            target.Node.InputPorts.ToList().IndexOf(inputPort));
 
         // 중복 연결 체크
-        if (_connections.Any(c => c.Source == source && c.Target == target))
-            return null;
+        if (_connections.Any(c => c.SourcePortId == sourcePortId && c.TargetPortId == targetPortId))
+        {
+            return null!;
+        }
 
         var connection = new Connection(outputPort, inputPort);
         source.AddConnection(connection);
@@ -306,7 +278,7 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
     {
         if (nodes == null) throw new ArgumentNullException(nameof(nodes));
         
-        var group = new NodeGroup(Guid.NewGuid().ToString(), name);
+        var group = new NodeGroup(Guid.NewGuid(), name);
         foreach (var node in nodes)
         {
             if (_nodes.Contains(node))
@@ -364,6 +336,92 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         if (canvas == null)
             throw new JsonException("Failed to deserialize NodeCanvas from JSON");
         return canvas;
+    }
+
+    public static NodeCanvas Create()
+    {
+        return new NodeCanvas();
+    }
+
+    public T CreateNodeWithId<T>(Guid id, double x = 0, double y = 0) where T : INode
+    {
+        var nodeType = typeof(T);
+        var node = (T)CreateNodeWithId(id, nodeType, x, y);
+        return node;
+    }
+
+    public INode CreateNodeWithId(Guid id, Type nodeType, double x = 0, double y = 0)
+    {
+        if (!typeof(NodeBase).IsAssignableFrom(nodeType))
+            throw new ArgumentException($"노드 타입은 NodeBase를 상속해야 합니다: {nodeType.Name}");
+
+        // 생성자에 Canvas와 Id를 전달하여 노드 생성
+        var node = (NodeBase)Activator.CreateInstance(nodeType, this, id)!;
+        node.X = x;
+        node.Y = y;
+        node.Initialize();
+        
+        AddNodeInternal(node);
+        return node;
+    }
+
+    public IConnection ConnectWithId(Guid id, IPort source, IPort target)
+    {
+        if (source is not IOutputPort outputPort)
+            throw new ArgumentException("소스는 출력 포트여야 합니다.", nameof(source));
+        if (target is not IInputPort inputPort)
+            throw new ArgumentException("타겟은 입력 포트여야 합니다.", nameof(target));
+        if (!outputPort.CanConnectTo(inputPort))
+            throw new InvalidOperationException("포트를 연결할 수 없습니다.");
+        if (source.Node == null || target.Node == null)
+            throw new InvalidOperationException("포트는 노드에 연결되어 있어야 합니다.");
+
+        var sourcePortId = new PortId(
+            source.Node.Id,
+            false,
+            source.Node.OutputPorts.ToList().IndexOf(outputPort));
+            
+        var targetPortId = new PortId(
+            target.Node.Id,
+            true,
+            target.Node.InputPorts.ToList().IndexOf(inputPort));
+
+        // 중복 연결 체크
+        if (_connections.Any(c => c.SourcePortId == sourcePortId && c.TargetPortId == targetPortId))
+        {
+            return null!;
+        }
+
+        var connection = new Connection(id, outputPort, inputPort);
+        source.AddConnection(connection);
+        target.AddConnection(connection);
+        _connections.Add(connection);
+        OnPropertyChanged(nameof(Connections));
+        return connection;
+    }
+
+    public NodeGroup CreateGroupWithId(Guid id, IEnumerable<NodeBase> nodes, string name = "New Group")
+    {
+        if (nodes == null) throw new ArgumentNullException(nameof(nodes));
+        
+        var group = new NodeGroup(id, name);
+        foreach (var node in nodes)
+        {
+            if (_nodes.Contains(node))
+            {
+                group.Nodes.Add(node);
+            }
+        }
+        _groups.Add(group);
+        return group;
+    }
+
+    // 포트 ID로 연결을 찾는 유틸리티 메서드
+    private IConnection? FindConnection(PortId sourcePortId, PortId targetPortId)
+    {
+        return _connections.FirstOrDefault(c => 
+            c.SourcePortId == sourcePortId && 
+            c.TargetPortId == targetPortId);
     }
 }
 

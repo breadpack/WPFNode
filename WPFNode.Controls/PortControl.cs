@@ -254,31 +254,3 @@ public abstract class PortControl : Control
         return GetParentOfType<T>(VisualTreeHelper.GetParent(element));
     }
 }
-
-public class InputPortControl : PortControl
-{
-    static InputPortControl()
-    {
-        DefaultStyleKeyProperty.OverrideMetadata(typeof(InputPortControl),
-            new FrameworkPropertyMetadata(typeof(InputPortControl)));
-    }
-
-    public InputPortControl()
-    {
-        IsInput = true;
-    }
-}
-
-public class OutputPortControl : PortControl
-{
-    static OutputPortControl()
-    {
-        DefaultStyleKeyProperty.OverrideMetadata(typeof(OutputPortControl),
-            new FrameworkPropertyMetadata(typeof(OutputPortControl)));
-    }
-
-    public OutputPortControl()
-    {
-        IsInput = false;
-    }
-} 

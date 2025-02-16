@@ -210,7 +210,7 @@ public class NodeCanvasControl : Control
         }
     }
 
-    private void UpdateAllConnections()
+    public void UpdateAllConnections()
     {
         foreach (var connection in this.GetVisualDescendants().OfType<ConnectionControl>())
         {

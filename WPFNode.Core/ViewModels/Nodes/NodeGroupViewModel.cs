@@ -56,7 +56,7 @@ public class NodeGroupViewModel : ViewModelBase
         };
     }
 
-    public string Id => _group.Id;
+    public Guid Id => _group.Id;
 
     public string Name
     {

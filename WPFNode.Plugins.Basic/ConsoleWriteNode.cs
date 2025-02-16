@@ -13,7 +13,7 @@ public class ConsoleWriteNode : NodeBase {
     
     public InputPort<string> Input => _input;
 
-    public ConsoleWriteNode(INodeCanvas canvas) : base(canvas) {
+    public ConsoleWriteNode(INodeCanvas canvas, Guid id) : base(canvas, id) {
         _input = CreateInputPort<string>("Text");
     }
 

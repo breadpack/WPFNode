@@ -2,6 +2,7 @@ using System.Threading.Tasks;
 using WPFNode.Abstractions;
 using WPFNode.Abstractions.Attributes;
 using WPFNode.Abstractions.Constants;
+using WPFNode.Core.Models;
 using WPFNode.Plugins.Basic.Constants;
 using WPFNode.Plugins.Basic.Primitives.Base;
 
@@ -13,9 +14,13 @@ namespace WPFNode.Plugins.Basic.Primitives;
 [NodeStyle(StyleKeys.Input.Double)]
 public class DoubleInputNode : NumberInputNodeBase<double>
 {
-    public DoubleInputNode(INodeCanvas canvas) : base(canvas) { }
+    public DoubleInputNode(INodeCanvas canvas, Guid id) : base(canvas, id)
+    {
+        // 기본값 설정
+        Value = 0.0;
+    }
 
-    [NodeProperty("Value", NodePropertyControlType.NumberBox, "F2")]
+    [NodeProperty("Value", NodePropertyControlType.NumberBox)]
     public override double Value
     {
         get => base.Value;

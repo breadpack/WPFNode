@@ -111,7 +111,7 @@ public class NodePluginService : INodePluginService, IDisposable
         if (type == null) return false;
         
         var hasValidConstructor = type.GetConstructor(Type.EmptyTypes) != null ||
-                                type.GetConstructor(new[] { typeof(INodeCanvas) }) != null;
+                                type.GetConstructor(new[] { typeof(INodeCanvas), typeof(Guid) }) != null;
         
         return typeof(INode).IsAssignableFrom(type) && 
                !type.IsInterface && 

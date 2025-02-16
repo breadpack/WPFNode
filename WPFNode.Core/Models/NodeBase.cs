@@ -9,17 +9,17 @@ using WPFNode.Abstractions;
 using WPFNode.Abstractions.Attributes;
 using WPFNode.Abstractions.Constants;
 using WPFNode.Core.Models.Properties;
+using System.Linq;
 
 namespace WPFNode.Core.Models;
 
-public abstract class NodeBase : INode, INotifyPropertyChanged
+public abstract class NodeBase : INode
 {
     private string _name = string.Empty;
     private readonly string _category;
     private string _description = string.Empty;
     private double _x;
     private double _y;
-    private bool _isProcessing;
     private bool _isVisible = true;
     private readonly List<IInputPort> _inputPorts = new();
     private readonly List<IOutputPort> _outputPorts = new();
@@ -27,10 +27,10 @@ public abstract class NodeBase : INode, INotifyPropertyChanged
     private bool _isInitialized;
     private readonly INodeCanvas _canvas;
 
-    protected NodeBase(INodeCanvas canvas)
+    protected NodeBase(INodeCanvas canvas, Guid id)
     {
         _canvas = canvas ?? throw new ArgumentNullException(nameof(canvas));
-        Id = Guid.NewGuid();
+        Id      = id;
 
         // 어트리뷰트에서 직접 값을 가져옴
         var type = GetType();
@@ -72,12 +72,6 @@ public abstract class NodeBase : INode, INotifyPropertyChanged
         get => _y;
         set => SetField(ref _y, value);
     }
-    
-    public bool IsProcessing
-    {
-        get => _isProcessing;
-        protected set => SetField(ref _isProcessing, value);
-    }
 
     public bool IsVisible
     {
@@ -103,26 +97,63 @@ public abstract class NodeBase : INode, INotifyPropertyChanged
         _isInitialized = true;
     }
 
-    protected void AddProperty<T>(
+    protected NodeProperty<T> CreateProperty<T>(
         string name,
         string displayName,
         NodePropertyControlType controlType,
-        Func<T> getValue,
-        Action<T> setValue,
         string? format = null,
         bool canConnectToPort = false)
     {
-        _properties[name] = new NodeProperty<T>(
+        var portIndex = _inputPorts.Count;
+        var property = new NodeProperty<T>(
             displayName,
             controlType,
-            getValue,
-            setValue,
+            this,
+            portIndex,
             format,
             canConnectToPort);
+            
+        _properties[name] = property;
+        
+        // 프로퍼티 변경 이벤트 구독
+        if (property is INotifyPropertyChanged notifyPropertyChanged)
+        {
+            notifyPropertyChanged.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(INodeProperty.CanConnectToPort))
+                {
+                    UpdatePropertyPortVisibility(name, property);
+                }
+            };
+        }
+        
+        // 항상 InputPort로 등록
+        _inputPorts.Add(property);
+        return property;
+    }
+
+    private void UpdatePropertyPortVisibility(string propertyName, INodeProperty property)
+    {
+        if (property is IInputPort inputPort)
+        {
+            OnPropertyChanged(nameof(InputPorts));
+        }
     }
 
     protected void RemoveProperty(string name)
     {
+        if (_properties.TryGetValue(name, out var property))
+        {
+            if (property is IInputPort inputPort && _inputPorts.Contains(inputPort))
+            {
+                if (property.IsConnectedToPort)
+                {
+                    property.DisconnectFromPort();
+                }
+                _inputPorts.Remove(inputPort);
+                OnPropertyChanged(nameof(InputPorts));
+            }
+        }
         _properties.Remove(name);
     }
 
@@ -165,14 +196,16 @@ public abstract class NodeBase : INode, INotifyPropertyChanged
 
     protected InputPort<T> CreateInputPort<T>(string name)
     {
-        var port = new InputPort<T>(name, this);
+        var portIndex = _inputPorts.Count;
+        var port = new InputPort<T>(name, this, portIndex);
         RegisterInputPort(port);
         return port;
     }
 
     protected OutputPort<T> CreateOutputPort<T>(string name)
     {
-        var port = new OutputPort<T>(name, this);
+        var portIndex = _outputPorts.Count;
+        var port = new OutputPort<T>(name, this, portIndex);
         RegisterOutputPort(port);
         return port;
     }

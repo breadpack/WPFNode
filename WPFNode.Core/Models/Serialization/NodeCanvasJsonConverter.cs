@@ -8,470 +8,256 @@ using WPFNode.Abstractions;
 
 namespace WPFNode.Core.Models.Serialization;
 
+public class PropertySerializationData
+{
+    public string Name { get; set; } = string.Empty;
+    public string? ValueType { get; set; }
+    public string? SerializedValue { get; set; }
+    public bool CanConnectToPort { get; set; }
+}
+
 public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
 {
-    private readonly INodePluginService _pluginService;
-    private readonly List<NodeBase> _nodes = new();
-
-    public NodeCanvasJsonConverter() {
-        _pluginService = NodeServices.PluginService;
-    }
-
-    [JsonPropertyName("nodes")]
-    public List<NodeBase> SerializableNodes => _nodes;
-
     public override NodeCanvas Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
-        if (reader.TokenType != JsonTokenType.StartObject)
-        {
-            throw new JsonException("Expected StartObject token");
-        }
-
-        var canvas = new NodeCanvas();
-        var nodeDict = new Dictionary<Guid, NodeBase>();
-        var connections = new List<(Guid sourceNodeId, int sourcePortIndex, Guid targetNodeId, int targetPortIndex)>();
-
-        while (reader.Read())
-        {
-            if (reader.TokenType == JsonTokenType.EndObject)
-            {
-                break;
-            }
-
-            if (reader.TokenType != JsonTokenType.PropertyName)
-            {
-                throw new JsonException("Expected PropertyName token");
-            }
-
-            var propertyName = reader.GetString();
-            reader.Read();
-
-            switch (propertyName)
-            {
-                case "Nodes":
-                    ReadNodes(ref reader, canvas, nodeDict, options);
-                    break;
-                case "Connections":
-                    ReadConnections(ref reader, connections);
-                    break;
-                case "Scale":
-                case "OffsetX":
-                case "OffsetY":
-                    ReadCanvasProperty(ref reader, canvas, propertyName);
-                    break;
-                default:
-                    reader.Skip();
-                    break;
-            }
-        }
-
-        RestoreConnections(canvas, nodeDict, connections);
+        var canvasData = JsonDocument.ParseValue(ref reader).RootElement;
+        var canvas = NodeCanvas.Create();
+        var nodesById = new Dictionary<Guid, INode>();
+        
+        ReadNodes(canvasData, canvas, nodesById, options);
+        ReadConnections(canvasData, canvas, nodesById);
+        ReadGroups(canvasData, canvas, nodesById);
+        
         return canvas;
     }
 
-    private void ReadCanvasProperty(ref Utf8JsonReader reader, NodeCanvas canvas, string propertyName)
+    private void ReadNodes(JsonElement canvasData, NodeCanvas canvas, Dictionary<Guid, INode> nodesById, JsonSerializerOptions options)
     {
-        var value = reader.GetDouble();
-        switch (propertyName)
+        if (!canvasData.TryGetProperty("Nodes", out var nodesElement)) return;
+
+        foreach (var nodeElement in nodesElement.EnumerateArray())
         {
-            case "Scale":
-                canvas.Scale = value;
-                break;
-            case "OffsetX":
-                canvas.OffsetX = value;
-                break;
-            case "OffsetY":
-                canvas.OffsetY = value;
-                break;
+            var node = CreateNodeFromJson(nodeElement, canvas);
+            if (node != null)
+            {
+                nodesById[node.Id] = node;
+                ReadNodeProperties(nodeElement, node, options);
+            }
         }
     }
 
-    private void RestoreConnections(
-        NodeCanvas canvas,
-        Dictionary<Guid, NodeBase> nodeDict,
-        List<(Guid sourceNodeId, int sourcePortIndex, Guid targetNodeId, int targetPortIndex)> connections)
+    private INode? CreateNodeFromJson(JsonElement nodeElement, NodeCanvas canvas)
     {
-        foreach (var (sourceNodeId, sourcePortIndex, targetNodeId, targetPortIndex) in connections)
+        try
         {
-            if (nodeDict.TryGetValue(sourceNodeId, out var sourceNode) &&
-                nodeDict.TryGetValue(targetNodeId, out var targetNode))
+            var nodeId = Guid.Parse(nodeElement.GetProperty("Id").GetString()!);
+            var nodeType = Type.GetType(nodeElement.GetProperty("Type").GetString()!);
+            var x = nodeElement.GetProperty("X").GetDouble();
+            var y = nodeElement.GetProperty("Y").GetDouble();
+            
+            return canvas.CreateNodeWithId(nodeId, nodeType, x, y);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private void ReadNodeProperties(JsonElement nodeElement, INode node, JsonSerializerOptions options)
+    {
+        if (!nodeElement.TryGetProperty("Properties", out var propertiesElement)) return;
+
+        foreach (var propertyElement in propertiesElement.EnumerateArray())
+        {
+            var propertyData = DeserializePropertyData(propertyElement, options);
+            if (propertyData != null)
+            {
+                ApplyPropertyData(node, propertyData);
+            }
+        }
+    }
+
+    private PropertySerializationData? DeserializePropertyData(JsonElement propertyElement, JsonSerializerOptions options)
+    {
+        try
+        {
+            var propertyBytes = System.Text.Encoding.UTF8.GetBytes(propertyElement.GetRawText());
+            var propertyReader = new Utf8JsonReader(propertyBytes);
+            return JsonSerializer.Deserialize<PropertySerializationData>(ref propertyReader, options);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private void ApplyPropertyData(INode node, PropertySerializationData propertyData)
+    {
+        if (propertyData.ValueType == null || 
+            !node.Properties.TryGetValue(propertyData.Name, out var property))
+            return;
+
+        property.CanConnectToPort = propertyData.CanConnectToPort;
+        
+        if (propertyData.SerializedValue != null)
+        {
+            ApplyPropertyValue(property, propertyData.ValueType, propertyData.SerializedValue);
+        }
+    }
+
+    private void ApplyPropertyValue(INodeProperty property, string valueType, string serializedValue)
+    {
+        try
+        {
+            var type = Type.GetType(valueType);
+            if (type != null)
+            {
+                var value = JsonSerializer.Deserialize(serializedValue, type);
+                property.Value = value;
+            }
+        }
+        catch
+        {
+            // 값 복원 실패 시 기본값 유지
+        }
+    }
+
+    private void ReadConnections(JsonElement canvasData, NodeCanvas canvas, Dictionary<Guid, INode> nodesById)
+    {
+        if (!canvasData.TryGetProperty("Connections", out var connectionsElement)) return;
+
+        foreach (var connectionElement in connectionsElement.EnumerateArray())
+        {
+            var connection = CreateConnectionFromJson(connectionElement, nodesById, canvas);
+            if (connection != null)
+            {
+                // Connection은 canvas.ConnectWithId에서 자동으로 추가됨
+            }
+        }
+    }
+
+    private IConnection? CreateConnectionFromJson(JsonElement connectionElement, Dictionary<Guid, INode> nodesById, NodeCanvas canvas)
+    {
+        try
+        {
+            var connectionId = Guid.Parse(connectionElement.GetProperty("Id").GetString()!);
+            var sourceNodeId = Guid.Parse(connectionElement.GetProperty("SourceNodeId").GetString()!);
+            var sourcePortIndex = connectionElement.GetProperty("SourcePortIndex").GetInt32();
+            var targetNodeId = Guid.Parse(connectionElement.GetProperty("TargetNodeId").GetString()!);
+            var targetPortIndex = connectionElement.GetProperty("TargetPortIndex").GetInt32();
+
+            if (nodesById.TryGetValue(sourceNodeId, out var sourceNode) && 
+                nodesById.TryGetValue(targetNodeId, out var targetNode))
             {
                 var sourcePort = sourceNode.OutputPorts.ElementAtOrDefault(sourcePortIndex);
                 var targetPort = targetNode.InputPorts.ElementAtOrDefault(targetPortIndex);
 
                 if (sourcePort != null && targetPort != null)
                 {
-                    canvas.Connect(sourcePort, targetPort);
+                    return canvas.ConnectWithId(connectionId, sourcePort, targetPort);
                 }
             }
         }
+        catch
+        {
+            // 연결 생성 실패 시 무시
+        }
+        return null;
     }
 
-    private void ReadNodes(
-        ref Utf8JsonReader reader,
-        NodeCanvas canvas,
-        Dictionary<Guid, NodeBase> nodeDict,
-        JsonSerializerOptions options)
+    private void ReadGroups(JsonElement canvasData, NodeCanvas canvas, Dictionary<Guid, INode> nodesById)
     {
-        if (reader.TokenType != JsonTokenType.StartArray)
+        if (!canvasData.TryGetProperty("Groups", out var groupsElement)) return;
+
+        foreach (var groupElement in groupsElement.EnumerateArray())
         {
-            throw new JsonException("Expected StartArray token for nodes");
-        }
-
-        while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
-        {
-            ReadNode(ref reader, canvas, nodeDict, options);
-        }
-    }
-
-    private void ReadNode(
-        ref Utf8JsonReader reader,
-        NodeCanvas canvas,
-        Dictionary<Guid, NodeBase> nodeDict,
-        JsonSerializerOptions options)
-    {
-        if (reader.TokenType != JsonTokenType.StartObject)
-        {
-            throw new JsonException("Expected StartObject token for node");
-        }
-
-        var nodeInfo = ReadNodeInfo(ref reader);
-        var node = CreateNode(canvas, nodeInfo, options);
-        
-        RestoreNodeProperties(node, nodeInfo.Properties, options);
-        RestoreNodePorts(node, nodeInfo.Properties, options);
-        
-        nodeDict[node.Id] = node;
-    }
-
-    private (string? TypeString, Guid Id, double X, double Y, Dictionary<string, JsonElement> Properties) ReadNodeInfo(
-        ref Utf8JsonReader reader)
-    {
-        string? typeString = null;
-        Guid nodeId = Guid.Empty;
-        double x = 0, y = 0;
-        var properties = new Dictionary<string, JsonElement>();
-
-        while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
-        {
-            if (reader.TokenType != JsonTokenType.PropertyName)
+            var group = CreateGroupFromJson(groupElement, nodesById, canvas);
+            if (group != null)
             {
-                throw new JsonException("Expected PropertyName token");
-            }
-
-            var propertyName = reader.GetString();
-            reader.Read();
-
-            switch (propertyName?.ToLower())
-            {
-                case "$type":
-                    typeString = reader.GetString();
-                    break;
-                case "id":
-                    nodeId = Guid.Parse(reader.GetString() ?? throw new JsonException("Node Id cannot be null"));
-                    break;
-                case "x":
-                    x = reader.GetDouble();
-                    break;
-                case "y":
-                    y = reader.GetDouble();
-                    break;
-                case "properties":
-                    properties["Properties"] = JsonElement.ParseValue(ref reader);
-                    break;
-                default:
-                    properties[propertyName ?? string.Empty] = JsonElement.ParseValue(ref reader);
-                    break;
+                // Group은 canvas.CreateGroupWithId에서 자동으로 추가됨
             }
         }
-
-        return (typeString, nodeId, x, y, properties);
     }
 
-    private NodeBase CreateNode(
-        NodeCanvas canvas,
-        (string? TypeString, Guid Id, double X, double Y, Dictionary<string, JsonElement> Properties) nodeInfo,
-        JsonSerializerOptions options)
+    private NodeGroup? CreateGroupFromJson(JsonElement groupElement, Dictionary<Guid, INode> nodesById, NodeCanvas canvas)
     {
-        if (string.IsNullOrEmpty(nodeInfo.TypeString))
-        {
-            throw new JsonException("Node type information is missing");
-        }
-
-        var nodeType = Type.GetType(nodeInfo.TypeString);
-        if (nodeType == null)
-        {
-            throw new JsonException($"Could not find type {nodeInfo.TypeString}");
-        }
-
         try
         {
-            var node = (NodeBase)canvas.CreateNode(nodeType, nodeInfo.X, nodeInfo.Y);
-            node.Id = nodeInfo.Id;
-
-            // Value 속성을 먼저 설정
-            if (nodeInfo.Properties.TryGetValue("value", out var valueElement))
+            var groupId = Guid.Parse(groupElement.GetProperty("Id").GetString()!);
+            var name = groupElement.GetProperty("Name").GetString();
+            var nodeIds = groupElement.GetProperty("NodeIds")
+                .EnumerateArray()
+                .Select(e => Guid.Parse(e.GetString()!))
+                .ToList();
+            
+            var nodes = nodeIds
+                .Where(id => nodesById.ContainsKey(id))
+                .Select(id => nodesById[id])
+                .Cast<NodeBase>()
+                .ToList();
+            
+            if (nodes.Any())
             {
-                var valueProperty = nodeType.GetProperty("Value", BindingFlags.Public | BindingFlags.Instance);
-                if (valueProperty != null)
-                {
-                    SetPropertyValue(node, valueProperty, valueElement, options);
-                    nodeInfo.Properties.Remove("value");
-                }
-            }
-
-            return node;
-        }
-        catch (Exception ex)
-        {
-            throw new JsonException($"Failed to create node of type {nodeType.Name}", ex);
-        }
-    }
-
-    private void RestoreNodeProperties(NodeBase node, Dictionary<string, JsonElement> properties, JsonSerializerOptions options)
-    {
-        if (properties.TryGetValue("Properties", out var propertiesElement))
-        {
-            ReadProperties(propertiesElement, node, node.GetType(), options);
-            properties.Remove("Properties");
-        }
-
-        // 나머지 속성 설정
-        foreach (var prop in properties)
-        {
-            var property = node.GetType().GetProperty(prop.Key, BindingFlags.Public | BindingFlags.Instance);
-            if (property != null && property.CanWrite)
-            {
-                SetPropertyValue(node, property, prop.Value, options);
+                return canvas.CreateGroupWithId(groupId, nodes, name ?? "New Group");
             }
         }
+        catch
+        {
+            // 그룹 생성 실패 시 무시
+        }
+        return null;
     }
 
-    private void RestoreNodePorts(NodeBase node, Dictionary<string, JsonElement> properties, JsonSerializerOptions options)
-    {
-        if (properties.TryGetValue("InputPorts", out var inputPortsElement))
-        {
-            ReadPorts<IInputPort>(inputPortsElement, node.InputPorts, options);
-        }
-
-        if (properties.TryGetValue("OutputPorts", out var outputPortsElement))
-        {
-            ReadPorts<IOutputPort>(outputPortsElement, node.OutputPorts, options);
-        }
-    }
-
-    private void ReadPorts<T>(JsonElement portsElement, IReadOnlyList<T> ports, JsonSerializerOptions options) where T : IPort
-    {
-        var portInfos = JsonSerializer.Deserialize<List<PortInfo>>(portsElement.GetRawText(), options);
-        if (portInfos != null)
-        {
-            foreach (var portInfo in portInfos)
-            {
-                var port = ports.FirstOrDefault(p => p.Id == portInfo.Id);
-                if (port != null)
-                {
-                    port.Name = portInfo.Name;
-                }
-            }
-        }
-    }
-
-    private void ReadProperties(JsonElement propertiesElement, NodeBase node, Type nodeType, JsonSerializerOptions options)
-    {
-        var nodePropertiesDict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(propertiesElement.GetRawText(), options);
-        if (nodePropertiesDict != null)
-        {
-            foreach (var nodeProp in nodePropertiesDict)
-            {
-                var propObj = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(nodeProp.Value.GetRawText(), options);
-                if (propObj != null && node.Properties.ContainsKey(nodeProp.Key))
-                {
-                    var nodeProperty = node.Properties[nodeProp.Key];
-                    if (propObj.TryGetValue("Value", out var propValueElement))
-                    {
-                        try
-                        {
-                            var propValue = JsonSerializer.Deserialize(propValueElement.GetRawText(), nodeProperty.GetType().GetProperty("Value")?.PropertyType ?? typeof(object), options);
-                            nodeProperty.SetValue(propValue);
-                        }
-                        catch (JsonException ex)
-                        {
-                            throw new JsonException($"Failed to set value for property {nodeProp.Key} on node type {nodeType.Name}", ex);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private class PortInfo
-    {
-        public Guid Id { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string DataType { get; set; } = string.Empty;
-    }
-
-    private void ReadConnections(
-        ref Utf8JsonReader reader,
-        List<(Guid sourceNodeId, int sourcePortIndex, Guid targetNodeId, int targetPortIndex)> connections)
-    {
-        if (reader.TokenType != JsonTokenType.StartArray)
-        {
-            throw new JsonException("Expected StartArray token for connections");
-        }
-
-        while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
-        {
-            if (reader.TokenType != JsonTokenType.StartObject)
-            {
-                throw new JsonException("Expected StartObject token for connection");
-            }
-
-            Guid sourceNodeId = Guid.Empty, targetNodeId = Guid.Empty;
-            int sourcePortIndex = -1, targetPortIndex = -1;
-
-            while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
-            {
-                if (reader.TokenType != JsonTokenType.PropertyName)
-                {
-                    throw new JsonException("Expected PropertyName token");
-                }
-
-                var propertyName = reader.GetString()?.ToLower();
-                reader.Read();
-
-                switch (propertyName)
-                {
-                    case "sourcenodeid":
-                        sourceNodeId = reader.GetGuid();
-                        break;
-                    case "sourceportindex":
-                        sourcePortIndex = reader.GetInt32();
-                        break;
-                    case "targetnodeid":
-                        targetNodeId = reader.GetGuid();
-                        break;
-                    case "targetportindex":
-                        targetPortIndex = reader.GetInt32();
-                        break;
-                    default:
-                        reader.Skip();
-                        break;
-                }
-            }
-
-            if (sourceNodeId != Guid.Empty && targetNodeId != Guid.Empty &&
-                sourcePortIndex >= 0 && targetPortIndex >= 0)
-            {
-                connections.Add((sourceNodeId, sourcePortIndex, targetNodeId, targetPortIndex));
-            }
-        }
-    }
-
-    public override void Write(Utf8JsonWriter writer, NodeCanvas canvas, JsonSerializerOptions options)
+    public override void Write(Utf8JsonWriter writer, NodeCanvas value, JsonSerializerOptions options)
     {
         writer.WriteStartObject();
-
-        WriteCanvasProperties(writer, canvas);
-        WriteNodes(writer, canvas, options);
-        WriteConnections(writer, canvas);
-
+        
+        WriteNodes(writer, value, options);
+        WriteConnections(writer, value);
+        WriteGroups(writer, value);
+        
         writer.WriteEndObject();
-    }
-
-    private void WriteCanvasProperties(Utf8JsonWriter writer, NodeCanvas canvas)
-    {
-        writer.WriteNumber("Scale", canvas.Scale);
-        writer.WriteNumber("OffsetX", canvas.OffsetX);
-        writer.WriteNumber("OffsetY", canvas.OffsetY);
     }
 
     private void WriteNodes(Utf8JsonWriter writer, NodeCanvas canvas, JsonSerializerOptions options)
     {
         writer.WriteStartArray("Nodes");
-        foreach (var node in canvas.SerializableNodes)
+        foreach (var node in canvas.Nodes)
         {
             WriteNode(writer, node, options);
         }
         writer.WriteEndArray();
     }
 
-    private void WriteNode(Utf8JsonWriter writer, NodeBase node, JsonSerializerOptions options)
+    private void WriteNode(Utf8JsonWriter writer, INode node, JsonSerializerOptions options)
     {
         writer.WriteStartObject();
-        
-        // 기본 정보
-        writer.WriteString("$type", node.GetType().AssemblyQualifiedName);
         writer.WriteString("Id", node.Id.ToString());
+        writer.WriteString("Type", node.GetType().AssemblyQualifiedName);
         writer.WriteNumber("X", node.X);
         writer.WriteNumber("Y", node.Y);
 
-        // Properties
         WriteNodeProperties(writer, node, options);
-
-        // Ports
-        WriteNodePorts(writer, node);
-
         writer.WriteEndObject();
     }
 
-    private void WriteNodeProperties(Utf8JsonWriter writer, NodeBase node, JsonSerializerOptions options)
+    private void WriteNodeProperties(Utf8JsonWriter writer, INode node, JsonSerializerOptions options)
     {
-        if (!node.Properties.Any()) return;
-
-        writer.WritePropertyName("Properties");
-        writer.WriteStartObject();
-        
-        foreach (var property in node.Properties)
+        writer.WriteStartArray("Properties");
+        foreach (var property in node.Properties.Where(p => HasChangedFromDefault(p.Value)))
         {
-            writer.WritePropertyName(property.Key);
-            writer.WriteStartObject();
-            
-            writer.WriteString("DisplayName", property.Value.DisplayName);
-            writer.WriteNumber("ControlType", (int)property.Value.ControlType);
-            
-            if (property.Value.Format != null)
-                writer.WriteString("Format", property.Value.Format);
-                
-            writer.WriteBoolean("CanConnectToPort", property.Value.CanConnectToPort);
-            
-            if (property.Value.GetValue() != null)
-            {
-                writer.WritePropertyName("Value");
-                JsonSerializer.Serialize(writer, property.Value.GetValue(), options);
-            }
-            
-            writer.WriteEndObject();
-        }
-        
-        writer.WriteEndObject();
-    }
-
-    private void WriteNodePorts(Utf8JsonWriter writer, NodeBase node)
-    {
-        // 입력 포트
-        writer.WriteStartArray("InputPorts");
-        foreach (var port in node.InputPorts)
-        {
-            WritePort(writer, port);
-        }
-        writer.WriteEndArray();
-
-        // 출력 포트
-        writer.WriteStartArray("OutputPorts");
-        foreach (var port in node.OutputPorts)
-        {
-            WritePort(writer, port);
+            WriteProperty(writer, property.Key, property.Value);
         }
         writer.WriteEndArray();
     }
 
-    private void WritePort(Utf8JsonWriter writer, IPort port)
+    private void WriteProperty(Utf8JsonWriter writer, string key, INodeProperty property)
     {
         writer.WriteStartObject();
-        writer.WriteString("Id", port.Id.ToString());
-        writer.WriteString("Name", port.Name);
-        writer.WriteString("DataType", port.DataType.AssemblyQualifiedName);
+        writer.WriteString("Name", key);
+        writer.WriteString("ValueType", property.PropertyType.AssemblyQualifiedName);
+        writer.WriteString("SerializedValue", JsonSerializer.Serialize(property.Value, property.PropertyType));
+        writer.WriteBoolean("CanConnectToPort", property.CanConnectToPort);
         writer.WriteEndObject();
     }
 
@@ -488,49 +274,52 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
     private void WriteConnection(Utf8JsonWriter writer, IConnection connection)
     {
         writer.WriteStartObject();
-        
-        var sourceNode = (NodeBase)connection.Source.Node;
-        var targetNode = (NodeBase)connection.Target.Node;
-        
-        var sourcePortIndex = sourceNode.OutputPorts.ToList().IndexOf(connection.Source);
-        var targetPortIndex = targetNode.InputPorts.ToList().IndexOf(connection.Target);
-
-        writer.WriteString("SourceNodeId", sourceNode.Id.ToString());
-        writer.WriteNumber("SourcePortIndex", sourcePortIndex);
-        writer.WriteString("TargetNodeId", targetNode.Id.ToString());
-        writer.WriteNumber("TargetPortIndex", targetPortIndex);
-
+        writer.WriteString("Id", connection.Id.ToString());
+        writer.WriteString("SourceNodeId", connection.Source.Node!.Id.ToString());
+        writer.WriteNumber("SourcePortIndex", connection.Source.GetPortIndex());
+        writer.WriteString("TargetNodeId", connection.Target.Node!.Id.ToString());
+        writer.WriteNumber("TargetPortIndex", connection.Target.GetPortIndex());
         writer.WriteEndObject();
     }
 
-    /// <summary>
-    /// JSON 요소를 안전하게 역직렬화하는 헬퍼 메서드
-    /// </summary>
-    private T? DeserializeElement<T>(JsonElement element, JsonSerializerOptions options)
+    private void WriteGroups(Utf8JsonWriter writer, NodeCanvas canvas)
     {
-        try
+        writer.WriteStartArray("Groups");
+        foreach (var group in canvas.Groups)
         {
-            return JsonSerializer.Deserialize<T>(element.GetRawText(), options);
+            WriteGroup(writer, group);
         }
-        catch (JsonException)
-        {
-            return default;
-        }
+        writer.WriteEndArray();
     }
 
-    /// <summary>
-    /// 속성 값을 안전하게 설정하는 헬퍼 메서드
-    /// </summary>
-    private void SetPropertyValue(object target, PropertyInfo property, JsonElement element, JsonSerializerOptions options)
+    private void WriteGroup(Utf8JsonWriter writer, NodeGroup group)
     {
-        try
+        writer.WriteStartObject();
+        writer.WriteString("Id", group.Id.ToString());
+        writer.WriteString("Name", group.Name);
+        writer.WriteStartArray("NodeIds");
+        foreach (var node in group.Nodes)
         {
-            var value = JsonSerializer.Deserialize(element.GetRawText(), property.PropertyType, options);
-            property.SetValue(target, value);
+            writer.WriteStringValue(node.Id.ToString());
         }
-        catch (JsonException ex)
+        writer.WriteEndArray();
+        writer.WriteEndObject();
+    }
+
+    private bool HasChangedFromDefault(INodeProperty property)
+    {
+        // 포트로 사용되는 경우
+        if (property.CanConnectToPort)
+            return true;
+
+        // 값이 변경된 경우
+        if (property.Value != null)
         {
-            throw new JsonException($"Failed to set property {property.Name} on type {target.GetType().Name}", ex);
+            var defaultValue = property.PropertyType.IsValueType ? 
+                Activator.CreateInstance(property.PropertyType) : null;
+            return !Equals(property.Value, defaultValue);
         }
+
+        return false;
     }
 } 

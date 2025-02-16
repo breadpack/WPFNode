@@ -12,7 +12,7 @@ public abstract class NumberInputNodeBase<T> : InputNodeBase<T>, INumberInputNod
     public OutputPort<T> Output => _output;
     
 
-    protected NumberInputNodeBase(INodeCanvas canvas) : base(canvas)
+    protected NumberInputNodeBase(INodeCanvas canvas, Guid id) : base(canvas, id)
     {
     }
 

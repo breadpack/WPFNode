@@ -10,16 +10,12 @@ public interface INode : INotifyPropertyChanged
     Guid Id { get; }
     string Name { get; set; }
     string Category { get; }
-    string Description { get; set; }
+    string Description { get; }
     double X { get; set; }
     double Y { get; set; }
-    bool IsProcessing { get; }
-    bool IsOutputNode { get; }
-    bool IsInitialized { get; }
     
     IReadOnlyList<IInputPort> InputPorts { get; }
     IReadOnlyList<IOutputPort> OutputPorts { get; }
-    
     IReadOnlyDictionary<string, INodeProperty> Properties { get; }
     
     Task ProcessAsync();

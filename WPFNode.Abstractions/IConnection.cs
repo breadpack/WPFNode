@@ -3,11 +3,10 @@ using System;
 namespace WPFNode.Abstractions;
 
 public interface IConnection {
-    Guid        Id     { get; }
-    IOutputPort  Source { get; }
-    IInputPort Target { get; }
-
-    // 추가적인 확장 가능성을 위한 속성들
-    bool IsEnabled { get; set; }
-    bool IsValid   { get; }
+    Guid        Id             { get; }
+    IOutputPort  Source         { get; }
+    IInputPort Target         { get; }
+    PortId SourcePortId { get; }
+    PortId TargetPortId { get; }
+    void        Disconnect();
 }

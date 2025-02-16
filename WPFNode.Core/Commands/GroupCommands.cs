@@ -14,7 +14,7 @@ public class AddGroupCommand : ICommand
     {
         _canvas = canvas;
         _nodes = nodes;
-        _group = new NodeGroup(Guid.NewGuid().ToString(), name);
+        _group = new NodeGroup(Guid.NewGuid(), name);
     }
 
     public void Execute()

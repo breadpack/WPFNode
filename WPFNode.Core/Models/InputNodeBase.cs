@@ -1,36 +1,41 @@
 using WPFNode.Abstractions;
+using WPFNode.Abstractions.Constants;
+using System.Threading.Tasks;
+using WPFNode.Core.Models.Properties;
 
 namespace WPFNode.Core.Models;
 
 public abstract class InputNodeBase<T> : NodeBase
 {
     protected readonly OutputPort<T> _output;
-    protected T _value;
     
-    public OutputPort<T> Result => _output;
+    public OutputPort<T>   Result        => _output;
+    
+    public NodeProperty<T> InputProperty { get; }
 
-    protected InputNodeBase(INodeCanvas canvas) : base(canvas) {
+    protected InputNodeBase(INodeCanvas canvas, Guid id) : base(canvas, id) 
+    {
         _output = CreateOutputPort<T>("Value");
-        _value  = default!;
+        
+        // AddProperty를 사용하여 Value 속성 추가
+        InputProperty = CreateProperty<T>(
+            "Value",
+            "Value",
+            NodePropertyControlType.TextBox);
     }
+
 
     public virtual T Value
     {
-        get => _value;
-        set
-        {
-            if (!EqualityComparer<T>.Default.Equals(_value, value))
-            {
-                _value = value;
-                _output.Value = value;
-                OnPropertyChanged();
-            }
-        }
+        get => InputProperty.Value!;
+        set => InputProperty.Value = value;
     }
 
     public override Task ProcessAsync()
     {
-        _output.Value = _value;
+        // Value 속성의 값이 이미 OutputPort에 연결되어 있으므로
+        // 추가 작업 필요 없음
+        Result.Value = Value;
         return Task.CompletedTask;
     }
 } 

@@ -268,6 +268,11 @@ public partial class NodeCanvasViewModel : ObservableObject
         return null;
     }
 
+    public void OnPortsChanged()
+    {
+        SynchronizeWithModel();
+    }
+
     public NodeCanvas Model => _canvas;
 
     private async void ExecuteNodes()

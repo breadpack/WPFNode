@@ -10,10 +10,24 @@ public class Connection : IConnection
 
     [JsonConstructor]
     public Connection(IOutputPort source, IInputPort target)
+        : this(Guid.NewGuid(), source, target)
     {
-        Id = Guid.NewGuid();
+    }
+
+    public Connection(Guid id, IOutputPort source, IInputPort target)
+    {
+        if (source.Node == null)
+            throw new ArgumentException("Source port must be attached to a node", nameof(source));
+        if (target.Node == null)
+            throw new ArgumentException("Target port must be attached to a node", nameof(target));
+
+        Id = id;
         Source = source;
         Target = target;
+        
+        // PortId 가져오기
+        SourcePortId = source.Id;
+        TargetPortId = target.Id;
     }
 
     [JsonPropertyName("id")]
@@ -24,6 +38,12 @@ public class Connection : IConnection
     
     [JsonPropertyName("target")]
     public IInputPort Target { get; }
+
+    [JsonPropertyName("sourcePortId")]
+    public PortId SourcePortId { get; }
+
+    [JsonPropertyName("targetPortId")]
+    public PortId TargetPortId { get; }
     
     [JsonPropertyName("isEnabled")]
     public bool IsEnabled 
@@ -35,4 +55,11 @@ public class Connection : IConnection
     [JsonPropertyName("isValid")]
     public bool IsValid => Source != null && Target != null && 
                           Target.DataType.IsAssignableFrom(Source.DataType);
+
+    public void Disconnect()
+    {
+        // 양쪽 포트에서 연결 제거
+        Source.RemoveConnection(this);
+        Target.RemoveConnection(this);
+    }
 } 

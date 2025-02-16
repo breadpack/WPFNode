@@ -31,11 +31,14 @@ public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
                     OnPropertyChanged(nameof(Connections));
                     OnPropertyChanged(nameof(IsConnected));
                     break;
+                case nameof(IPort.IsVisible):
+                    OnPropertyChanged(nameof(IsVisible));
+                    break;
             }
         };
     }
 
-    public Guid Id => _port.Id;
+    public PortId Id => _port.Id;
     
     public string Name
     {
@@ -85,6 +88,8 @@ public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
             .Where(vm => vm != null)
             .Cast<ConnectionViewModel>()
             .ToList();
+
+    public bool IsVisible => _port.IsVisible;
 
     public bool CanConnectTo(NodePortViewModel other)
     {

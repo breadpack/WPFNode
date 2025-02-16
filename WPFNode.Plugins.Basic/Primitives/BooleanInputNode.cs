@@ -9,23 +9,20 @@ namespace WPFNode.Plugins.Basic.Primitives;
 
 [NodeName("Boolean Input")]
 [NodeCategory("Primitives")]
-[NodeDescription("불리언 값을 입력받는 노드입니다.")]
+[NodeDescription("부울 값을 입력받는 노드입니다.")]
 [NodeStyle(StyleKeys.Input.Boolean)]
 public class BooleanInputNode : InputNodeBase<bool>
 {
-    public BooleanInputNode(INodeCanvas canvas) : base(canvas) { }
+    public BooleanInputNode(INodeCanvas canvas, Guid id) : base(canvas, id)
+    {
+        // 기본값 설정
+        Value = false;
+    }
 
     [NodeProperty("Value", NodePropertyControlType.CheckBox)]
     public override bool Value
     {
         get => base.Value;
-        set
-        {
-            if (base.Value != value)
-            {
-                base.Value = value;
-                OnPropertyChanged();
-            }
-        }
+        set => base.Value = value;
     }
 } 

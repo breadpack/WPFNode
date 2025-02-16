@@ -8,7 +8,10 @@
     xmlns:nodes="clr-namespace:WPFNode.Core.ViewModels.Nodes;assembly=WPFNode.Core"
     xmlns:behaviors="clr-namespace:WPFNode.Controls.Behaviors"
     xmlns:commands="clr-namespace:WPFNode.Controls.Commands"
-    xmlns:media="clr-namespace:System.Windows.Media;assembly=PresentationCore">
+    xmlns:media="clr-namespace:System.Windows.Media;assembly=PresentationCore"
+    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
 
     <Style TargetType="{x:Type local:NodeControl}">
         <Setter Property="Template">
@@ -49,7 +52,8 @@
                                             Margin="0,0,4,0">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <local:InputPortControl DataContext="{Binding}"/>
+                                            <local:InputPortControl DataContext="{Binding}"
+                                                                  Visibility="{Binding IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
@@ -65,7 +69,8 @@
                                             Margin="4,0,0,0">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <local:OutputPortControl DataContext="{Binding}"/>
+                                            <local:OutputPortControl DataContext="{Binding}"
+                                                                   Visibility="{Binding IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
@@ -94,10 +99,12 @@
         <Setter Property="MinWidth" Value="50"/>
         <Setter Property="Height" Value="24"/>
         <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Visibility" Value="{Binding IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type local:PortControl}">
-                    <Grid Background="{TemplateBinding Background}">
+                    <Grid Background="{TemplateBinding Background}"
+                          Visibility="{Binding IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
@@ -141,6 +148,41 @@
     </Style>
 
     <Style TargetType="{x:Type local:InputPortControl}" BasedOn="{StaticResource {x:Type local:PortControl}}"/>
+
+    <Style x:Key="PropertyGridInputPortStyle" TargetType="{x:Type local:InputPortControl}" BasedOn="{StaticResource {x:Type local:PortControl}}">
+        <Setter Property="Width" Value="16"/>
+        <Setter Property="Height" Value="16"/>
+        <Setter Property="Visibility" Value="{Binding IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type local:PortControl}">
+                    <Grid Background="{TemplateBinding Background}"
+                          Visibility="{Binding IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Ellipse x:Name="PART_ConnectionPoint"
+                                Width="12" Height="12"
+                                Fill="#FF404040"
+                                Stroke="#FF606060"
+                                StrokeThickness="1">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsConnected}" Value="True">
+                                            <Setter Property="Fill" Value="#FF00AA00"/>
+                                            <Setter Property="Stroke" Value="#FF00FF00"/>
+                                        </DataTrigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Fill" Value="#FF606060"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style TargetType="{x:Type local:OutputPortControl}" BasedOn="{StaticResource {x:Type local:PortControl}}"/>
 
     <Style TargetType="{x:Type local:ConnectionControl}">
@@ -292,6 +334,7 @@
                             <!-- 속성 그리드 -->
                             <local:PropertyGrid Grid.Column="1"
                                               SelectedNode="{Binding SelectedNode}"
+                                              CanvasViewModel="{Binding Path=.}"
                                               Background="White"
                                               BorderBrush="Gray"
                                               BorderThickness="0,0,0,1"/>
@@ -366,7 +409,6 @@
     </Style>
 
     <!-- 색상 변환기 -->
-    <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
     <local:ColorToBrushConverter x:Key="ColorToBrushConverter"/>
 
     <!-- Value Converters -->
@@ -407,7 +449,7 @@
                     Content="연결"
                     Margin="2,2,2,2"
                     Padding="4,0"
-                    Visibility="{Binding CanConnectToPort, Converter={StaticResource BooleanToVisibilityConverter}}"
+                    Visibility="{Binding CanConnectToPort, Mode=TwoWay, Converter={StaticResource BooleanToVisibilityConverter}}"
                     Command="{Binding ConnectToPortCommand}"/>
         </Grid>
     </DataTemplate>
@@ -487,8 +529,49 @@
                                 <DataGridTemplateColumn Header="값" Width="*">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <ContentPresenter Content="{Binding}"
-                                                            ContentTemplate="{Binding ControlTemplate}"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                
+                                                <ContentPresenter Grid.Column="0"
+                                                                Content="{Binding}"
+                                                                ContentTemplate="{Binding ControlTemplate}"/>
+                                                
+                                                <ToggleButton Grid.Column="1"
+                                                            Width="16" Height="16"
+                                                            Margin="4,0,0,0"
+                                                            IsChecked="{Binding CanConnectToPort, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                            ToolTip="포트로 사용">
+                                                    <ToggleButton.Style>
+                                                        <Style TargetType="ToggleButton">
+                                                            <Setter Property="Template">
+                                                                <Setter.Value>
+                                                                    <ControlTemplate TargetType="ToggleButton">
+                                                                        <Border x:Name="border"
+                                                                                BorderThickness="1"
+                                                                                BorderBrush="#FF606060"
+                                                                                Background="Transparent">
+                                                                            <Path x:Name="icon"
+                                                                                  Width="10" Height="10"
+                                                                                  Stretch="Uniform"
+                                                                                  Fill="#FF606060"
+                                                                                  Data="M12,3C7.58,3 4,4.79 4,7C4,9.21 7.58,11 12,11C16.42,11 20,9.21 20,7C20,4.79 16.42,3 12,3M4,9V12C4,14.21 7.58,16 12,16C16.42,16 20,14.21 20,12V9C20,11.21 16.42,13 12,13C7.58,13 4,11.21 4,9M4,14V17C4,19.21 7.58,21 12,21C16.42,21 20,19.21 20,17V14C20,16.21 16.42,18 12,18C7.58,18 4,16.21 4,14Z"/>
+                                                                        </Border>
+                                                                        <ControlTemplate.Triggers>
+                                                                            <Trigger Property="IsChecked" Value="True">
+                                                                                <Setter TargetName="border" Property="Background" Value="#FF404040"/>
+                                                                                <Setter TargetName="icon" Property="Fill" Value="#FFFFFFFF"/>
+                                                                            </Trigger>
+                                                                        </ControlTemplate.Triggers>
+                                                                    </ControlTemplate>
+                                                                </Setter.Value>
+                                                            </Setter>
+                                                        </Style>
+                                                    </ToggleButton.Style>
+                                                </ToggleButton>
+                                            </Grid>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
