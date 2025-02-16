@@ -1,0 +1,59 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    
+    <!-- NuGet 패키지 메타데이터 -->
+    <PackageId>dev.BreadPack.WPFNode</PackageId>
+    <Title>WPFNode - Node-based Editor Framework for WPF</Title>
+    <Version>0.1.0</Version>
+    <Authors>BreadPack</Authors>
+    <Description>A powerful and flexible node-based editor framework for WPF applications. Supports visual programming, data flow visualization, and custom node creation.</Description>
+    <PackageTags>wpf;node-editor;visual-programming;node-based;graph-editor</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    
+    <!-- XML 문서 생성 설정 -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+    <!-- 소스 링크 설정 -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\LICENSE" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WPFNode.Abstractions\WPFNode.Abstractions.csproj" PrivateAssets="All" />
+    <ProjectReference Include="..\WPFNode.Core\WPFNode.Core.csproj" PrivateAssets="All" />
+    <ProjectReference Include="..\WPFNode.Controls\WPFNode.Controls.csproj" PrivateAssets="All" />
+    <ProjectReference Include="..\WPFNode.Plugin.SDK\WPFNode.Plugin.SDK.csproj" PrivateAssets="All" />
+    <ProjectReference Include="..\WPFNode.Serialization\WPFNode.Serialization.csproj" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);CopyProjectReferencesToPackage</TargetsForTfmSpecificBuildOutput>
+  </PropertyGroup>
+
+  <Target Name="CopyProjectReferencesToPackage" DependsOnTargets="BuildOnlySettings;ResolveReferences">
+    <ItemGroup>
+      <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths-&gt;WithMetadataValue('ReferenceSourceTarget', 'ProjectReference'))" />
+    </ItemGroup>
+  </Target>
+
+</Project>
