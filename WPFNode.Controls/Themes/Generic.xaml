@@ -371,6 +371,7 @@
 
     <!-- Value Converters -->
     <converters:CenterOffsetConverter x:Key="CenterOffsetConverter"/>
+    <converters:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
 
     <!-- PropertyGrid 관련 리소스 -->
     <!-- 텍스트 입력 -->
@@ -392,9 +393,23 @@
 
     <!-- 숫자 입력 -->
     <DataTemplate x:Key="NumberBoxTemplate">
-        <TextBox Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                 MinWidth="60"
-                 Margin="2"/>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBox Grid.Column="0" 
+                    Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                    MinWidth="60"
+                    Margin="2"
+                    IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}"/>
+            <Button Grid.Column="1"
+                    Content="연결"
+                    Margin="2,2,2,2"
+                    Padding="4,0"
+                    Visibility="{Binding CanConnectToPort, Converter={StaticResource BooleanToVisibilityConverter}}"
+                    Command="{Binding ConnectToPortCommand}"/>
+        </Grid>
     </DataTemplate>
 
     <!-- 체크박스 -->

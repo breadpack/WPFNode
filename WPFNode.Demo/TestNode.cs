@@ -25,15 +25,6 @@ public class TestNode : NodeBase
     public TestNode(INodeCanvas canvas) : base(canvas) {
         Output = CreateOutputPort<string>("출력");
 
-        Initialize();
-    }
-
-    public override void Initialize()
-    {
-        if (IsInitialized) return;
-        
-        base.Initialize();
-
         AddProperty(
             "TextValue",
             "텍스트",

@@ -13,7 +13,6 @@ public interface IPort : INotifyPropertyChanged
     bool IsConnected { get; }
     IReadOnlyList<IConnection> Connections { get; }
     INode? Node { get; }
-    object? Value { get; set; }
     void AddConnection(IConnection connection);
     void RemoveConnection(IConnection connection);
 }

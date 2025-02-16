@@ -2,13 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using WPFNode.Abstractions;
+using System.Reflection;
 
 namespace WPFNode.Core.Models;
 
 public class InputPort<T> : IInputPort, INotifyPropertyChanged
 {
     private readonly List<IConnection> _connections = new();
-    private T? _value;
     private readonly Dictionary<Type, Func<object, T>> _converters = new();
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -18,12 +18,6 @@ public class InputPort<T> : IInputPort, INotifyPropertyChanged
         Id = Guid.NewGuid();
         Name = name;
         Node = node;
-        
-        // string 타입으로의 기본 변환 등록
-        if (typeof(T) == typeof(string))
-        {
-            RegisterConverter<object>(obj => (T)(object)(obj?.ToString() ?? string.Empty));
-        }
     }
 
     public Guid Id { get; }
@@ -44,27 +38,31 @@ public class InputPort<T> : IInputPort, INotifyPropertyChanged
 
     public bool CanAcceptType(Type sourceType)
     {
-        // 컨버터가 등록되어 있으면 변환 가능
+        // 1. 컨버터가 등록되어 있으면 변환 가능
         if (_converters.ContainsKey(sourceType))
             return true;
 
-        // 동일한 타입이면 호환됨
+        // 2. 동일한 타입이면 호환됨
         if (sourceType == typeof(T) || typeof(T).IsAssignableFrom(sourceType))
             return true;
 
-        // 숫자 타입 간의 암시적 변환 체크
+        // 3. 암시적 변환 연산자 확인
+        var implicitOperator = sourceType.GetMethod("op_Implicit", 
+            BindingFlags.Public | BindingFlags.Static,
+            null,
+            new[] { sourceType },
+            null);
+
+        if (implicitOperator != null && implicitOperator.ReturnType == typeof(T))
+            return true;
+
+        // 4. 숫자 타입 간의 안전한 변환이 가능한 경우
         if (IsNumericType(sourceType) && IsNumericType(typeof(T)))
         {
-            // 암시적 변환이 가능한지 확인
-            var method = sourceType.GetMethod("op_Implicit", new[] { sourceType });
-            if (method != null && method.ReturnType == typeof(T))
-                return true;
-
-            // 기본 숫자 타입 간의 암시적 변환 규칙 적용
             return IsImplicitNumericConversion(sourceType, typeof(T));
         }
 
-        // string으로의 변환 지원
+        // 5. string으로의 변환 지원
         if (typeof(T) == typeof(string))
             return true;
 
@@ -142,45 +140,77 @@ public class InputPort<T> : IInputPort, INotifyPropertyChanged
 
     public object? Value
     {
-        get => _value;
-        set
+        get
         {
-            if (value == null)
+            // 연결된 OutputPort로부터 값을 가져옴
+            if (_connections.Count > 0 && _connections[0].Source is IOutputPort outputPort)
             {
-                if (!Equals(_value, default(T)))
-                {
-                    _value = default;
-                    OnPropertyChanged(nameof(Value));
-                }
-                return;
-            }
+                var sourceValue = outputPort.Value;
+                if (sourceValue == null) return default(T);
 
-            var sourceType = value.GetType();
-            
-            // 컨버터를 통한 변환 시도
-            if (_converters.TryGetValue(sourceType, out var converter))
-            {
-                var convertedValue = converter(value);
-                if (!Equals(_value, convertedValue))
+                var sourceType = sourceValue.GetType();
+                
+                // 1. 컨버터를 통한 변환 시도
+                if (_converters.TryGetValue(sourceType, out var converter))
                 {
-                    _value = convertedValue;
-                    OnPropertyChanged(nameof(Value));
+                    return converter(sourceValue);
                 }
-                return;
-            }
 
-            // 기존 변환 로직
-            if (value is T typedValue && !Equals(_value, typedValue))
-            {
-                _value = typedValue;
-                OnPropertyChanged(nameof(Value));
+                // 2. 직접적인 타입 체크
+                if (sourceValue is T typedValue)
+                {
+                    return typedValue;
+                }
+
+                // 3. 암시적 변환 연산자 확인
+                var implicitOperator = sourceType.GetMethod("op_Implicit", 
+                    BindingFlags.Public | BindingFlags.Static,
+                    null,
+                    new[] { sourceType },
+                    null);
+
+                if (implicitOperator != null && implicitOperator.ReturnType == typeof(T))
+                {
+                    try
+                    {
+                        return implicitOperator.Invoke(null, new[] { sourceValue });
+                    }
+                    catch
+                    {
+                        return default(T);
+                    }
+                }
+
+                // 4. 숫자 타입 간의 안전한 변환 시도
+                if (IsNumericType(sourceType) && IsNumericType(typeof(T)))
+                {
+                    try
+                    {
+                        if (IsImplicitNumericConversion(sourceType, typeof(T)))
+                        {
+                            return Convert.ChangeType(sourceValue, typeof(T));
+                        }
+                    }
+                    catch
+                    {
+                        return default(T);
+                    }
+                }
+
+                // 5. string 타입으로의 변환
+                if (typeof(T) == typeof(string))
+                {
+                    return (T)(object)(sourceValue.ToString() ?? string.Empty);
+                }
             }
+            return default(T);
         }
     }
 
     public T? GetValueOrDefault(T? defaultValue = default)
     {
-        return _value ?? defaultValue;
+        var value = Value;
+        return value is T typedValue ? typedValue : defaultValue;
     }
 
     public void AddConnection(IConnection connection)

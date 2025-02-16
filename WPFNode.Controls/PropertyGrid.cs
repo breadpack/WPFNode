@@ -11,6 +11,8 @@ using WPFNode.Abstractions.Constants;
 using WPFNode.Core.ViewModels.Nodes;
 using WPFNode.Abstractions;
 using WPFNode.Core.Models.Properties;
+using System.Windows.Input;
+using CommunityToolkit.Mvvm.Input;
 
 namespace WPFNode.Controls;
 
@@ -116,12 +118,15 @@ public class PropertyGrid : Control, INotifyPropertyChanged
 public class NodePropertyItem : INotifyPropertyChanged
 {
     private readonly INodeProperty _property;
+    private bool _isConnected;
+    private ICommand? _connectToPortCommand;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public NodePropertyItem(INodeProperty property)
     {
         _property = property;
+        _connectToPortCommand = new RelayCommand(ExecuteConnectToPort);
 
         if (_property is INotifyPropertyChanged notifyPropertyChanged)
         {
@@ -139,6 +144,29 @@ public class NodePropertyItem : INotifyPropertyChanged
     public NodePropertyControlType ControlType => _property.ControlType;
     public string? Format => _property.Format;
     public bool CanConnectToPort => _property.CanConnectToPort;
+
+    public bool IsConnected
+    {
+        get => _isConnected;
+        private set
+        {
+            if (_isConnected != value)
+            {
+                _isConnected = value;
+                OnPropertyChanged(nameof(IsConnected));
+            }
+        }
+    }
+
+    public ICommand ConnectToPortCommand => _connectToPortCommand ??= new RelayCommand(ExecuteConnectToPort);
+
+    private void ExecuteConnectToPort()
+    {
+        // TODO: 포트 연결 로직 구현
+        // 1. 입력 포트 생성
+        // 2. 속성과 포트 연결
+        // 3. IsConnected 상태 업데이트
+    }
 
     public object? Value
     {
