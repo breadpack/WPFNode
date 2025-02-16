@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <data name="SOURCE_MUST_BE_OUTPUT_PORT">
+    <value>Source must be an output port.</value>
+  </data>
+  <data name="TARGET_MUST_BE_INPUT_PORT">
+    <value>Target must be an input port.</value>
+  </data>
+  <data name="PORTS_CANNOT_BE_CONNECTED">
+    <value>Ports cannot be connected.</value>
+  </data>
+  <data name="PORTS_MUST_BE_ATTACHED_TO_NODE">
+    <value>Ports must be attached to a node.</value>
+  </data>
+  <data name="PORTS_ALREADY_CONNECTED">
+    <value>Ports are already connected.</value>
+  </data>
+  <data name="CONNECTION_NOT_FOUND">
+    <value>Connection not found.</value>
+  </data>
+  <data name="NODE_IS_NULL">
+    <value>Node is null.</value>
+  </data>
+  <data name="NODE_MUST_INHERIT_NODEBASE">
+    <value>Node type must inherit from NodeBase: {0}</value>
+  </data>
+  <data name="NODE_NOT_FOUND">
+    <value>Node not found.</value>
+  </data>
+  <data name="NODE_LIST_IS_NULL">
+    <value>Node list is null.</value>
+  </data>
+  <data name="GROUP_IS_NULL">
+    <value>Group is null.</value>
+  </data>
+  <data name="GROUP_NOT_FOUND">
+    <value>Group not found.</value>
+  </data>
+  <data name="GROUP_ALREADY_EXISTS">
+    <value>Group already exists.</value>
+  </data>
+</root> 

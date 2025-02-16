@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <data name="SOURCE_MUST_BE_OUTPUT_PORT">
+    <value>소스는 출력 포트여야 합니다.</value>
+  </data>
+  <data name="TARGET_MUST_BE_INPUT_PORT">
+    <value>타겟은 입력 포트여야 합니다.</value>
+  </data>
+  <data name="PORTS_CANNOT_BE_CONNECTED">
+    <value>포트를 연결할 수 없습니다.</value>
+  </data>
+  <data name="PORTS_MUST_BE_ATTACHED_TO_NODE">
+    <value>포트는 노드에 연결되어 있어야 합니다.</value>
+  </data>
+  <data name="PORTS_ALREADY_CONNECTED">
+    <value>이미 연결되어 있는 포트입니다.</value>
+  </data>
+  <data name="CONNECTION_NOT_FOUND">
+    <value>존재하지 않는 연결입니다.</value>
+  </data>
+  <data name="NODE_IS_NULL">
+    <value>노드가 null입니다.</value>
+  </data>
+  <data name="NODE_MUST_INHERIT_NODEBASE">
+    <value>노드 타입은 NodeBase를 상속해야 합니다: {0}</value>
+  </data>
+  <data name="NODE_NOT_FOUND">
+    <value>존재하지 않는 노드입니다.</value>
+  </data>
+  <data name="NODE_LIST_IS_NULL">
+    <value>노드 목록이 null입니다.</value>
+  </data>
+  <data name="GROUP_IS_NULL">
+    <value>그룹이 null입니다.</value>
+  </data>
+  <data name="GROUP_NOT_FOUND">
+    <value>존재하지 않는 그룹입니다.</value>
+  </data>
+  <data name="GROUP_ALREADY_EXISTS">
+    <value>이미 존재하는 그룹입니다.</value>
+  </data>
+</root> 

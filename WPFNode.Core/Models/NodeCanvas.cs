@@ -13,6 +13,7 @@ using WPFNode.Core.Services;
 using WPFNode.Core.Interfaces;
 using WPFNode.Core.Models.Serialization;
 using WPFNode.Core.Exceptions;
+using WPFNode.Core.Resources;
 
 namespace WPFNode.Core.Models;
 
@@ -94,7 +95,8 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
     public INode CreateNode(Type nodeType, double x = 0, double y = 0)
     {
         if (!typeof(NodeBase).IsAssignableFrom(nodeType))
-            throw new NodeValidationException($"노드 타입은 NodeBase를 상속해야 합니다: {nodeType.Name}");
+            throw new NodeValidationException(
+                string.Format(ExceptionMessages.GetMessage(ExceptionMessages.NodeMustInheritNodeBase), nodeType.Name));
 
         // 생성자에 Canvas를 전달하여 노드 생성
         var node = (NodeBase)Activator.CreateInstance(nodeType, this, Guid.NewGuid())!;
@@ -109,7 +111,8 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
     private void AddNodeInternal(NodeBase node)
     {
         if (node == null)
-            throw new NodeValidationException("노드가 null입니다.");
+            throw new NodeValidationException(
+                ExceptionMessages.GetMessage(ExceptionMessages.NodeIsNull));
 
         _nodes.Add(node);
         OnPropertyChanged(nameof(Nodes));
@@ -118,11 +121,14 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
     public void RemoveNode(INode node)
     {
         if (node == null) 
-            throw new NodeValidationException("노드가 null입니다.");
+            throw new NodeValidationException(
+                ExceptionMessages.GetMessage(ExceptionMessages.NodeIsNull));
         if (node is not NodeBase nodeBase) 
-            throw new NodeValidationException("노드는 NodeBase 타입이어야 합니다.");
+            throw new NodeValidationException(
+                ExceptionMessages.GetMessage(ExceptionMessages.NodeMustInheritNodeBase));
         if (!_nodes.Contains(nodeBase)) 
-            throw new NodeValidationException("존재하지 않는 노드입니다.");
+            throw new NodeValidationException(
+                ExceptionMessages.GetMessage(ExceptionMessages.NodeNotFound));
 
         // 노드와 관련된 모든 연결 제거
         var connectionsToRemove = _connections
@@ -142,13 +148,21 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
     public IConnection Connect(IPort source, IPort target)
     {
         if (source is not IOutputPort outputPort)
-            throw new NodeConnectionException("소스는 출력 포트여야 합니다.", source, target);
+            throw new NodeConnectionException(
+                ExceptionMessages.GetMessage(ExceptionMessages.SourceMustBeOutputPort), 
+                source, target);
         if (target is not IInputPort inputPort)
-            throw new NodeConnectionException("타겟은 입력 포트여야 합니다.", source, target);
+            throw new NodeConnectionException(
+                ExceptionMessages.GetMessage(ExceptionMessages.TargetMustBeInputPort), 
+                source, target);
         if (!outputPort.CanConnectTo(inputPort))
-            throw new NodeConnectionException("포트를 연결할 수 없습니다.", source, target);
+            throw new NodeConnectionException(
+                ExceptionMessages.GetMessage(ExceptionMessages.PortsCannotBeConnected), 
+                source, target);
         if (source.Node == null || target.Node == null)
-            throw new NodeConnectionException("포트는 노드에 연결되어 있어야 합니다.", source, target);
+            throw new NodeConnectionException(
+                ExceptionMessages.GetMessage(ExceptionMessages.PortsMustBeAttachedToNode), 
+                source, target);
 
         var sourcePortId = new PortId(
             source.Node.Id,
@@ -163,7 +177,9 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         // 중복 연결 체크
         if (_connections.Any(c => c.SourcePortId == sourcePortId && c.TargetPortId == targetPortId))
         {
-            throw new NodeConnectionException("이미 연결되어 있는 포트입니다.", source, target);
+            throw new NodeConnectionException(
+                ExceptionMessages.GetMessage(ExceptionMessages.PortsAlreadyConnected), 
+                source, target);
         }
 
         var connection = new Connection(outputPort, inputPort);
@@ -177,10 +193,13 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
     public void Disconnect(IConnection connection)
     {
         if (connection == null) 
-            throw new ArgumentNullException(nameof(connection));
+            throw new NodeValidationException(
+                ExceptionMessages.GetMessage(ExceptionMessages.ConnectionNotFound));
             
         if (!_connections.Contains(connection)) 
-            throw new NodeConnectionException("존재하지 않는 연결입니다.", connection.Id.ToString());
+            throw new NodeConnectionException(
+                ExceptionMessages.GetMessage(ExceptionMessages.ConnectionNotFound), 
+                connection.Id.ToString());
         
         // Canvas의 Connections 컬렉션에서 제거
         _connections.Remove(connection);
