@@ -6,6 +6,8 @@ public abstract class InputNodeBase<T> : NodeBase
 {
     protected readonly OutputPort<T> _output;
     protected T _value;
+    
+    public OutputPort<T> Result => _output;
 
     protected InputNodeBase(INodeCanvas canvas) : base(canvas) {
         _output = CreateOutputPort<T>("Value");

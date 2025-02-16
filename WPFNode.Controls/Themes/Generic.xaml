@@ -79,7 +79,6 @@
                             <Setter Property="Effect">
                                 <Setter.Value>
                                     <DropShadowEffect Color="#FF007ACC" 
-                                                    BlurRadius="8" 
                                                     ShadowDepth="0" 
                                                     Opacity="0.5"/>
                                 </Setter.Value>
@@ -216,7 +215,14 @@
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}">
                         <Grid>
-                            <ScrollViewer x:Name="PART_ScrollViewer"
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="250"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- 캔버스 영역 -->
+                            <ScrollViewer Grid.Column="0"
+                                        x:Name="PART_ScrollViewer"
                                         HorizontalScrollBarVisibility="Auto"
                                         VerticalScrollBarVisibility="Auto">
                                 <Canvas x:Name="PART_Canvas"
@@ -248,7 +254,7 @@
                                     <ItemsControl ItemsSource="{Binding Nodes}">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
-                                                <Canvas IsItemsHost="True" ZIndex="0"/>
+                                                <Canvas IsItemsHost="True" ZIndex="2"/>
                                             </ItemsPanelTemplate>
                                         </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
@@ -282,12 +288,13 @@
                                     </ItemsControl>
                                 </Canvas>
                             </ScrollViewer>
-                            
-                            <local:SearchPanel x:Name="PART_SearchPanel"
-                                             Visibility="Collapsed"
-                                             HorizontalAlignment="Center"
-                                             VerticalAlignment="Top"
-                                             Margin="0,20,0,0"/>
+
+                            <!-- 속성 그리드 -->
+                            <local:PropertyGrid Grid.Column="1"
+                                              SelectedNode="{Binding SelectedNode}"
+                                              Background="White"
+                                              BorderBrush="Gray"
+                                              BorderThickness="0,0,0,1"/>
                         </Grid>
                     </Border>
                 </ControlTemplate>
@@ -365,52 +372,53 @@
     <!-- Value Converters -->
     <converters:CenterOffsetConverter x:Key="CenterOffsetConverter"/>
 
+    <!-- PropertyGrid 관련 리소스 -->
+    <!-- 텍스트 입력 -->
     <DataTemplate x:Key="TextBoxTemplate">
         <TextBox Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                 MinWidth="60"/>
+                 MinWidth="60"
+                 Margin="2"/>
     </DataTemplate>
 
+    <!-- 여러 줄 텍스트 입력 -->
+    <DataTemplate x:Key="MultilineTextTemplate">
+        <TextBox Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                 TextWrapping="Wrap"
+                 AcceptsReturn="True"
+                 MinHeight="60"
+                 VerticalScrollBarVisibility="Auto"
+                 Margin="2"/>
+    </DataTemplate>
+
+    <!-- 숫자 입력 -->
     <DataTemplate x:Key="NumberBoxTemplate">
-        <Grid behaviors:NumberBoxCommandBehavior.CommandBindings="True">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <TextBox Grid.Column="0"
-                     Text="{Binding Value, Mode=TwoWay, StringFormat={Binding Format}, UpdateSourceTrigger=PropertyChanged}"
-                     MinWidth="60"/>
-            <StackPanel Grid.Column="1" Orientation="Vertical" Width="16">
-                <Button Content="▲" Height="12" Padding="0" 
-                        Command="{x:Static commands:NumberBoxCommands.Increment}"
-                        CommandParameter="{Binding}"/>
-                <Button Content="▼" Height="12" Padding="0" 
-                        Command="{x:Static commands:NumberBoxCommands.Decrement}"
-                        CommandParameter="{Binding}"/>
-            </StackPanel>
-        </Grid>
+        <TextBox Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                 MinWidth="60"
+                 Margin="2"/>
     </DataTemplate>
 
+    <!-- 체크박스 -->
     <DataTemplate x:Key="CheckBoxTemplate">
-        <CheckBox IsChecked="{Binding Value, Mode=TwoWay}"
-                  VerticalAlignment="Center"/>
+        <CheckBox IsChecked="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                 VerticalAlignment="Center"
+                 Margin="2"/>
     </DataTemplate>
 
+    <!-- 색상 선택 -->
     <DataTemplate x:Key="ColorPickerTemplate">
-        <ComboBox SelectedValue="{Binding Value, Mode=TwoWay}"
-                  MinWidth="60">
+        <ComboBox SelectedValue="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                 MinWidth="60"
+                 Margin="2">
             <ComboBox.ItemsSource>
                 <x:Array Type="media:Color">
+                    <media:Color>White</media:Color>
+                    <media:Color>Black</media:Color>
                     <media:Color>Red</media:Color>
                     <media:Color>Green</media:Color>
                     <media:Color>Blue</media:Color>
                     <media:Color>Yellow</media:Color>
                     <media:Color>Orange</media:Color>
                     <media:Color>Purple</media:Color>
-                    <media:Color>Pink</media:Color>
-                    <media:Color>Brown</media:Color>
-                    <media:Color>Gray</media:Color>
-                    <media:Color>White</media:Color>
-                    <media:Color>Black</media:Color>
                 </x:Array>
             </ComboBox.ItemsSource>
             <ComboBox.ItemTemplate>
@@ -428,13 +436,53 @@
         </ComboBox>
     </DataTemplate>
 
-    <DataTemplate x:Key="MultilineTextTemplate">
-        <TextBox Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                 MinWidth="60"
-                 MinHeight="60"
-                 AcceptsReturn="True"
-                 TextWrapping="Wrap"
-                 VerticalScrollBarVisibility="Auto"/>
-    </DataTemplate>
+    <!-- PropertyGrid 스타일 -->
+    <Style TargetType="{x:Type local:PropertyGrid}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type local:PropertyGrid}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- 검색 박스 -->
+                        <TextBox Grid.Row="0" 
+                                Text="{Binding SearchText, RelativeSource={RelativeSource TemplatedParent}, UpdateSourceTrigger=PropertyChanged}"
+                                Margin="2"
+                                Padding="2"/>
+
+                        <!-- 속성 목록 -->
+                        <DataGrid Grid.Row="1"
+                                ItemsSource="{Binding FilteredProperties, RelativeSource={RelativeSource TemplatedParent}}"
+                                AutoGenerateColumns="False"
+                                CanUserAddRows="False"
+                                CanUserDeleteRows="False"
+                                CanUserReorderColumns="False"
+                                HeadersVisibility="Column"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="속성" 
+                                                  Binding="{Binding DisplayName}" 
+                                                  Width="120"
+                                                  IsReadOnly="True"/>
+                                <DataGridTemplateColumn Header="값" Width="*">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <ContentPresenter Content="{Binding}"
+                                                            ContentTemplate="{Binding ControlTemplate}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 
 </ResourceDictionary> 

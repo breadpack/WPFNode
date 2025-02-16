@@ -7,9 +7,9 @@ using Microsoft.Extensions.Logging;
 using WPFNode.Abstractions;
 using WPFNode.Core.Interfaces;
 using WPFNode.Core.Models;
-using WPFNode.Core.Attributes;
 using System.Windows;
 using System.Collections.Concurrent;
+using WPFNode.Abstractions.Attributes;
 
 namespace WPFNode.Core.Services;
 

@@ -1,4 +1,4 @@
-﻿namespace WPFNode.Core.Attributes;
+﻿namespace WPFNode.Abstractions.Attributes;
 
 [AttributeUsage(AttributeTargets.Property)]
 public class PortLabelAttribute : Attribute

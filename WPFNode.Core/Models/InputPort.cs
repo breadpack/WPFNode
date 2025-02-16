@@ -1,166 +1,208 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using WPFNode.Abstractions;
 
 namespace WPFNode.Core.Models;
 
-public class InputPort<T>(string name, INode node) : PortBase(name, typeof(T), true, node), IInputPort {
-    private readonly Dictionary<Type, Func<object, T?>> _typeConverters = new() {
-        { typeof(T), o => o is T t ? t : default }
-    };
+public class InputPort<T> : IInputPort, INotifyPropertyChanged
+{
+    private readonly List<IConnection> _connections = new();
+    private T? _value;
+    private readonly Dictionary<Type, Func<object, T>> _converters = new();
 
-    public void AddTypeConverter<TInput>(Func<TInput, T?> converter)
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public InputPort(string name, INode node)
     {
-        _typeConverters[typeof(TInput)] = value => value is TInput input ? converter(input) : default;
+        Id = Guid.NewGuid();
+        Name = name;
+        Node = node;
+        
+        // string 타입으로의 기본 변환 등록
+        if (typeof(T) == typeof(string))
+        {
+            RegisterConverter<object>(obj => (T)(object)(obj?.ToString() ?? string.Empty));
+        }
     }
 
-    private bool CanImplicitlyCast(Type sourceType)
+    public Guid Id { get; }
+    public string Name { get; set; }
+    public Type DataType => typeof(T);
+    public bool IsInput => true;
+    public bool IsConnected => _connections.Count > 0;
+    public IReadOnlyList<IConnection> Connections => _connections;
+    public INode? Node { get; private set; }
+
+    public void RegisterConverter<TSource>(Func<TSource, T> converter)
     {
-        // 이미 같은 타입이거나 상속 관계인 경우
-        if (typeof(T).IsAssignableFrom(sourceType))
+        if (converter == null)
+            throw new ArgumentNullException(nameof(converter));
+            
+        _converters[typeof(TSource)] = obj => converter((TSource)obj);
+    }
+
+    public bool CanAcceptType(Type sourceType)
+    {
+        // 컨버터가 등록되어 있으면 변환 가능
+        if (_converters.ContainsKey(sourceType))
             return true;
 
-        // 숫자 타입 간의 암시적 변환 가능 여부 확인
-        try
+        // 동일한 타입이면 호환됨
+        if (sourceType == typeof(T) || typeof(T).IsAssignableFrom(sourceType))
+            return true;
+
+        // 숫자 타입 간의 암시적 변환 체크
+        if (IsNumericType(sourceType) && IsNumericType(typeof(T)))
         {
+            // 암시적 변환이 가능한지 확인
             var method = sourceType.GetMethod("op_Implicit", new[] { sourceType });
             if (method != null && method.ReturnType == typeof(T))
                 return true;
 
-            // Convert.ChangeType를 통한 변환 가능 여부 확인
-            if (typeof(IConvertible).IsAssignableFrom(sourceType) && 
-                typeof(IConvertible).IsAssignableFrom(typeof(T)))
-                return true;
+            // 기본 숫자 타입 간의 암시적 변환 규칙 적용
+            return IsImplicitNumericConversion(sourceType, typeof(T));
         }
-        catch
-        {
-            return false;
-        }
+
+        // string으로의 변환 지원
+        if (typeof(T) == typeof(string))
+            return true;
 
         return false;
     }
 
-    private T? ConvertValue(object? value)
+    private bool IsNumericType(Type type)
     {
-        if (value == null)
-            return default;
+        if (type == null) return false;
 
-        var valueType = value.GetType();
-        if(typeof(T) == typeof(string)) 
-            return (T?)(object?)value.ToString();
-
-        // 등록된 타입 변환기를 찾아서 실행
-        if (_typeConverters.TryGetValue(valueType, out var converter))
+        switch (Type.GetTypeCode(type))
         {
-            var result = converter(value);
-            if (result != null)
-                return result;
-            throw new InvalidOperationException($"[{Name}] 타입 변환 실패: {valueType.Name} -> {typeof(T).Name}, 변환 결과가 null");
+            case TypeCode.Byte:
+            case TypeCode.SByte:
+            case TypeCode.UInt16:
+            case TypeCode.UInt32:
+            case TypeCode.UInt64:
+            case TypeCode.Int16:
+            case TypeCode.Int32:
+            case TypeCode.Int64:
+            case TypeCode.Decimal:
+            case TypeCode.Double:
+            case TypeCode.Single:
+                return true;
+            default:
+                return false;
         }
-
-        // 암시적 캐스팅 시도
-        try
-        {
-            if (CanImplicitlyCast(valueType))
-            {
-                if (typeof(T).IsAssignableFrom(valueType))
-                    return (T?)value;
-
-                var convertedValue = Convert.ChangeType(value, typeof(T));
-                return (T?)convertedValue;
-            }
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException($"[{Name}] 암시적 변환 실패: {valueType.Name} -> {typeof(T).Name}", ex);
-        }
-
-        throw new InvalidOperationException($"[{Name}] 타입 변환기 없음: {valueType.Name} -> {typeof(T).Name}");
     }
 
-    public bool CanAcceptType(Type type)
+    private bool IsImplicitNumericConversion(Type source, Type target)
     {
-        if (typeof(T) == typeof(string)) {
-            return true;
+        var sourceCode = Type.GetTypeCode(source);
+        var targetCode = Type.GetTypeCode(target);
+
+        switch (sourceCode)
+        {
+            case TypeCode.SByte:
+                return targetCode == TypeCode.Int16 || targetCode == TypeCode.Int32 || 
+                       targetCode == TypeCode.Int64 || targetCode == TypeCode.Single || 
+                       targetCode == TypeCode.Double || targetCode == TypeCode.Decimal;
+            case TypeCode.Byte:
+                return targetCode == TypeCode.Int16 || targetCode == TypeCode.UInt16 || 
+                       targetCode == TypeCode.Int32 || targetCode == TypeCode.UInt32 ||
+                       targetCode == TypeCode.Int64 || targetCode == TypeCode.UInt64 || 
+                       targetCode == TypeCode.Single || targetCode == TypeCode.Double || 
+                       targetCode == TypeCode.Decimal;
+            case TypeCode.Int16:
+                return targetCode == TypeCode.Int32 || targetCode == TypeCode.Int64 || 
+                       targetCode == TypeCode.Single || targetCode == TypeCode.Double || 
+                       targetCode == TypeCode.Decimal;
+            case TypeCode.UInt16:
+                return targetCode == TypeCode.Int32 || targetCode == TypeCode.UInt32 ||
+                       targetCode == TypeCode.Int64 || targetCode == TypeCode.UInt64 ||
+                       targetCode == TypeCode.Single || targetCode == TypeCode.Double ||
+                       targetCode == TypeCode.Decimal;
+            case TypeCode.Int32:
+                return targetCode == TypeCode.Int64 || targetCode == TypeCode.Single ||
+                       targetCode == TypeCode.Double || targetCode == TypeCode.Decimal;
+            case TypeCode.UInt32:
+                return targetCode == TypeCode.Int64 || targetCode == TypeCode.UInt64 ||
+                       targetCode == TypeCode.Single || targetCode == TypeCode.Double ||
+                       targetCode == TypeCode.Decimal;
+            case TypeCode.Int64:
+                return targetCode == TypeCode.Single || targetCode == TypeCode.Double ||
+                       targetCode == TypeCode.Decimal;
+            case TypeCode.UInt64:
+                return targetCode == TypeCode.Single || targetCode == TypeCode.Double ||
+                       targetCode == TypeCode.Decimal;
+            case TypeCode.Single:
+                return targetCode == TypeCode.Double;
+            default:
+                return false;
         }
-        
-        return _typeConverters.ContainsKey(type) || CanImplicitlyCast(type);
-    }
-
-    public bool CanConnectTo(IOutputPort targetPort)
-    {
-        // 같은 노드의 포트와는 연결 불가
-        if (targetPort.Node == Node) return false;
-
-        if (IsInput == targetPort.IsInput) return false;
-
-        return CanAcceptType(targetPort.DataType);
     }
 
     public object? Value
     {
-        get
+        get => _value;
+        set
         {
-            if (!IsConnected)
+            if (value == null)
             {
-                throw new InvalidOperationException($"[{Name}] 연결되지 않은 입력 포트의 값을 읽을 수 없습니다.");
+                if (!Equals(_value, default(T)))
+                {
+                    _value = default;
+                    OnPropertyChanged(nameof(Value));
+                }
+                return;
             }
 
-            var outputPort = Connections.FirstOrDefault()?.Source as IOutputPort;
-            if (outputPort == null)
+            var sourceType = value.GetType();
+            
+            // 컨버터를 통한 변환 시도
+            if (_converters.TryGetValue(sourceType, out var converter))
             {
-                throw new InvalidOperationException($"[{Name}] 연결된 출력 포트를 찾을 수 없습니다.");
+                var convertedValue = converter(value);
+                if (!Equals(_value, convertedValue))
+                {
+                    _value = convertedValue;
+                    OnPropertyChanged(nameof(Value));
+                }
+                return;
             }
 
-            var value = outputPort.Value;
-            return ConvertValue(value);
+            // 기존 변환 로직
+            if (value is T typedValue && !Equals(_value, typedValue))
+            {
+                _value = typedValue;
+                OnPropertyChanged(nameof(Value));
+            }
         }
     }
 
-    public T GetValueOrDefault(T defaultValue)
+    public T? GetValueOrDefault(T? defaultValue = default)
     {
-        if (!IsConnected)
-            return defaultValue;
-
-        try
-        {
-            var value = Value;
-            return value != null ? (T)ConvertValue(value)! : defaultValue;
-        }
-        catch
-        {
-            return defaultValue;
-        }
+        return _value ?? defaultValue;
     }
 
-    public T GetValueOrDefault()
+    public void AddConnection(IConnection connection)
     {
-        return GetValueOrDefault(default!);
+        if (connection == null)
+            throw new ArgumentNullException(nameof(connection));
+        _connections.Add(connection);
+        OnPropertyChanged(nameof(Connections));
+        OnPropertyChanged(nameof(IsConnected));
     }
 
-    public bool TryGetValue(out T? value)
+    public void RemoveConnection(IConnection connection)
     {
-        if (!IsConnected)
-        {
-            value = default;
-            return false;
-        }
+        if (connection == null)
+            throw new ArgumentNullException(nameof(connection));
+        _connections.Remove(connection);
+        OnPropertyChanged(nameof(Connections));
+        OnPropertyChanged(nameof(IsConnected));
+    }
 
-        try
-        {
-            var rawValue = Value;
-            if (rawValue != null)
-            {
-                value = ConvertValue(rawValue);
-                return value != null;
-            }
-        }
-        catch
-        {
-            // 변환 실패 시 기본값 반환
-        }
-
-        value = default;
-        return false;
+    protected virtual void OnPropertyChanged(string propertyName)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 } 

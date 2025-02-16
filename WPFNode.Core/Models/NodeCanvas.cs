@@ -191,8 +191,8 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
             return null;
 
         var connection = new Connection(outputPort, inputPort);
-        ((PortBase)source).AddConnection(connection);
-        ((PortBase)target).AddConnection(connection);
+        source.AddConnection(connection);
+        target.AddConnection(connection);
         _connections.Add(connection);
         OnPropertyChanged(nameof(Connections));
         return connection;
@@ -207,8 +207,8 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         _connections.Remove(connection);
         
         // 포트에서 연결 제거
-        ((PortBase)connection.Source).RemoveConnection(connection);
-        ((PortBase)connection.Target).RemoveConnection(connection);
+        connection.Source.RemoveConnection(connection);
+        connection.Target.RemoveConnection(connection);
         
         OnPropertyChanged(nameof(Connections));
     }
@@ -236,8 +236,6 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
 
     private bool IsNumericType(Type type)
     {
-        if (type == null) return false;
-
         switch (Type.GetTypeCode(type))
         {
             case TypeCode.Byte:

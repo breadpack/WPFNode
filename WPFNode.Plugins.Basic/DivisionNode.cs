@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 using WPFNode.Abstractions;
-using WPFNode.Core.Attributes;
+using WPFNode.Abstractions.Attributes;
 using WPFNode.Core.Models;
 
 namespace WPFNode.Plugins.Basic;
@@ -13,6 +13,10 @@ public class DivisionNode : NodeBase
     private readonly InputPort<double> _inputA;
     private readonly InputPort<double> _inputB;
     private readonly OutputPort<double> _output;
+    
+    public InputPort<double> InputA => _inputA;
+    public InputPort<double> InputB => _inputB;
+    public OutputPort<double> Result => _output;
 
     public DivisionNode(INodeCanvas canvas) : base(canvas) {
         _inputA = CreateInputPort<double>("A");

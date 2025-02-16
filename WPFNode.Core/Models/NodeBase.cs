@@ -1,23 +1,29 @@
+using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
+using System.Threading.Tasks;
 using WPFNode.Abstractions;
-using WPFNode.Core.Attributes;
+using WPFNode.Abstractions.Attributes;
+using WPFNode.Abstractions.Constants;
+using WPFNode.Core.Models.Properties;
 
 namespace WPFNode.Core.Models;
 
 public abstract class NodeBase : INode, INotifyPropertyChanged
 {
-    private string _name;
+    private string _name = string.Empty;
     private readonly string _category;
-    private readonly string _description;
+    private string _description = string.Empty;
     private double _x;
     private double _y;
     private bool _isProcessing;
     private bool _isVisible = true;
     private readonly List<IInputPort> _inputPorts = new();
     private readonly List<IOutputPort> _outputPorts = new();
+    private readonly Dictionary<string, INodeProperty> _properties = new();
     private bool _isInitialized;
     private readonly INodeCanvas _canvas;
 
@@ -37,54 +43,59 @@ public abstract class NodeBase : INode, INotifyPropertyChanged
         _description = descriptionAttr?.Description ?? string.Empty;
     }
 
-    public Guid Id { get; internal set; }
-
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    public Guid Id { get; internal set; }
 
     public string Name
     {
         get => _name;
-        set => SetProperty(ref _name, value);
+        set => SetField(ref _name, value);
     }
 
-    public string Category => _category;
-    public string Description => _description;
+    public virtual string Category => _category;
+    
+    public string Description
+    {
+        get => _description;
+        set => SetField(ref _description, value);
+    }
     
     public double X
     {
         get => _x;
-        set => SetProperty(ref _x, value);
+        set => SetField(ref _x, value);
     }
     
     public double Y
     {
         get => _y;
-        set => SetProperty(ref _y, value);
+        set => SetField(ref _y, value);
     }
     
     public bool IsProcessing
     {
         get => _isProcessing;
-        protected set => SetProperty(ref _isProcessing, value);
+        protected set => SetField(ref _isProcessing, value);
     }
 
     public bool IsVisible
     {
         get => _isVisible;
-        set => SetProperty(ref _isVisible, value);
+        set => SetField(ref _isVisible, value);
     }
 
     public bool IsOutputNode => GetType().GetCustomAttribute<OutputNodeAttribute>() != null;
 
     public IReadOnlyList<IInputPort> InputPorts => _inputPorts;
-
     public IReadOnlyList<IOutputPort> OutputPorts => _outputPorts;
+    public IReadOnlyDictionary<string, INodeProperty> Properties => _properties;
 
     public bool IsInitialized => _isInitialized;
 
     internal INodeCanvas Canvas => _canvas;
 
-    public void Initialize()
+    public virtual void Initialize()
     {
         if (_isInitialized)
             return;
@@ -92,17 +103,40 @@ public abstract class NodeBase : INode, INotifyPropertyChanged
         _isInitialized = true;
     }
 
-    protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+    protected void AddProperty<T>(
+        string name,
+        string displayName,
+        NodePropertyControlType controlType,
+        Func<T> getValue,
+        Action<T> setValue,
+        string? format = null,
+        bool canConnectToPort = false)
     {
-        if (EqualityComparer<T>.Default.Equals(field, value)) return false;
-        field = value;
-        OnPropertyChanged(propertyName);
-        return true;
+        _properties[name] = new NodeProperty<T>(
+            displayName,
+            controlType,
+            getValue,
+            setValue,
+            format,
+            canConnectToPort);
+    }
+
+    protected void RemoveProperty(string name)
+    {
+        _properties.Remove(name);
     }
 
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    protected bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+    {
+        if (EqualityComparer<T>.Default.Equals(field, value)) return false;
+        field = value;
+        OnPropertyChanged(propertyName);
+        return true;
     }
 
     public virtual bool CanExecuteCommand(string commandName, object? parameter = null)

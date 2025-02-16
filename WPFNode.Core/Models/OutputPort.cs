@@ -1,16 +1,44 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using WPFNode.Abstractions;
 
 namespace WPFNode.Core.Models;
 
-public class OutputPort<T> : PortBase, IOutputPort
+public class OutputPort<T> : IOutputPort, INotifyPropertyChanged
 {
+    private readonly List<IConnection> _connections = new();
     private T? _value;
     private INodeCanvas Canvas => ((NodeBase)Node).Canvas;
 
-    internal OutputPort(string name, INode node) : base(name, typeof(T), false, node)
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public OutputPort(string name, INode node)
     {
+        Id = Guid.NewGuid();
+        Name = name;
+        Node = node;
+    }
+
+    public Guid Id { get; }
+    public string Name { get; set; }
+    public Type DataType => typeof(T);
+    public bool IsInput => false;
+    public bool IsConnected => _connections.Count > 0;
+    public IReadOnlyList<IConnection> Connections => _connections;
+    public INode? Node { get; private set; }
+
+    public object? Value
+    {
+        get => _value;
+        set
+        {
+            if (value is T typedValue && !Equals(_value, typedValue))
+            {
+                _value = typedValue;
+                OnPropertyChanged(nameof(Value));
+            }
+        }
     }
 
     public bool CanConnectTo(IInputPort targetPort)
@@ -39,22 +67,26 @@ public class OutputPort<T> : PortBase, IOutputPort
         }
     }
 
-    public object? Value
+    public void AddConnection(IConnection connection)
     {
-        get => _value;
-        set
-        {
-            if (value != null && !typeof(T).IsAssignableFrom(value.GetType()))
-            {
-                throw new ArgumentException($"[{Name}] 타입이 일치하지 않습니다. 예상: {typeof(T).Name}, 실제: {value.GetType().Name}");
-            }
+        if (connection == null)
+            throw new ArgumentNullException(nameof(connection));
+        _connections.Add(connection);
+        OnPropertyChanged(nameof(Connections));
+        OnPropertyChanged(nameof(IsConnected));
+    }
 
-            var typedValue = (T?)value;
-            if (!EqualityComparer<T?>.Default.Equals(_value, typedValue))
-            {
-                _value = typedValue;
-                OnPropertyChanged();
-            }
-        }
+    public void RemoveConnection(IConnection connection)
+    {
+        if (connection == null)
+            throw new ArgumentNullException(nameof(connection));
+        _connections.Remove(connection);
+        OnPropertyChanged(nameof(Connections));
+        OnPropertyChanged(nameof(IsConnected));
+    }
+
+    protected virtual void OnPropertyChanged(string propertyName)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 } 

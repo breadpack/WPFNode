@@ -90,6 +90,9 @@ public class MainWindowViewModel : INotifyPropertyChanged
     {
         // 플러그인 로드
         _pluginService.LoadPlugins("Plugins");
+        
+        // 테스트 노드 등록
+        _pluginService.RegisterNodeType(typeof(TestNode));
 
         // 마지막 세션 불러오기 시도
         try

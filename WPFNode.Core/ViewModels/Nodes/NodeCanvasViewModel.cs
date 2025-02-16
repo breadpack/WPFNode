@@ -37,6 +37,9 @@ public partial class NodeCanvasViewModel : ObservableObject
     [ObservableProperty]
     private double _offsetY;
 
+    [ObservableProperty]
+    private NodeViewModel? _selectedNode;
+
     public IWpfCommand AddNodeCommand { get; }
     public IWpfCommand RemoveNodeCommand { get; }
     public IWpfCommand ConnectCommand { get; }
@@ -111,7 +114,22 @@ public partial class NodeCanvasViewModel : ObservableObject
         if (node is not NodeBase nodeBase)
             throw new ArgumentException("노드는 NodeBase 타입이어야 합니다.");
             
-        return new NodeViewModel(nodeBase, _commandService, this);
+        var viewModel = new NodeViewModel(nodeBase, _commandService, this);
+        viewModel.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName == nameof(NodeViewModel.IsSelected))
+            {
+                if (viewModel.IsSelected)
+                {
+                    SelectedNode = viewModel;
+                }
+                else if (SelectedNode == viewModel)
+                {
+                    SelectedNode = null;
+                }
+            }
+        };
+        return viewModel;
     }
 
     private void ExecuteAddNode(Type? nodeType)

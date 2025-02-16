@@ -11,9 +11,9 @@ public class Connection : IConnection
     [JsonConstructor]
     public Connection(IOutputPort source, IInputPort target)
     {
-        Source = source ?? throw new ArgumentNullException(nameof(source));
-        Target = target ?? throw new ArgumentNullException(nameof(target));
         Id = Guid.NewGuid();
+        Source = source;
+        Target = target;
     }
 
     [JsonPropertyName("id")]

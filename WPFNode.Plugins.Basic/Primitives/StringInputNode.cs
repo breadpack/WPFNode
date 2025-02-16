@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using WPFNode.Abstractions;
-using WPFNode.Core.Attributes;
+using WPFNode.Abstractions.Attributes;
+using WPFNode.Abstractions.Constants;
 using WPFNode.Core.Models;
 using WPFNode.Plugins.Basic.Constants;
 

@@ -7,7 +7,6 @@ using WPFNode.Core.ViewModels.Nodes;
 using System.Windows.Markup;
 using WPFNode.Abstractions.Controls;
 using System.Reflection;
-using WPFNode.Core.Attributes;
 using System.Collections.Generic;
 using WPFNode.Core.Interfaces;
 using WPFNode.Core.Services;

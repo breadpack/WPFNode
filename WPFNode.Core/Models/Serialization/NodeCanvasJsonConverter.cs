@@ -367,21 +367,21 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
             // 노드의 추가 속성들 직렬화
             foreach (var prop in node.GetType().GetProperties())
             {
+                // Id, X, Y, InputPorts, OutputPorts는 이미 별도로 처리됨
                 if (prop.Name is "Id" or "X" or "Y" or "InputPorts" or "OutputPorts")
+                    continue;
+
+                // InputPort<T>, OutputPort<T> 타입의 프로퍼티는 제외
+                if (prop.PropertyType.IsGenericType && 
+                    (prop.PropertyType.GetGenericTypeDefinition() == typeof(InputPort<>) ||
+                     prop.PropertyType.GetGenericTypeDefinition() == typeof(OutputPort<>)))
                     continue;
 
                 var value = prop.GetValue(node);
                 if (value != null)
                 {
                     writer.WritePropertyName(prop.Name);
-                    if (prop.Name == "Value" && node is InputNodeBase<double> doubleInputNode)
-                    {
-                        writer.WriteNumberValue(doubleInputNode.Value);
-                    }
-                    else
-                    {
-                        JsonSerializer.Serialize(writer, value, prop.PropertyType, options);
-                    }
+                    JsonSerializer.Serialize(writer, value, prop.PropertyType, options);
                 }
             }
 
