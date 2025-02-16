@@ -1,6 +1,7 @@
 using System;
 using System.Text.Json.Serialization;
 using WPFNode.Abstractions;
+using WPFNode.Core.Exceptions;
 
 namespace WPFNode.Core.Models;
 
@@ -16,10 +17,14 @@ public class Connection : IConnection
 
     public Connection(Guid id, IOutputPort source, IInputPort target)
     {
+        if (source == null)
+            throw new NodeConnectionException("소스 포트가 null입니다.");
+        if (target == null)
+            throw new NodeConnectionException("타겟 포트가 null입니다.");
         if (source.Node == null)
-            throw new ArgumentException("Source port must be attached to a node", nameof(source));
+            throw new NodeConnectionException("소스 포트가 노드에 연결되어 있지 않습니다.", source, target);
         if (target.Node == null)
-            throw new ArgumentException("Target port must be attached to a node", nameof(target));
+            throw new NodeConnectionException("타겟 포트가 노드에 연결되어 있지 않습니다.", source, target);
 
         Id = id;
         Source = source;

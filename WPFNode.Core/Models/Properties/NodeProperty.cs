@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using WPFNode.Abstractions;
 using WPFNode.Abstractions.Constants;
 using WPFNode.Core.Utilities;
+using WPFNode.Core.Exceptions;
 
 namespace WPFNode.Core.Models.Properties;
 
@@ -173,7 +174,11 @@ public class NodeProperty<T> : INodeProperty, IInputPort
     public void AddConnection(IConnection connection)
     {
         if (connection == null)
-            throw new ArgumentNullException(nameof(connection));
+            throw new NodeConnectionException("연결이 null입니다.");
+        if (!connection.Target.Equals(this))
+            throw new NodeConnectionException("연결의 타겟 포트가 일치하지 않습니다.", connection.Target, this);
+        if (!CanConnectToPort)
+            throw new NodeConnectionException("이 프로퍼티는 포트 연결을 허용하지 않습니다.");
             
         _connections.Add(connection);
         OnPropertyChanged(nameof(Connections));
@@ -184,7 +189,9 @@ public class NodeProperty<T> : INodeProperty, IInputPort
     public void RemoveConnection(IConnection connection)
     {
         if (connection == null)
-            throw new ArgumentNullException(nameof(connection));
+            throw new NodeConnectionException("연결이 null입니다.");
+        if (!connection.Target.Equals(this))
+            throw new NodeConnectionException("연결의 타겟 포트가 일치하지 않습니다.", connection.Target, this);
             
         _connections.Remove(connection);
         OnPropertyChanged(nameof(Connections));
@@ -197,6 +204,9 @@ public class NodeProperty<T> : INodeProperty, IInputPort
         // 포트로 사용되지 않는 경우 연결 불가
         if (!CanConnectToPort)
             return false;
+
+        if (type == null)
+            throw new NodeConnectionException("타입이 null입니다.");
 
         return type.CanImplicitlyConvertTo(PropertyType);
     }

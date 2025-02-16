@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using WPFNode.Abstractions;
+using WPFNode.Core.Exceptions;
 
 namespace WPFNode.Core.Models;
 
@@ -79,17 +80,25 @@ public class OutputPort<T> : IOutputPort, INotifyPropertyChanged {
         }
     }
 
-    public void AddConnection(IConnection connection) {
+    public void AddConnection(IConnection connection)
+    {
         if (connection == null)
-            throw new ArgumentNullException(nameof(connection));
+            throw new NodeConnectionException("연결이 null입니다.");
+        if (!connection.Source.Equals(this))
+            throw new NodeConnectionException("연결의 소스 포트가 일치하지 않습니다.", this, connection.Source);
+            
         _connections.Add(connection);
         OnPropertyChanged(nameof(Connections));
         OnPropertyChanged(nameof(IsConnected));
     }
 
-    public void RemoveConnection(IConnection connection) {
+    public void RemoveConnection(IConnection connection)
+    {
         if (connection == null)
-            throw new ArgumentNullException(nameof(connection));
+            throw new NodeConnectionException("연결이 null입니다.");
+        if (!connection.Source.Equals(this))
+            throw new NodeConnectionException("연결의 소스 포트가 일치하지 않습니다.", this, connection.Source);
+            
         _connections.Remove(connection);
         OnPropertyChanged(nameof(Connections));
         OnPropertyChanged(nameof(IsConnected));

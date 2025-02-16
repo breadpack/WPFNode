@@ -10,6 +10,8 @@ using WPFNode.Core.Models;
 using System.Windows;
 using System.Collections.Concurrent;
 using WPFNode.Abstractions.Attributes;
+using WPFNode.Core.Exceptions;
+using WPFNode.Core.Constants;
 
 namespace WPFNode.Core.Services;
 
@@ -42,7 +44,8 @@ public class NodePluginService : INodePluginService, IDisposable
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "어셈블리 로드 중 오류 발생");
+            _logger?.LogError(ex, LoggerMessages.AssemblyLoadError, "Core Assemblies");
+            throw new NodePluginException("코어 어셈블리 로드 중 오류가 발생했습니다.", ex);
         }
     }
 
@@ -50,23 +53,31 @@ public class NodePluginService : INodePluginService, IDisposable
     {
         if (assembly == null) return false;
         
-        // 시스템 어셈블리 제외
-        if (assembly.IsDynamic || 
-            assembly.GlobalAssemblyCache ||
-            assembly.FullName?.StartsWith("System.") == true ||
-            assembly.FullName?.StartsWith("Microsoft.") == true)
-            return false;
+        try
+        {
+            // 시스템 어셈블리 제외
+            if (assembly.IsDynamic || 
+                assembly.GlobalAssemblyCache ||
+                assembly.FullName?.StartsWith("System.") == true ||
+                assembly.FullName?.StartsWith("Microsoft.") == true)
+                return false;
 
-        // WPFNode 관련 어셈블리만 포함
-        var assemblyName = assembly.GetName().Name;
-        return assemblyName?.StartsWith("WPFNode") == true;
+            // WPFNode 관련 어셈블리만 포함
+            var assemblyName = assembly.GetName().Name;
+            return assemblyName?.StartsWith("WPFNode") == true;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "어셈블리 유효성 검사 중 오류 발생: {Assembly}", assembly.FullName);
+            return false;
+        }
     }
 
     private void LoadNodesFromAssembly(Assembly assembly)
     {
         try
         {
-            _logger?.LogInformation("어셈블리 검사 중: {Assembly}", assembly.FullName);
+            _logger?.LogInformation(LoggerMessages.AssemblyInspecting, assembly.FullName);
 
             var nodeTypes = assembly.GetTypes()
                 .Where(IsValidNodeType)
@@ -80,18 +91,30 @@ public class NodePluginService : INodePluginService, IDisposable
                 }
                 catch (Exception ex)
                 {
-                    _logger?.LogError(ex, "노드 타입 등록 실패: {Type}", nodeType.FullName);
+                    _logger?.LogError(ex, LoggerMessages.NodeTypeRegistrationFailed, nodeType.FullName);
+                    throw new NodePluginException(
+                        $"노드 타입 등록 실패: {nodeType.FullName}", 
+                        assembly.Location, 
+                        ex);
                 }
             }
         }
         catch (ReflectionTypeLoadException ex)
         {
-            _logger?.LogError(ex, "어셈블리 타입 로드 실패: {Assembly}", assembly.FullName);
+            _logger?.LogError(ex, LoggerMessages.AssemblyTypeLoadFailed, assembly.FullName);
             LogLoaderExceptions(ex);
+            throw new NodePluginException(
+                $"어셈블리 타입 로드 실패: {assembly.FullName}", 
+                assembly.Location, 
+                ex);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not NodePluginException)
         {
-            _logger?.LogError(ex, "어셈블리 처리 중 오류 발생: {Assembly}", assembly.FullName);
+            _logger?.LogError(ex, LoggerMessages.AssemblyProcessingError, assembly.FullName);
+            throw new NodePluginException(
+                $"어셈블리 처리 중 오류 발생: {assembly.FullName}", 
+                assembly.Location, 
+                ex);
         }
     }
 
@@ -101,7 +124,7 @@ public class NodePluginService : INodePluginService, IDisposable
         {
             if (loaderException != null)
             {
-                _logger?.LogError(loaderException, "로더 예외");
+                _logger?.LogError(loaderException, "로더 예외: {Message}", loaderException.Message);
             }
         }
     }
@@ -110,20 +133,28 @@ public class NodePluginService : INodePluginService, IDisposable
     {
         if (type == null) return false;
         
-        var hasValidConstructor = type.GetConstructor(Type.EmptyTypes) != null ||
-                                type.GetConstructor(new[] { typeof(INodeCanvas), typeof(Guid) }) != null;
-        
-        return typeof(INode).IsAssignableFrom(type) && 
-               !type.IsInterface && 
-               !type.IsAbstract &&
-               hasValidConstructor;
+        try
+        {
+            var hasValidConstructor = type.GetConstructor(Type.EmptyTypes) != null ||
+                                    type.GetConstructor(new[] { typeof(INodeCanvas), typeof(Guid) }) != null;
+            
+            return typeof(INode).IsAssignableFrom(type) && 
+                   !type.IsInterface && 
+                   !type.IsAbstract &&
+                   hasValidConstructor;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "타입 유효성 검사 중 오류 발생: {Type}", type.FullName);
+            return false;
+        }
     }
 
     public void LoadPlugins(string pluginPath)
     {
         if (!Directory.Exists(pluginPath))
         {
-            _logger?.LogWarning("플러그인 디렉토리가 존재하지 않습니다: {Path}", pluginPath);
+            _logger?.LogWarning(LoggerMessages.PluginDirectoryNotFound, pluginPath);
             return;
         }
 
@@ -139,7 +170,11 @@ public class NodePluginService : INodePluginService, IDisposable
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "외부 플러그인 어셈블리 로드 실패: {Path}", dllFile);
+                _logger?.LogError(ex, LoggerMessages.ExternalPluginLoadFailed, dllFile);
+                throw new NodePluginException(
+                    $"외부 플러그인 어셈블리 로드 실패: {dllFile}", 
+                    pluginPath, 
+                    ex);
             }
         }
     }
@@ -176,14 +211,14 @@ public class NodePluginService : INodePluginService, IDisposable
                 }
                 catch (Exception ex)
                 {
-                    _logger?.LogWarning(ex, "리소스 딕셔너리 로드 실패: {Assembly}, {ResourceFile}", assemblyName, resourceFile);
+                    _logger?.LogWarning(ex, LoggerMessages.ResourceDictionaryLoadFailed, assemblyName, resourceFile);
                     return null;
                 }
             })?[resourceKey] as Style;
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "노드 스타일 검색 중 오류 발생: {NodeType}", nodeType.Name);
+            _logger?.LogError(ex, LoggerMessages.NodeStyleSearchError, nodeType.Name);
             return null;
         }
     }
@@ -194,7 +229,8 @@ public class NodePluginService : INodePluginService, IDisposable
             throw new ArgumentNullException(nameof(nodeType));
 
         if (!IsValidNodeType(nodeType))
-            throw new ArgumentException($"유효하지 않은 노드 타입입니다: {nodeType.Name}");
+            throw new NodeValidationException(
+                string.Format(LoggerMessages.InvalidNodeType, nodeType.Name));
 
         _nodeTypes.TryAdd(nodeType, CreateNodeMetadata(nodeType));
         
@@ -214,7 +250,8 @@ public class NodePluginService : INodePluginService, IDisposable
     {
         if (!_nodeTypes.ContainsKey(nodeType))
         {
-            throw new ArgumentException($"등록되지 않은 노드 타입입니다: {nodeType.Name}");
+            throw new NodeValidationException(
+                string.Format(LoggerMessages.UnregisteredNodeType, nodeType.Name));
         }
 
         try
@@ -225,8 +262,9 @@ public class NodePluginService : INodePluginService, IDisposable
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "노드 인스턴스 생성 실패: {Type}", nodeType.Name);
-            throw;
+            _logger?.LogError(ex, LoggerMessages.NodeInstanceCreationFailed, nodeType.Name);
+            throw new NodeValidationException(
+                $"노드 인스턴스 생성 실패: {nodeType.Name}", ex);
         }
     }
 
@@ -253,7 +291,8 @@ public class NodePluginService : INodePluginService, IDisposable
             throw new ArgumentNullException(nameof(nodeType));
 
         if (!typeof(INode).IsAssignableFrom(nodeType))
-            throw new ArgumentException($"타입이 INode를 구현하지 않습니다: {nodeType.Name}");
+            throw new NodeValidationException(
+                $"타입이 INode를 구현하지 않습니다: {nodeType.Name}");
 
         var nameAttr = nodeType.GetCustomAttribute<NodeNameAttribute>();
         var categoryAttr = nodeType.GetCustomAttribute<NodeCategoryAttribute>();
@@ -284,13 +323,9 @@ public class NodePluginService : INodePluginService, IDisposable
     {
         if (_isDisposed) return;
         
-        foreach (var resourceDict in _resourceCache.Values)
-        {
-            resourceDict?.Clear();
-        }
-        _resourceCache.Clear();
         _nodeTypes.Clear();
         _categoryCache.Clear();
+        _resourceCache.Clear();
         
         _isDisposed = true;
         GC.SuppressFinalize(this);
