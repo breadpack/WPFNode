@@ -1,61 +1,65 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net9.0-windows</TargetFramework>
-    <UseWPF>true</UseWPF>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <IsPackable>true</IsPackable>
-    
-    <!-- NuGet 패키지 메타데이터 -->
-    <PackageId>dev.breadpack.WPFNode</PackageId>
-    <Version>0.1.0</Version>
-    <Authors>BreadPack</Authors>
-    <Company>BreadPack</Company>
-    <Description>WPF 애플리케이션을 위한 강력하고 유연한 노드 기반 에디터 프레임워크</Description>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>wpf;node-editor;visual-programming;node;editor;graph</PackageTags>
-    
-    <!-- 연락처 정보 -->
-    <PackageProjectUrl>https://github.com/breadpack/WPFNode</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/breadpack/WPFNode.git</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-    <PackageReleaseNotes>Initial release</PackageReleaseNotes>
+    <PropertyGroup>
+        <TargetFramework>net9.0-windows</TargetFramework>
+        <UseWPF>true</UseWPF>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <IsPackable>true</IsPackable>
 
-    <!-- XML 문서 생성 설정 -->
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
-  </PropertyGroup>
+        <!-- NuGet 패키지 메타데이터 -->
+        <PackageId>dev.breadpack.WPFNode</PackageId>
+        <Version>0.1.0</Version>
+        <Authors>BreadPack</Authors>
+        <Company>BreadPack</Company>
+        <Description>WPF 애플리케이션을 위한 강력하고 유연한 노드 기반 에디터 프레임워크</Description>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageTags>wpf;node-editor;visual-programming;node;editor;graph</PackageTags>
 
-  <ItemGroup>
-    <None Include="..\README.md" Pack="true" PackagePath="\" />
-    <None Include="..\LICENSE" Pack="true" PackagePath="\" />
-  </ItemGroup>
+        <!-- 연락처 정보 -->
+        <PackageProjectUrl>https://github.com/breadpack/WPFNode</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/breadpack/WPFNode.git</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageReleaseNotes>Initial release</PackageReleaseNotes>
 
-<ItemGroup>
-    <ProjectReference Include="..\WPFNode.Core\WPFNode.Core.csproj">
-        <PrivateAssets>compile</PrivateAssets>
-    </ProjectReference>
-    <ProjectReference Include="..\WPFNode.Abstractions\WPFNode.Abstractions.csproj">
-        <PrivateAssets>compile</PrivateAssets>
-    </ProjectReference>
-    <ProjectReference Include="..\WPFNode.Controls\WPFNode.Controls.csproj">
-        <PrivateAssets>compile</PrivateAssets>
-    </ProjectReference>
-    <ProjectReference Include="..\WPFNode.Plugins.Basic\WPFNode.Plugins.Basic.csproj">
-        <PrivateAssets>compile</PrivateAssets>
-    </ProjectReference>
-</ItemGroup>
+        <!-- XML 문서 생성 설정 -->
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
+    </PropertyGroup>
 
-  <PropertyGroup>
-    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);CopyProjectReferencesToPackage</TargetsForTfmSpecificBuildOutput>
-  </PropertyGroup>
-
-  <Target Name="CopyProjectReferencesToPackage" DependsOnTargets="BuildOnlySettings;ResolveReferences">
     <ItemGroup>
-      <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths-&gt;WithMetadataValue('ReferenceSourceTarget', 'ProjectReference'))" />
+        <None Include="..\README.md" Pack="true" PackagePath="\"/>
+        <None Include="..\LICENSE" Pack="true" PackagePath="\"/>
     </ItemGroup>
-  </Target>
+
+    <ItemGroup>
+        <ProjectReference Include="..\WPFNode.Core\WPFNode.Core.csproj">
+            <PrivateAssets>contentfiles;analyzers</PrivateAssets>
+            <IncludeAssets>runtime; build; native; dependencies; buildtransitive</IncludeAssets>
+        </ProjectReference>
+        <ProjectReference Include="..\WPFNode.Abstractions\WPFNode.Abstractions.csproj">
+            <PrivateAssets>contentfiles;analyzers</PrivateAssets>
+            <IncludeAssets>runtime; build; native; dependencies; buildtransitive</IncludeAssets>
+        </ProjectReference>
+        <ProjectReference Include="..\WPFNode.Controls\WPFNode.Controls.csproj">
+            <PrivateAssets>contentfiles;analyzers</PrivateAssets>
+            <IncludeAssets>runtime; build; native; dependencies; buildtransitive</IncludeAssets>
+        </ProjectReference>
+        <ProjectReference Include="..\WPFNode.Plugins.Basic\WPFNode.Plugins.Basic.csproj">
+            <PrivateAssets>contentfiles;analyzers</PrivateAssets>
+            <IncludeAssets>runtime; build; native; dependencies; buildtransitive</IncludeAssets>
+        </ProjectReference>
+    </ItemGroup>
+
+    <PropertyGroup>
+        <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);CopyProjectReferencesToPackage</TargetsForTfmSpecificBuildOutput>
+    </PropertyGroup>
+
+    <Target Name="CopyProjectReferencesToPackage" DependsOnTargets="BuildOnlySettings;ResolveReferences">
+        <ItemGroup>
+            <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths-&gt;WithMetadataValue('ReferenceSourceTarget', 'ProjectReference'))"/>
+        </ItemGroup>
+    </Target>
 
 </Project>
