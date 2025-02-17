@@ -1,0 +1,36 @@
+name: NuGet 패키지 빌드 및 배포
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  build-and-publish:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore WPFNode.sln
+
+      - name: Build
+        run: dotnet build WPFNode.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test WPFNode.sln --no-restore --verbosity normal
+
+      - name: Pack
+        run: dotnet pack WPFNode/WPFNode.csproj --configuration Release --no-build --output ./nupkgs
+
+      - name: Publish to NuGet
+        run: dotnet nuget push ./nupkgs/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json 

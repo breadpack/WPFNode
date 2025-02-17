@@ -2,7 +2,6 @@
   <PropertyGroup>
     <Version>0.1.0</Version>
     <Authors>BreadPack</Authors>
-    <Company></Company>
     <Product>WPFNode</Product>
     <Description>A powerful node-based editor framework for WPF applications</Description>
     <Copyright>Copyright © 2024 BreadPack</Copyright>

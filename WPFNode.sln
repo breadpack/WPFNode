@@ -14,9 +14,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WPFNode.Abstractions", "WPF
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WPFNode.Tests", "WPFNode.Tests\WPFNode.Tests.csproj", "{00000000-0000-0000-0000-000000000000}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WPFNode.Serialization", "WPFNode.Serialization\WPFNode.Serialization.csproj", "{9389CCC8-801C-4D41-8800-CACAB96D6803}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WPFNode", "WPFNode\WPFNode.csproj", "{NEW-GUID}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WPFNode", "WPFNode\WPFNode.csproj", "{00000000-0000-0000-0000-000000000000}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -44,10 +42,6 @@ Global
 		{71DC9E67-05C3-4C78-9854-67F10384DB5D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{71DC9E67-05C3-4C78-9854-67F10384DB5D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{71DC9E67-05C3-4C78-9854-67F10384DB5D}.Release|Any CPU.Build.0 = Release|Any CPU
-		{9389CCC8-801C-4D41-8800-CACAB96D6803}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{9389CCC8-801C-4D41-8800-CACAB96D6803}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{9389CCC8-801C-4D41-8800-CACAB96D6803}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{9389CCC8-801C-4D41-8800-CACAB96D6803}.Release|Any CPU.Build.0 = Release|Any CPU
 		{00000000-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{00000000-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{00000000-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU

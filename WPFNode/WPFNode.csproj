@@ -6,27 +6,26 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>true</IsPackable>
-    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     
     <!-- NuGet 패키지 메타데이터 -->
-    <PackageId>dev.BreadPack.WPFNode</PackageId>
-    <Title>WPFNode - Node-based Editor Framework for WPF</Title>
+    <PackageId>dev.breadpack.WPFNode</PackageId>
     <Version>0.1.0</Version>
     <Authors>BreadPack</Authors>
-    <Description>A powerful and flexible node-based editor framework for WPF applications. Supports visual programming, data flow visualization, and custom node creation.</Description>
-    <PackageTags>wpf;node-editor;visual-programming;node-based;graph-editor</PackageTags>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Company>BreadPack</Company>
+    <Description>WPF 애플리케이션을 위한 강력하고 유연한 노드 기반 에디터 프레임워크</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>wpf;node-editor;visual-programming;node;editor;graph</PackageTags>
     
+    <!-- 연락처 정보 -->
+    <PackageProjectUrl>https://github.com/breadpack/WPFNode</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/breadpack/WPFNode.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReleaseNotes>Initial release</PackageReleaseNotes>
+
     <!-- XML 문서 생성 설정 -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
-
-    <!-- 소스 링크 설정 -->
-    <PublishRepositoryUrl>true</PublishRepositoryUrl>
-    <EmbedUntrackedSources>true</EmbedUntrackedSources>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup>
@@ -35,11 +34,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\WPFNode.Abstractions\WPFNode.Abstractions.csproj" PrivateAssets="All" />
-    <ProjectReference Include="..\WPFNode.Core\WPFNode.Core.csproj" PrivateAssets="All" />
-    <ProjectReference Include="..\WPFNode.Controls\WPFNode.Controls.csproj" PrivateAssets="All" />
-    <ProjectReference Include="..\WPFNode.Plugin.SDK\WPFNode.Plugin.SDK.csproj" PrivateAssets="All" />
-    <ProjectReference Include="..\WPFNode.Serialization\WPFNode.Serialization.csproj" PrivateAssets="All" />
+    <ProjectReference Include="..\WPFNode.Core\WPFNode.Core.csproj" />
+    <ProjectReference Include="..\WPFNode.Abstractions\WPFNode.Abstractions.csproj" />
+    <ProjectReference Include="..\WPFNode.Controls\WPFNode.Controls.csproj" />
+    <ProjectReference Include="..\WPFNode.Plugins.Basic\WPFNode.Plugins.Basic.csproj" />
   </ItemGroup>
 
   <ItemGroup>
