@@ -1,14 +1,13 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using WPFNode.Core.Models;
 using WPFNode.Plugins.Basic;
-using WPFNode.Core.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
+using WPFNode.Models;
 using WPFNode.Plugins.Basic.Primitives;
-using WPFNode.Abstractions;
+using WPFNode.Services;
 
 namespace WPFNode.Tests.Models;
 

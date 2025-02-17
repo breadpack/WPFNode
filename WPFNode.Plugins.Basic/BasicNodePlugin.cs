@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Windows;
-using WPFNode.Abstractions;
+using WPFNode.Interfaces;
 
 namespace WPFNode.Plugins.Basic;
 

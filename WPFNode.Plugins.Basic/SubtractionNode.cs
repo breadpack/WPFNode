@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
-using WPFNode.Abstractions;
-using WPFNode.Abstractions.Attributes;
-using WPFNode.Core.Models;
+using WPFNode.Attributes;
+using WPFNode.Interfaces;
+using WPFNode.Models;
 
 namespace WPFNode.Plugins.Basic;
 

@@ -22,44 +22,21 @@
         <RepositoryUrl>https://github.com/breadpack/WPFNode.git</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
         <PackageReleaseNotes>Initial release</PackageReleaseNotes>
-
-        <!-- XML 문서 생성 설정 -->
-        <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <NoWarn>$(NoWarn);CS1591</NoWarn>
     </PropertyGroup>
+    
+  <PropertyGroup>
+    <DefaultWpfTheme>Generic</DefaultWpfTheme>
+    <ThemeInherited>true</ThemeInherited>
+  </PropertyGroup>
 
     <ItemGroup>
         <None Include="..\README.md" Pack="true" PackagePath="\"/>
         <None Include="..\LICENSE" Pack="true" PackagePath="\"/>
     </ItemGroup>
 
+
     <ItemGroup>
-        <ProjectReference Include="..\WPFNode.Core\WPFNode.Core.csproj">
-            <PrivateAssets>contentfiles;analyzers</PrivateAssets>
-            <IncludeAssets>runtime; build; native; dependencies; buildtransitive</IncludeAssets>
-        </ProjectReference>
-        <ProjectReference Include="..\WPFNode.Abstractions\WPFNode.Abstractions.csproj">
-            <PrivateAssets>contentfiles;analyzers</PrivateAssets>
-            <IncludeAssets>runtime; build; native; dependencies; buildtransitive</IncludeAssets>
-        </ProjectReference>
-        <ProjectReference Include="..\WPFNode.Controls\WPFNode.Controls.csproj">
-            <PrivateAssets>contentfiles;analyzers</PrivateAssets>
-            <IncludeAssets>runtime; build; native; dependencies; buildtransitive</IncludeAssets>
-        </ProjectReference>
-        <ProjectReference Include="..\WPFNode.Plugins.Basic\WPFNode.Plugins.Basic.csproj">
-            <PrivateAssets>contentfiles;analyzers</PrivateAssets>
-            <IncludeAssets>runtime; build; native; dependencies; buildtransitive</IncludeAssets>
-        </ProjectReference>
+        <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.2" />
     </ItemGroup>
-
-    <PropertyGroup>
-        <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);CopyProjectReferencesToPackage</TargetsForTfmSpecificBuildOutput>
-    </PropertyGroup>
-
-    <Target Name="CopyProjectReferencesToPackage" DependsOnTargets="BuildOnlySettings;ResolveReferences">
-        <ItemGroup>
-            <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths-&gt;WithMetadataValue('ReferenceSourceTarget', 'ProjectReference'))"/>
-        </ItemGroup>
-    </Target>
-
 </Project>

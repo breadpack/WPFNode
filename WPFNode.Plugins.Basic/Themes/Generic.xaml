@@ -1,11 +1,9 @@
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:abstractions="clr-namespace:WPFNode.Abstractions.Controls;assembly=WPFNode.Abstractions"
-    xmlns:commands="clr-namespace:WPFNode.Controls.Commands;assembly=WPFNode.Controls"
-    xmlns:controls="clr-namespace:WPFNode.Controls;assembly=WPFNode.Controls"
     xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
-    xmlns:system="clr-namespace:System;assembly=System.Runtime">
+    xmlns:system="clr-namespace:System;assembly=System.Runtime"
+    xmlns:controls="clr-namespace:WPFNode.Controls;assembly=WPFNode">
 
     <!-- 기본 입력 노드 스타일 -->
     <Style x:Key="Basic.InputNode.Base"

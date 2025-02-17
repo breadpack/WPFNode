@@ -1,41 +1,43 @@
-name: NuGet 패키지 빌드 및 배포
+name: Publish NuGet Packages
 
 on:
   push:
     tags:
-      - 'v*.*.*'
-  workflow_dispatch:
+      - 'v*'
 
 jobs:
   build-and-publish:
-    runs-on: windows-latest
-
+    runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: '9.0.x'
-
-      - name: Get version from tag
-        id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
-        shell: bash
-
-      - name: Restore dependencies
-        run: dotnet restore WPFNode.sln
-
-      - name: Build
-        run: dotnet build WPFNode.sln --configuration Release --no-restore
-
-      - name: Test
-        run: dotnet test WPFNode.sln --no-restore --verbosity normal
-
-      - name: Pack
-        run: dotnet pack WPFNode/WPFNode.csproj --configuration Release --output "${{ github.workspace }}\nupkgs" /p:Version=${{ env.VERSION }}
-
-      - name: Publish to NuGet
-        run: dotnet nuget push "${{ github.workspace }}\nupkgs\*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json 
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+        
+    - name: Get version from tag
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+      shell: bash
+        
+    - name: Restore dependencies
+      run: dotnet restore
+      
+    - name: Build
+      run: dotnet build --configuration Release --no-restore
+      
+    - name: Test
+      run: dotnet test --no-build --verbosity normal
+      
+    - name: Pack WPFNode
+      run: dotnet pack WPFNode/WPFNode.csproj --configuration Release --no-build --output nupkgs /p:Version=${{ env.VERSION }}
+      
+    - name: Pack WPFNode.Plugins.Basic
+      run: dotnet pack WPFNode.Plugins.Basic/WPFNode.Plugins.Basic.csproj --configuration Release --no-build --output nupkgs /p:Version=${{ env.VERSION }}
+      
+    - name: Push to NuGet
+      run: |
+        dotnet nuget push "nupkgs/dev.breadpack.WPFNode.*.nupkg" --api-key ${{secrets.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        dotnet nuget push "nupkgs/dev.breadpack.WPFNode.Plugins.Basic.*.nupkg" --api-key ${{secrets.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate 

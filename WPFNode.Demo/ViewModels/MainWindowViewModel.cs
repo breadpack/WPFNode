@@ -1,16 +1,16 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Windows.Input;
-using WPFNode.Core.Interfaces;
-using WPFNode.Core.Models;
-using WPFNode.Core.ViewModels.Nodes;
 using CommunityToolkit.Mvvm.Input;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
-using WPFNode.Core.Services;
 using System.Text.Json;
 using System.IO;
-using WPFNode.Core.Models.Serialization;
+using WPFNode.Interfaces;
+using WPFNode.Models;
+using WPFNode.Models.Serialization;
+using WPFNode.Services;
+using WPFNode.ViewModels.Nodes;
+using ICommand = System.Windows.Input.ICommand;
 
 namespace WPFNode.Demo.ViewModels;
 

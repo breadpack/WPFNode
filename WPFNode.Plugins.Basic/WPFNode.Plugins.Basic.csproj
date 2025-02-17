@@ -5,17 +5,36 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
-    <IsPackable>false</IsPackable>
+    <IsPackable>true</IsPackable>
+
+    <!-- NuGet 패키지 메타데이터 -->
+    <PackageId>dev.breadpack.WPFNode.Plugins.Basic</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>BreadPack</Authors>
+    <Company>BreadPack</Company>
+    <Description>WPFNode를 위한 기본 노드 플러그인 패키지</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>wpf;node-editor;visual-programming;node;editor;graph;plugins</PackageTags>
+
+    <!-- 연락처 정보 -->
+    <PackageProjectUrl>https://github.com/breadpack/WPFNode</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/breadpack/WPFNode.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReleaseNotes>Initial release</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
-    <PackageReference Include="Extended.Wpf.Toolkit" Version="4.7.25103.5738" />
-    <PackageReference Remove="Microsoft.SourceLink.GitHub" />
+    <None Include="..\README.md" Pack="true" PackagePath="\"/>
+    <None Include="..\LICENSE" Pack="true" PackagePath="\"/>
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\WPFNode.Controls\WPFNode.Controls.csproj" />
+    <ProjectReference Include="..\WPFNode\WPFNode.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Extended.Wpf.Toolkit" Version="4.7.25103.5738" />
   </ItemGroup>
 
 </Project> 

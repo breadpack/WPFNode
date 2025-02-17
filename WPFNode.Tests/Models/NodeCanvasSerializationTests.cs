@@ -5,16 +5,16 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using WPFNode.Core.Models;
 using WPFNode.Plugins.Basic;
-using WPFNode.Core.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
-using WPFNode.Core.Models.Serialization;
+using WPFNode.Interfaces;
+using WPFNode.Models;
+using WPFNode.Models.Serialization;
 using WPFNode.Plugins.Basic.Primitives;
-using WPFNode.Abstractions;
+using WPFNode.Services;
 
 namespace WPFNode.Tests.Models;
 

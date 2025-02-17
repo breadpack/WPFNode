@@ -1,7 +1,6 @@
-using WPFNode.Abstractions;
-using WPFNode.Controls.Behaviors;
-using WPFNode.Core.Models;
-using WPFNode.Core.Models.Properties;
+using WPFNode.Behaviors;
+using WPFNode.Interfaces;
+using WPFNode.Models;
 
 namespace WPFNode.Plugins.Basic.Primitives.Base;
 

@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows.Media;
-using WPFNode.Abstractions;
-using WPFNode.Abstractions.Attributes;
-using WPFNode.Abstractions.Constants;
-using WPFNode.Core.Models;
-using WPFNode.Core.Models.Properties;
+using WPFNode.Attributes;
+using WPFNode.Constants;
+using WPFNode.Interfaces;
+using WPFNode.Models;
+using WPFNode.Models.Properties;
 
 namespace WPFNode.Demo;
 

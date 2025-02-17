@@ -1,9 +1,8 @@
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using WPFNode.Demo.ViewModels;
-using WPFNode.Core.Services;
-using WPFNode.Abstractions;
 using WPFNode.Plugins.Basic;
+using WPFNode.Services;
 
 namespace WPFNode.Demo;
 
