@@ -30,7 +30,7 @@ jobs:
         run: dotnet test WPFNode.sln --no-restore --verbosity normal
 
       - name: Pack
-        run: dotnet pack WPFNode/WPFNode.csproj --configuration Release --output ./nupkgs
+        run: dotnet pack WPFNode/WPFNode.csproj --configuration Release --output ${{ github.workspace }}/nupkgs
 
       - name: Publish to NuGet
-        run: dotnet nuget push ./nupkgs/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json 
+        run: dotnet nuget push ${{ github.workspace }}/nupkgs/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json 
