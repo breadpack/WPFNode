@@ -141,38 +141,48 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
 
     public IConnection Connect(IPort source, IPort target)
     {
+        // 기본 유효성 검사
+        if (source == null || target == null)
+            throw new NodeConnectionException(
+                ExceptionMessages.GetMessage(ExceptionMessages.NodeIsNull));
+
+        // 포트 타입 검사
         if (source is not IOutputPort outputPort)
             throw new NodeConnectionException(
-                ExceptionMessages.GetMessage(ExceptionMessages.SourceMustBeOutputPort), 
+                ExceptionMessages.GetMessage(ExceptionMessages.SourceMustBeOutputPort),
                 source, target);
         if (target is not IInputPort inputPort)
             throw new NodeConnectionException(
-                ExceptionMessages.GetMessage(ExceptionMessages.TargetMustBeInputPort), 
-                source, target);
-        if (!outputPort.CanConnectTo(inputPort))
-            throw new NodeConnectionException(
-                ExceptionMessages.GetMessage(ExceptionMessages.PortsCannotBeConnected), 
+                ExceptionMessages.GetMessage(ExceptionMessages.TargetMustBeInputPort),
                 source, target);
         if (source.Node == null || target.Node == null)
             throw new NodeConnectionException(
-                ExceptionMessages.GetMessage(ExceptionMessages.PortsMustBeAttachedToNode), 
+                ExceptionMessages.GetMessage(ExceptionMessages.PortsMustBeAttachedToNode),
                 source, target);
+
+        // 포트 연결 가능 여부 검사
+        if (!outputPort.CanConnectTo(inputPort))
+        {
+            throw new NodeConnectionException(
+                ExceptionMessages.GetMessage(ExceptionMessages.PortsCannotBeConnected),
+                source, target);
+        }
 
         var sourcePortId = new PortId(
             source.Node.Id,
             false,
-            source.Node.OutputPorts.ToList().IndexOf(outputPort));
+            source.GetPortIndex());
             
         var targetPortId = new PortId(
             target.Node.Id,
             true,
-            target.Node.InputPorts.ToList().IndexOf(inputPort));
+            target.GetPortIndex());
 
         // 중복 연결 체크
         if (_connections.Any(c => c.SourcePortId == sourcePortId && c.TargetPortId == targetPortId))
         {
             throw new NodeConnectionException(
-                ExceptionMessages.GetMessage(ExceptionMessages.PortsAlreadyConnected), 
+                ExceptionMessages.GetMessage(ExceptionMessages.PortsAlreadyConnected),
                 source, target);
         }
 
@@ -203,95 +213,6 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         connection.Target.RemoveConnection(connection);
         
         OnPropertyChanged(nameof(Connections));
-    }
-
-    private bool IsTypeCompatible(Type sourceType, Type targetType)
-    {
-        // 동일한 타입이면 호환됨
-        if (targetType.IsAssignableFrom(sourceType))
-            return true;
-
-        // 숫자 타입 간의 암시적 변환 체크
-        if (IsNumericType(sourceType) && IsNumericType(targetType))
-        {
-            // 암시적 변환이 가능한지 확인
-            var method = sourceType.GetMethod("op_Implicit", new[] { sourceType });
-            if (method != null && method.ReturnType == targetType)
-                return true;
-
-            // 기본 숫자 타입 간의 암시적 변환 규칙 적용
-            return IsImplicitNumericConversion(sourceType, targetType);
-        }
-
-        return false;
-    }
-
-    private bool IsNumericType(Type type)
-    {
-        switch (Type.GetTypeCode(type))
-        {
-            case TypeCode.Byte:
-            case TypeCode.SByte:
-            case TypeCode.UInt16:
-            case TypeCode.UInt32:
-            case TypeCode.UInt64:
-            case TypeCode.Int16:
-            case TypeCode.Int32:
-            case TypeCode.Int64:
-            case TypeCode.Decimal:
-            case TypeCode.Double:
-            case TypeCode.Single:
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    private bool IsImplicitNumericConversion(Type source, Type target)
-    {
-        // 기본 숫자 타입 간의 암시적 변환 규칙
-        var sourceCode = Type.GetTypeCode(source);
-        var targetCode = Type.GetTypeCode(target);
-
-        switch (sourceCode)
-        {
-            case TypeCode.SByte:
-                return targetCode == TypeCode.Int16 || targetCode == TypeCode.Int32 || 
-                       targetCode == TypeCode.Int64 || targetCode == TypeCode.Single || 
-                       targetCode == TypeCode.Double || targetCode == TypeCode.Decimal;
-            case TypeCode.Byte:
-                return targetCode == TypeCode.Int16 || targetCode == TypeCode.UInt16 || 
-                       targetCode == TypeCode.Int32 || targetCode == TypeCode.UInt32 ||
-                       targetCode == TypeCode.Int64 || targetCode == TypeCode.UInt64 || 
-                       targetCode == TypeCode.Single || targetCode == TypeCode.Double || 
-                       targetCode == TypeCode.Decimal;
-            case TypeCode.Int16:
-                return targetCode == TypeCode.Int32 || targetCode == TypeCode.Int64 || 
-                       targetCode == TypeCode.Single || targetCode == TypeCode.Double || 
-                       targetCode == TypeCode.Decimal;
-            case TypeCode.UInt16:
-                return targetCode == TypeCode.Int32 || targetCode == TypeCode.UInt32 ||
-                       targetCode == TypeCode.Int64 || targetCode == TypeCode.UInt64 ||
-                       targetCode == TypeCode.Single || targetCode == TypeCode.Double ||
-                       targetCode == TypeCode.Decimal;
-            case TypeCode.Int32:
-                return targetCode == TypeCode.Int64 || targetCode == TypeCode.Single ||
-                       targetCode == TypeCode.Double || targetCode == TypeCode.Decimal;
-            case TypeCode.UInt32:
-                return targetCode == TypeCode.Int64 || targetCode == TypeCode.UInt64 ||
-                       targetCode == TypeCode.Single || targetCode == TypeCode.Double ||
-                       targetCode == TypeCode.Decimal;
-            case TypeCode.Int64:
-                return targetCode == TypeCode.Single || targetCode == TypeCode.Double ||
-                       targetCode == TypeCode.Decimal;
-            case TypeCode.UInt64:
-                return targetCode == TypeCode.Single || targetCode == TypeCode.Double ||
-                       targetCode == TypeCode.Decimal;
-            case TypeCode.Single:
-                return targetCode == TypeCode.Double;
-            default:
-                return false;
-        }
     }
 
     public NodeGroup CreateGroup(IEnumerable<NodeBase> nodes, string name = "New Group")

@@ -6,7 +6,7 @@ namespace WPFNode.Resources;
 public static class ExceptionMessages
 {
     private static readonly ResourceManager ResourceManager = 
-        new ResourceManager("WPFNode.Core.Resources.ExceptionMessages", typeof(ExceptionMessages).Assembly);
+        new ResourceManager("WPFNode.Resources.ExceptionMessages", typeof(ExceptionMessages).Assembly);
 
     public static string GetMessage(string key) =>
         ResourceManager.GetString(key, CultureInfo.CurrentUICulture) ?? key;

@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using WPFNode.Models;
 using WPFNode.Plugins.Basic.Primitives;
 using WPFNode.Services;
+using WPFNode.Exceptions;
 
 namespace WPFNode.Tests.Models;
 
@@ -101,7 +102,7 @@ public class NodeGraphTests
         var add = _canvas.CreateNode<AdditionNode>(300, 150);
 
         // 2. 잘못된 연결 시도 (입력 포트끼리 연결)
-        Assert.ThrowsException<ArgumentException>(() =>
+        Assert.ThrowsException<NodeConnectionException>(() =>
             _canvas.Connect(add.InputPorts[0], add.InputPorts[1]));
 
         // 3. 올바른 연결
@@ -109,8 +110,8 @@ public class NodeGraphTests
         Assert.IsNotNull(connection);
 
         // 4. 중복 연결 시도
-        var duplicateConnection = _canvas.Connect(num1.OutputPorts[0], add.InputPorts[0]);
-        Assert.IsNull(duplicateConnection);
+        Assert.ThrowsException<NodeConnectionException>(() =>
+            _canvas.Connect(num1.OutputPorts[0], add.InputPorts[0]));
     }
 
     [TestMethod]

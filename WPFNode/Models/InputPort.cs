@@ -59,7 +59,11 @@ public class InputPort<T> : IInputPort, INotifyPropertyChanged {
         if (_converters.ContainsKey(sourceType))
             return true;
 
-        // 2. 타입 변환 가능 여부 확인
+        // 2. 대상 타입이 string이면 모든 타입 허용 (ToString 메서드를 통해 변환 가능)
+        if (typeof(T) == typeof(string))
+            return true;
+
+        // 3. 타입 호환성 검사
         return sourceType.CanImplicitlyConvertTo(typeof(T));
     }
 

@@ -44,19 +44,35 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
 
     private INode? CreateNodeFromJson(JsonElement nodeElement, NodeCanvas canvas)
     {
-        try
+        if (!nodeElement.TryGetProperty("Id", out var idElement) || 
+            !nodeElement.TryGetProperty("Type", out var typeElement) ||
+            !nodeElement.TryGetProperty("X", out var xElement) ||
+            !nodeElement.TryGetProperty("Y", out var yElement))
         {
-            var nodeId = Guid.Parse(nodeElement.GetProperty("Id").GetString()!);
-            var nodeType = Type.GetType(nodeElement.GetProperty("Type").GetString()!);
-            var x = nodeElement.GetProperty("X").GetDouble();
-            var y = nodeElement.GetProperty("Y").GetDouble();
-            
-            return canvas.CreateNodeWithId(nodeId, nodeType, x, y);
+            throw new JsonException("필수 노드 속성이 누락되었습니다.");
         }
-        catch
+
+        var nodeId = Guid.Parse(idElement.GetString()!);
+        var nodeTypeString = typeElement.GetString();
+        var nodeType = Type.GetType(nodeTypeString ?? string.Empty);
+        
+        if (nodeType == null)
         {
-            return null;
+            throw new JsonException($"노드 타입을 찾을 수 없습니다: {nodeTypeString}");
         }
+
+        var x = xElement.GetDouble();
+        var y = yElement.GetDouble();
+        
+        var node = canvas.CreateNodeWithId(nodeId, nodeType, x, y);
+        
+        // 이름 복원
+        if (nodeElement.TryGetProperty("Name", out var nameElement))
+        {
+            node.Name = nameElement.GetString() ?? node.Name;
+        }
+        
+        return node;
     }
 
     private void ReadNodeProperties(JsonElement nodeElement, INode node, JsonSerializerOptions options)
@@ -89,15 +105,25 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
 
     private void ApplyPropertyData(INode node, PropertySerializationData propertyData)
     {
-        if (propertyData.ValueType == null || 
+        if (string.IsNullOrEmpty(propertyData.Name) || 
+            propertyData.ValueType == null || 
             !node.Properties.TryGetValue(propertyData.Name, out var property))
             return;
 
+        // 포트 연결 가능 여부 설정
         property.CanConnectToPort = propertyData.CanConnectToPort;
         
-        if (propertyData.SerializedValue != null)
+        // 값 설정
+        if (!string.IsNullOrEmpty(propertyData.SerializedValue))
         {
-            ApplyPropertyValue(property, propertyData.ValueType, propertyData.SerializedValue);
+            try
+            {
+                ApplyPropertyValue(property, propertyData.ValueType, propertyData.SerializedValue);
+            }
+            catch (Exception ex)
+            {
+                throw new JsonException($"속성 값 설정 중 오류 발생: {propertyData.Name}", ex);
+            }
         }
     }
 
@@ -230,9 +256,9 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
         writer.WriteStartObject();
         writer.WriteString("Id", node.Id.ToString());
         writer.WriteString("Type", node.GetType().AssemblyQualifiedName);
+        writer.WriteString("Name", node.Name);
         writer.WriteNumber("X", node.X);
         writer.WriteNumber("Y", node.Y);
-
         WriteNodeProperties(writer, node, options);
         writer.WriteEndObject();
     }

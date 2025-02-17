@@ -36,6 +36,18 @@ public static class TypeExtensions
     public static bool CanImplicitlyConvertTo(this Type sourceType, Type targetType)
     {
         if (sourceType == targetType) return true;
+
+        // 1. 상속 관계 확인
+        if (targetType.IsAssignableFrom(sourceType)) return true;
+
+        // 2. Nullable 타입 처리
+        if (Nullable.GetUnderlyingType(targetType) != null)
+        {
+            var underlyingType = Nullable.GetUnderlyingType(targetType);
+            return sourceType.CanImplicitlyConvertTo(underlyingType!);
+        }
+
+        // 3. 숫자 타입 간의 암시적 변환 규칙 체크
         if (sourceType.IsNumericType() && targetType.IsNumericType())
         {
             // 숫자 타입 간의 암시적 변환 규칙 체크
