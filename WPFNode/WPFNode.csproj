@@ -33,12 +33,20 @@
     <None Include="..\LICENSE" Pack="true" PackagePath="\" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\WPFNode.Core\WPFNode.Core.csproj" PrivateAssets="all" />
-    <ProjectReference Include="..\WPFNode.Abstractions\WPFNode.Abstractions.csproj" PrivateAssets="all" />
-    <ProjectReference Include="..\WPFNode.Controls\WPFNode.Controls.csproj" PrivateAssets="all" />
-    <ProjectReference Include="..\WPFNode.Plugins.Basic\WPFNode.Plugins.Basic.csproj" PrivateAssets="all" />
-  </ItemGroup>
+<ItemGroup>
+    <ProjectReference Include="..\WPFNode.Core\WPFNode.Core.csproj">
+        <PrivateAssets>compile</PrivateAssets>
+    </ProjectReference>
+    <ProjectReference Include="..\WPFNode.Abstractions\WPFNode.Abstractions.csproj">
+        <PrivateAssets>compile</PrivateAssets>
+    </ProjectReference>
+    <ProjectReference Include="..\WPFNode.Controls\WPFNode.Controls.csproj">
+        <PrivateAssets>compile</PrivateAssets>
+    </ProjectReference>
+    <ProjectReference Include="..\WPFNode.Plugins.Basic\WPFNode.Plugins.Basic.csproj">
+        <PrivateAssets>compile</PrivateAssets>
+    </ProjectReference>
+</ItemGroup>
 
   <PropertyGroup>
     <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);CopyProjectReferencesToPackage</TargetsForTfmSpecificBuildOutput>
