@@ -32,12 +32,12 @@ jobs:
       run: dotnet test --verbosity normal
       
     - name: Pack WPFNode
-      run: dotnet pack WPFNode/WPFNode.csproj --configuration Release --no-build --output nupkgs /p:Version=${{ env.VERSION }}
+      run: dotnet pack WPFNode\WPFNode.csproj --configuration Release --no-build --output ${{ github.workspace }}\nupkgs /p:Version=${{ env.VERSION }}
       
     - name: Pack WPFNode.Plugins.Basic
-      run: dotnet pack WPFNode.Plugins.Basic/WPFNode.Plugins.Basic.csproj --configuration Release --no-build --output nupkgs /p:Version=${{ env.VERSION }}
+      run: dotnet pack WPFNode.Plugins.Basic\WPFNode.Plugins.Basic.csproj --configuration Release --no-build --output ${{ github.workspace }}\nupkgs /p:Version=${{ env.VERSION }}
       
     - name: Push to NuGet
       run: |
-        dotnet nuget push "nupkgs/dev.breadpack.WPFNode.*.nupkg" --api-key ${{secrets.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate
-        dotnet nuget push "nupkgs/dev.breadpack.WPFNode.Plugins.Basic.*.nupkg" --api-key ${{secrets.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate 
+        dotnet nuget push "${{ github.workspace }}\nupkgs\dev.breadpack.WPFNode.*.nupkg" --api-key ${{secrets.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        dotnet nuget push "${{ github.workspace }}\nupkgs\dev.breadpack.WPFNode.Plugins.Basic.*.nupkg" --api-key ${{secrets.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate 
