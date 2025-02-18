@@ -371,6 +371,21 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
             c.SourcePortId == sourcePortId && 
             c.TargetPortId == targetPortId);
     }
+
+    public DynamicNode CreateDynamicNode(
+        string name,
+        string category,
+        string description,
+        Func<DynamicNode, Task> processLogic,
+        double x = 0,
+        double y = 0)
+    {
+        var node = new DynamicNode(this, Guid.NewGuid(), name, category, description, processLogic);
+        node.X = x;
+        node.Y = y;
+        SerializableNodes.Add(node);
+        return node;
+    }
 }
 
 // NodeExecutionException을 ExecutionPlan.cs로 이동 

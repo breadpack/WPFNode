@@ -52,7 +52,7 @@ public class NodePropertyJsonConverter : JsonConverter<INodeProperty>
     }
 }
 
-public class PropertySerializationInfo : INodeProperty
+public class PropertySerializationInfo : INodeProperty, IJsonSerializable
 {
     public required string Name { get; init; }
     public required string DisplayName { get; init; }
@@ -71,4 +71,38 @@ public class PropertySerializationInfo : INodeProperty
     public void DisconnectFromPort() { }
     
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    public void WriteJson(Utf8JsonWriter writer)
+    {
+        writer.WriteStartObject();
+        
+        writer.WriteString("Name", Name);
+        writer.WriteString("DisplayName", DisplayName);
+        writer.WriteNumber("ControlType", (int)ControlType);
+        writer.WriteBoolean("CanConnectToPort", CanConnectToPort);
+        writer.WriteString("Format", Format);
+        writer.WriteString("PropertyType", PropertyType.AssemblyQualifiedName);
+        writer.WriteString("Value", JsonSerializer.Serialize(Value, PropertyType));
+        writer.WriteBoolean("IsVisible", IsVisible);
+        
+        writer.WriteEndObject();
+    }
+
+    public void ReadJson(JsonElement element)
+    {
+        if (element.TryGetProperty("Value", out var valueElement))
+        {
+            Value = JsonSerializer.Deserialize(valueElement.GetString()!, PropertyType);
+        }
+        
+        if (element.TryGetProperty("IsVisible", out var isVisibleElement))
+        {
+            IsVisible = isVisibleElement.GetBoolean();
+        }
+        
+        if (element.TryGetProperty("CanConnectToPort", out var canConnectElement))
+        {
+            CanConnectToPort = canConnectElement.GetBoolean();
+        }
+    }
 } 

@@ -15,29 +15,24 @@ using WPFNode.Models;
 using WPFNode.Models.Serialization;
 using WPFNode.Plugins.Basic.Primitives;
 using WPFNode.Services;
+using WPFNode.Constants;
 
 namespace WPFNode.Tests.Models;
 
 [TestClass]
 public class NodeCanvasSerializationTests : IDisposable
 {
-    private readonly string                _testFilePath;
-    private readonly NodePluginService     _pluginService;
-    private readonly NodeCanvas            _canvas;
+    private readonly string _testFilePath;
     private readonly JsonSerializerOptions _jsonOptions;
+    private readonly NodeCanvas _canvas;
 
     public NodeCanvasSerializationTests()
     {
         _testFilePath = Path.Combine(Path.GetTempPath(), $"nodecanvas_test_{Guid.NewGuid()}.json");
-
         _canvas = new NodeCanvas();
-
-        // JSON 설정
         _jsonOptions = new JsonSerializerOptions
         {
-            WriteIndented = true,
-            PropertyNameCaseInsensitive = true,
-            PropertyNamingPolicy = null  // 속성 이름을 그대로 유지
+            WriteIndented = true
         };
         _jsonOptions.Converters.Add(new NodeCanvasJsonConverter());
     }
@@ -311,6 +306,409 @@ public class NodeCanvasSerializationTests : IDisposable
         Assert.IsNotNull(loadedCanvas);
         Assert.AreEqual(2, loadedCanvas.Nodes.Count);
         Assert.AreEqual(1, loadedCanvas.Connections.Count);
+    }
+
+    [TestMethod]
+    public async Task SaveAndLoad_DynamicNode_WithDynamicPorts_ShouldWorkCorrectly()
+    {
+        // 1. DynamicNode 생성 및 설정
+        var dynamicNode = _canvas.CreateDynamicNode(
+            "TestDynamicNode",
+            "Test",
+            "Dynamic node for testing",
+            async (node) => await Task.CompletedTask
+        );
+
+        // 동적 포트 추가
+        var inputPort1 = dynamicNode.AddInputPort<int>("Input1");
+        var inputPort2 = dynamicNode.AddInputPort<string>("Input2");
+        var outputPort1 = dynamicNode.AddOutputPort<double>("Output1");
+        var outputPort2 = dynamicNode.AddOutputPort<bool>("Output2");
+
+        // 포트 가시성 설정
+        inputPort2.IsVisible = false;
+        outputPort1.IsVisible = false;
+
+        // 2. 저장
+        var json = JsonSerializer.Serialize(_canvas, _jsonOptions);
+        var loadedCanvas = JsonSerializer.Deserialize<NodeCanvas>(json, _jsonOptions);
+
+        // 3. 검증
+        Assert.IsNotNull(loadedCanvas);
+        Assert.AreEqual(1, loadedCanvas.Nodes.Count);
+
+        var loadedNode = loadedCanvas.Nodes[0] as DynamicNode;
+        Assert.IsNotNull(loadedNode);
+
+        // 포트 수 검증
+        Assert.AreEqual(2, loadedNode.InputPorts.Count);
+        Assert.AreEqual(2, loadedNode.OutputPorts.Count);
+
+        // 포트 타입 검증
+        Assert.AreEqual(typeof(int), loadedNode.InputPorts[0].DataType);
+        Assert.AreEqual(typeof(string), loadedNode.InputPorts[1].DataType);
+        Assert.AreEqual(typeof(double), loadedNode.OutputPorts[0].DataType);
+        Assert.AreEqual(typeof(bool), loadedNode.OutputPorts[1].DataType);
+
+        // 포트 이름 검증
+        Assert.AreEqual("Input1", loadedNode.InputPorts[0].Name);
+        Assert.AreEqual("Input2", loadedNode.InputPorts[1].Name);
+        Assert.AreEqual("Output1", loadedNode.OutputPorts[0].Name);
+        Assert.AreEqual("Output2", loadedNode.OutputPorts[1].Name);
+
+        // 포트 가시성 검증
+        Assert.IsTrue(loadedNode.InputPorts[0].IsVisible);
+        Assert.IsFalse(loadedNode.InputPorts[1].IsVisible);
+        Assert.IsFalse(loadedNode.OutputPorts[0].IsVisible);
+        Assert.IsTrue(loadedNode.OutputPorts[1].IsVisible);
+    }
+
+    [TestMethod]
+    public async Task SaveAndLoad_DynamicNode_WithDynamicProperties_ShouldWorkCorrectly()
+    {
+        // 1. DynamicNode 생성 및 설정
+        var dynamicNode = _canvas.CreateDynamicNode(
+            "TestDynamicNode",
+            "Test",
+            "Dynamic node for testing",
+            async (node) => await Task.CompletedTask
+        );
+
+        // 동적 프로퍼티 추가
+        var intProperty = dynamicNode.AddProperty<int>(
+            "IntProperty",
+            "Integer Property",
+            NodePropertyControlType.NumberBox
+        );
+        var stringProperty = dynamicNode.AddProperty<string>(
+            "StringProperty",
+            "String Property",
+            NodePropertyControlType.TextBox
+        );
+        var boolProperty = dynamicNode.AddProperty<bool>(
+            "BoolProperty",
+            "Boolean Property",
+            NodePropertyControlType.CheckBox,
+            null,
+            true  // 포트로 사용 가능
+        );
+
+        // 프로퍼티 값 설정
+        intProperty.Value = 42;
+        stringProperty.Value = "Test Value";
+        boolProperty.Value = true;
+        boolProperty.CanConnectToPort = true;
+
+        // 2. 저장
+        var json = JsonSerializer.Serialize(_canvas, _jsonOptions);
+        var loadedCanvas = JsonSerializer.Deserialize<NodeCanvas>(json, _jsonOptions);
+
+        // 3. 검증
+        Assert.IsNotNull(loadedCanvas);
+        Assert.AreEqual(1, loadedCanvas.Nodes.Count);
+
+        var loadedNode = loadedCanvas.Nodes[0] as DynamicNode;
+        Assert.IsNotNull(loadedNode);
+
+        // 프로퍼티 수 검증
+        Assert.AreEqual(3, loadedNode.Properties.Count);
+
+        // 프로퍼티 값 검증
+        var loadedIntProperty = loadedNode.Properties["IntProperty"];
+        var loadedStringProperty = loadedNode.Properties["StringProperty"];
+        var loadedBoolProperty = loadedNode.Properties["BoolProperty"];
+
+        Assert.AreEqual(42, loadedIntProperty.Value);
+        Assert.AreEqual("Test Value", loadedStringProperty.Value);
+        Assert.AreEqual(true, loadedBoolProperty.Value);
+
+        // 프로퍼티 설정 검증
+        Assert.IsFalse(loadedIntProperty.CanConnectToPort);
+        Assert.IsFalse(loadedStringProperty.CanConnectToPort);
+        Assert.IsTrue(loadedBoolProperty.CanConnectToPort);
+    }
+
+    [TestMethod]
+    public async Task SaveAndLoad_DynamicNode_WithConnections_ShouldWorkCorrectly()
+    {
+        // 1. 노드 생성
+        var sourceNode = _canvas.CreateNode<DoubleInputNode>(100, 100);
+        var dynamicNode = _canvas.CreateDynamicNode(
+            "TestDynamicNode",
+            "Test",
+            "Dynamic node for testing",
+            async (node) => await Task.CompletedTask,
+            200, 100
+        );
+        var targetNode = _canvas.CreateNode<ConsoleWriteNode>(300, 100);
+
+        // 동적 포트 및 프로퍼티 추가
+        var inputPort = dynamicNode.AddInputPort<double>("Input");
+        var outputPort = dynamicNode.AddOutputPort<double>("Output");
+        var property = dynamicNode.AddProperty<double>(
+            "Value",
+            "Value Property",
+            NodePropertyControlType.NumberBox,
+            null,
+            true
+        );
+
+        // 연결 설정
+        _canvas.Connect(sourceNode.OutputPorts[0], inputPort);
+        _canvas.Connect(outputPort, targetNode.InputPorts[0]);
+
+        // 값 설정
+        ((DoubleInputNode)sourceNode).Value = 42.0;
+        property.Value = 123.0;
+
+        // 2. 저장
+        var json = JsonSerializer.Serialize(_canvas, _jsonOptions);
+        var loadedCanvas = JsonSerializer.Deserialize<NodeCanvas>(json, _jsonOptions);
+
+        // 3. 검증
+        Assert.IsNotNull(loadedCanvas);
+        Assert.AreEqual(3, loadedCanvas.Nodes.Count);
+        Assert.AreEqual(2, loadedCanvas.Connections.Count);
+
+        var loadedDynamicNode = loadedCanvas.Nodes
+            .OfType<DynamicNode>()
+            .FirstOrDefault();
+        Assert.IsNotNull(loadedDynamicNode);
+
+        // 포트 연결 검증
+        Assert.IsTrue(loadedDynamicNode.InputPorts[0].IsConnected);
+        Assert.IsTrue(loadedDynamicNode.OutputPorts[0].IsConnected);
+
+        // 프로퍼티 값 검증
+        var loadedProperty = loadedDynamicNode.Properties["Value"];
+        Assert.AreEqual(123.0, loadedProperty.Value);
+    }
+
+    [TestMethod]
+    public async Task SaveAndLoad_DynamicNode_WithPortsAndPropertiesRemoval_ShouldWorkCorrectly()
+    {
+        // 1. DynamicNode 생성 및 설정
+        var dynamicNode = _canvas.CreateDynamicNode(
+            "TestDynamicNode",
+            "Test",
+            "Dynamic node for testing",
+            async (node) => await Task.CompletedTask
+        );
+
+        // 포트 및 프로퍼티 추가
+        var inputPort1 = dynamicNode.AddInputPort<int>("Input1");
+        var inputPort2 = dynamicNode.AddInputPort<string>("Input2");
+        var outputPort = dynamicNode.AddOutputPort<double>("Output");
+        
+        var property1 = dynamicNode.AddProperty<int>(
+            "Property1",
+            "Property 1",
+            NodePropertyControlType.NumberBox,
+            null,
+            true  // 포트로 사용 가능하도록 설정
+        );
+        var property2 = dynamicNode.AddProperty<string>(
+            "Property2",
+            "Property 2",
+            NodePropertyControlType.TextBox
+        );
+
+        // 일부 포트와 프로퍼티 제거
+        var json = JsonSerializer.Serialize(_canvas, _jsonOptions);
+        var loadedCanvas = JsonSerializer.Deserialize<NodeCanvas>(json, _jsonOptions);
+        var loadedNode = loadedCanvas.Nodes[0] as DynamicNode;
+        Assert.IsNotNull(loadedNode);
+        
+        // 새로운 포트와 프로퍼티 추가
+        var newInputPort = loadedNode.AddInputPort<bool>("NewInput");
+        var newOutputPort = loadedNode.AddOutputPort<string>("NewOutput");
+        var newProperty = loadedNode.AddProperty<bool>(
+            "NewProperty",
+            "New Property",
+            NodePropertyControlType.CheckBox,
+            null,
+            true  // 포트로 사용 가능하도록 설정
+        );
+
+        // 2. 저장
+        json = JsonSerializer.Serialize(loadedCanvas, _jsonOptions);
+        loadedCanvas = JsonSerializer.Deserialize<NodeCanvas>(json, _jsonOptions);
+
+        // 3. 검증
+        Assert.IsNotNull(loadedCanvas);
+        loadedNode = loadedCanvas.Nodes[0] as DynamicNode;
+        Assert.IsNotNull(loadedNode);
+
+        // 포트 검증 (InputPort 2개 + Property 3개)
+        Assert.AreEqual(6, loadedNode.InputPorts.Count, "InputPorts 개수가 일치하지 않습니다. (InputPort 3개 + Property 3개)");
+        Assert.AreEqual(2, loadedNode.OutputPorts.Count, "OutputPorts 개수가 일치하지 않습니다.");
+
+        // 입력 포트 순서 및 타입 검증
+        Assert.AreEqual("Input1", loadedNode.InputPorts[0].Name);
+        Assert.AreEqual("Input2", loadedNode.InputPorts[1].Name);
+        Assert.AreEqual("Property 1", loadedNode.InputPorts[2].Name);
+        Assert.AreEqual("Property 2", loadedNode.InputPorts[3].Name);
+        Assert.AreEqual("NewInput", loadedNode.InputPorts[4].Name);
+        
+        Assert.AreEqual(typeof(int), loadedNode.InputPorts[0].DataType);
+        Assert.AreEqual(typeof(string), loadedNode.InputPorts[1].DataType);
+        Assert.AreEqual(typeof(int), loadedNode.InputPorts[2].DataType);
+        Assert.AreEqual(typeof(string), loadedNode.InputPorts[3].DataType);
+        Assert.AreEqual(typeof(bool), loadedNode.InputPorts[4].DataType);
+
+        // Property의 CanConnectToPort 설정에 따른 IsVisible 검증
+        Assert.IsTrue(loadedNode.InputPorts[2].IsVisible, "Property1은 CanConnectToPort가 true이므로 IsVisible이어야 합니다");
+        Assert.IsFalse(loadedNode.InputPorts[3].IsVisible, "Property2는 CanConnectToPort가 false이므로 IsVisible이 아니어야 합니다");
+
+        // 출력 포트 검증
+        Assert.AreEqual("Output", loadedNode.OutputPorts[0].Name);
+        Assert.AreEqual("NewOutput", loadedNode.OutputPorts[1].Name);
+        Assert.AreEqual(typeof(double), loadedNode.OutputPorts[0].DataType);
+        Assert.AreEqual(typeof(string), loadedNode.OutputPorts[1].DataType);
+
+        // 프로퍼티 검증
+        Assert.AreEqual(3, loadedNode.Properties.Count, "Properties 개수가 일치하지 않습니다.");
+        Assert.IsTrue(loadedNode.Properties.ContainsKey("Property1"));
+        Assert.IsTrue(loadedNode.Properties.ContainsKey("Property2"));
+        Assert.IsTrue(loadedNode.Properties.ContainsKey("NewProperty"));
+        Assert.AreEqual(typeof(int), loadedNode.Properties["Property1"].PropertyType);
+        Assert.AreEqual(typeof(string), loadedNode.Properties["Property2"].PropertyType);
+        Assert.AreEqual(typeof(bool), loadedNode.Properties["NewProperty"].PropertyType);
+
+        // 프로퍼티의 CanConnectToPort 설정 검증
+        Assert.IsTrue(loadedNode.Properties["Property1"].CanConnectToPort);
+        Assert.IsFalse(loadedNode.Properties["Property2"].CanConnectToPort);
+        Assert.IsTrue(loadedNode.Properties["NewProperty"].CanConnectToPort);
+    }
+
+    [TestMethod]
+    public async Task SaveAndLoad_DynamicNode_WithOutputPortValues_ShouldWorkCorrectly()
+    {
+        // 1. DynamicNode 생성 및 설정
+        var dynamicNode = _canvas.CreateDynamicNode(
+            "TestDynamicNode",
+            "Test",
+            "Dynamic node for testing",
+            async (node) => {
+                // ProcessAsync 내에서 출력 포트 값 설정
+                var port1 = node.OutputPorts[0];
+                var port2 = node.OutputPorts[1];
+                port1.Value = 42;
+                port2.Value = "Test Value";
+            }
+        );
+
+        // 출력 포트 추가
+        var outputPort1 = dynamicNode.AddOutputPort<int>("Output1");
+        var outputPort2 = dynamicNode.AddOutputPort<string>("Output2");
+        
+        outputPort1.IsVisible = false;
+
+        // ProcessAsync 실행하여 값 설정
+        await dynamicNode.ProcessAsync();
+
+        // 2. 저장
+        var json = JsonSerializer.Serialize(_canvas, _jsonOptions);
+        var loadedCanvas = JsonSerializer.Deserialize<NodeCanvas>(json, _jsonOptions);
+
+        // 3. 검증
+        Assert.IsNotNull(loadedCanvas);
+        var loadedNode = loadedCanvas.Nodes[0] as DynamicNode;
+        Assert.IsNotNull(loadedNode);
+
+        // 포트 수 검증
+        Assert.AreEqual(2, loadedNode.OutputPorts.Count);
+
+        // 포트 타입 및 속성 검증
+        var loadedPort1 = loadedNode.OutputPorts[0];
+        var loadedPort2 = loadedNode.OutputPorts[1];
+
+        Assert.AreEqual(typeof(int), loadedPort1.DataType);
+        Assert.AreEqual(typeof(string), loadedPort2.DataType);
+        Assert.AreEqual("Output1", loadedPort1.Name);
+        Assert.AreEqual("Output2", loadedPort2.Name);
+        Assert.IsFalse(loadedPort1.IsVisible);
+        Assert.IsTrue(loadedPort2.IsVisible);
+
+        // ProcessAsync 실행 전에는 값이 기본값
+        Assert.AreEqual(0, loadedPort1.Value);
+        Assert.AreEqual(null, loadedPort2.Value);
+
+        // ProcessAsync 실행 후 값 검증
+        await loadedNode.ProcessAsync();
+        Assert.AreEqual(42, loadedPort1.Value);
+        Assert.AreEqual("Test Value", loadedPort2.Value);
+    }
+
+    [TestMethod]
+    public async Task SaveAndLoad_DynamicNode_WithPropertyFormatAndControlType_ShouldWorkCorrectly()
+    {
+        // 1. DynamicNode 생성 및 설정
+        var dynamicNode = _canvas.CreateDynamicNode(
+            "TestDynamicNode",
+            "Test",
+            "Dynamic node for testing",
+            async (node) => await Task.CompletedTask
+        );
+
+        // 다양한 형식과 컨트롤 타입을 가진 프로퍼티 추가
+        var numberProperty = dynamicNode.AddProperty<double>(
+            "NumberProperty",
+            "Number Property",
+            NodePropertyControlType.NumberBox,
+            "F2"  // 소수점 2자리 형식
+        );
+
+        var timeProperty = dynamicNode.AddProperty<TimeSpan>(
+            "TimeProperty",
+            "Time Property",
+            NodePropertyControlType.TextBox,
+            "hh\\:mm\\:ss"
+        );
+
+        var enumProperty = dynamicNode.AddProperty<DayOfWeek>(
+            "EnumProperty",
+            "Enum Property",
+            NodePropertyControlType.ComboBox
+        );
+
+        // 값 설정
+        numberProperty.Value = 123.456;
+        timeProperty.Value = TimeSpan.FromHours(14.5);
+        enumProperty.Value = DayOfWeek.Wednesday;
+
+        // 2. 저장
+        var json = JsonSerializer.Serialize(_canvas, _jsonOptions);
+        var loadedCanvas = JsonSerializer.Deserialize<NodeCanvas>(json, _jsonOptions);
+
+        // 3. 검증
+        Assert.IsNotNull(loadedCanvas);
+        var loadedNode = loadedCanvas.Nodes[0] as DynamicNode;
+        Assert.IsNotNull(loadedNode);
+
+        // 프로퍼티 검증
+        var loadedNumberProperty = loadedNode.Properties["NumberProperty"];
+        var loadedTimeProperty = loadedNode.Properties["TimeProperty"];
+        var loadedEnumProperty = loadedNode.Properties["EnumProperty"];
+
+        // 타입 검증
+        Assert.AreEqual(typeof(double), loadedNumberProperty.PropertyType);
+        Assert.AreEqual(typeof(TimeSpan), loadedTimeProperty.PropertyType);
+        Assert.AreEqual(typeof(DayOfWeek), loadedEnumProperty.PropertyType);
+
+        // 값 검증
+        Assert.AreEqual(123.456, loadedNumberProperty.Value);
+        Assert.AreEqual(TimeSpan.FromHours(14.5), loadedTimeProperty.Value);
+        Assert.AreEqual(DayOfWeek.Wednesday, loadedEnumProperty.Value);
+
+        // 형식 검증
+        Assert.AreEqual("F2", loadedNumberProperty.Format);
+        Assert.AreEqual("hh\\:mm\\:ss", loadedTimeProperty.Format);
+
+        // 컨트롤 타입 검증
+        Assert.AreEqual(NodePropertyControlType.NumberBox, loadedNumberProperty.ControlType);
+        Assert.AreEqual(NodePropertyControlType.TextBox, loadedTimeProperty.ControlType);
+        Assert.AreEqual(NodePropertyControlType.ComboBox, loadedEnumProperty.ControlType);
     }
 
     public void Dispose()

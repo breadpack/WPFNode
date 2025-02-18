@@ -2,7 +2,7 @@ using WPFNode.Models;
 
 namespace WPFNode.Interfaces;
 
-public interface IConnection {
+public interface IConnection : IJsonSerializable {
     Guid        Id             { get; }
     IOutputPort  Source         { get; }
     IInputPort Target         { get; }

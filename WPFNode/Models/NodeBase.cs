@@ -1,6 +1,9 @@
 using System.ComponentModel;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Linq;
 using WPFNode.Attributes;
 using WPFNode.Constants;
 using WPFNode.Interfaces;
@@ -22,6 +25,7 @@ public abstract class NodeBase : INode
     private bool _isInitialized;
     private readonly INodeCanvas _canvas;
 
+    [JsonConstructor]
     protected NodeBase(INodeCanvas canvas, Guid id)
     {
         _canvas = canvas ?? throw new ArgumentNullException(nameof(canvas));
@@ -92,24 +96,58 @@ public abstract class NodeBase : INode
         _isInitialized = true;
     }
 
-    protected NodeProperty<T> CreateProperty<T>(
+    protected virtual InputPort<T> CreateInputPort<T>(string name)
+    {
+        var portIndex = _inputPorts.Count;
+        var port = new InputPort<T>(name, this, portIndex);
+        RegisterInputPort(port);
+        return port;
+    }
+
+    protected virtual IInputPort CreateInputPort(string name, Type type)
+    {
+        var portIndex = _inputPorts.Count;
+        var port = (IInputPort)Activator.CreateInstance(
+            typeof(InputPort<>).MakeGenericType(type), 
+            name, this, portIndex)!;
+        RegisterInputPort(port);
+        return port;
+    }
+
+    protected virtual OutputPort<T> CreateOutputPort<T>(string name)
+    {
+        var portIndex = _outputPorts.Count;
+        var port = new OutputPort<T>(name, this, portIndex);
+        RegisterOutputPort(port);
+        return port;
+    }
+
+    protected virtual IOutputPort CreateOutputPort(string name, Type type)
+    {
+        var portIndex = _outputPorts.Count;
+        var port = (IOutputPort)Activator.CreateInstance(
+            typeof(OutputPort<>).MakeGenericType(type), 
+            name, this, portIndex)!;
+        RegisterOutputPort(port);
+        return port;
+    }
+
+    protected virtual NodeProperty<T> CreateProperty<T>(
         string name,
         string displayName,
         NodePropertyControlType controlType,
         string? format = null,
         bool canConnectToPort = false)
     {
-        var portIndex = _inputPorts.Count;
         var property = new NodeProperty<T>(
             displayName,
             controlType,
             this,
-            portIndex,
+            _inputPorts.Count,
             format,
             canConnectToPort);
-            
         _properties[name] = property;
-        
+
         // 프로퍼티 변경 이벤트 구독
         if (property is INotifyPropertyChanged notifyPropertyChanged)
         {
@@ -123,7 +161,45 @@ public abstract class NodeBase : INode
         }
         
         // 항상 InputPort로 등록
-        _inputPorts.Add(property);
+        if (property is IInputPort inputPort)
+        {
+            _inputPorts.Add(inputPort);
+        }
+
+        return property;
+    }
+
+    protected virtual INodeProperty CreateProperty(
+        string name,
+        string displayName,
+        Type type,
+        NodePropertyControlType controlType,
+        string? format = null,
+        bool canConnectToPort = false)
+    {
+        var property = (INodeProperty)Activator.CreateInstance(
+            typeof(NodeProperty<>).MakeGenericType(type),
+            displayName, controlType, this, _inputPorts.Count, format, canConnectToPort)!;
+        _properties[name] = property;
+
+        // 프로퍼티 변경 이벤트 구독
+        if (property is INotifyPropertyChanged notifyPropertyChanged)
+        {
+            notifyPropertyChanged.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(INodeProperty.CanConnectToPort))
+                {
+                    UpdatePropertyPortVisibility(name, property);
+                }
+            };
+        }
+        
+        // 항상 InputPort로 등록
+        if (property is IInputPort inputPort)
+        {
+            _inputPorts.Add(inputPort);
+        }
+
         return property;
     }
 
@@ -189,22 +265,6 @@ public abstract class NodeBase : INode
         return copy;
     }
 
-    protected InputPort<T> CreateInputPort<T>(string name)
-    {
-        var portIndex = _inputPorts.Count;
-        var port = new InputPort<T>(name, this, portIndex);
-        RegisterInputPort(port);
-        return port;
-    }
-
-    protected OutputPort<T> CreateOutputPort<T>(string name)
-    {
-        var portIndex = _outputPorts.Count;
-        var port = new OutputPort<T>(name, this, portIndex);
-        RegisterOutputPort(port);
-        return port;
-    }
-
     private void RegisterInputPort(IInputPort port)
     {
         if (port == null)
@@ -219,5 +279,110 @@ public abstract class NodeBase : INode
         _outputPorts.Add(port);
     }
 
+    protected void ClearPorts()
+    {
+        _inputPorts.Clear();
+        _outputPorts.Clear();
+        OnPropertyChanged(nameof(InputPorts));
+        OnPropertyChanged(nameof(OutputPorts));
+    }
+
+    protected void ClearProperties()
+    {
+        foreach (var prop in Properties.Keys.ToList())
+        {
+            RemoveProperty(prop);
+        }
+    }
+
+    protected void ResetNode()
+    {
+        ClearPorts();
+        ClearProperties();
+    }
+
     public abstract Task ProcessAsync();
+
+    public virtual void WriteJson(Utf8JsonWriter writer)
+    {
+        writer.WriteString("Id", Id.ToString());
+        writer.WriteString("Type", GetType().AssemblyQualifiedName);
+        writer.WriteString("Name", Name);
+        writer.WriteString("Category", Category);
+        writer.WriteString("Description", Description);
+        writer.WriteNumber("X", X);
+        writer.WriteNumber("Y", Y);
+        writer.WriteBoolean("IsVisible", IsVisible);
+        
+        // 프로퍼티 정보를 배열로 저장
+        writer.WriteStartArray("Properties");
+        foreach (var property in Properties)
+        {
+            if (property.Value is IJsonSerializable serializable)
+            {
+                writer.WriteStartObject();
+                writer.WriteString("Key", property.Key);
+                writer.WriteString("Name", property.Value.DisplayName);
+                writer.WriteString("DisplayName", property.Value.DisplayName);
+                writer.WriteString("Type", property.Value.PropertyType.AssemblyQualifiedName);
+                writer.WriteNumber("ControlType", (int)property.Value.ControlType);
+                writer.WriteString("Format", property.Value.Format);
+                writer.WriteBoolean("CanConnectToPort", property.Value.CanConnectToPort);
+                writer.WriteBoolean("IsVisible", property.Value.IsVisible);
+                
+                // 값이 있는 경우에만 직렬화
+                if (property.Value.Value != null || property.Value.PropertyType.IsValueType)
+                {
+                    writer.WritePropertyName("Value");
+                    JsonSerializer.Serialize(writer, property.Value.Value, property.Value.PropertyType);
+                }
+                
+                writer.WriteEndObject();
+            }
+        }
+        writer.WriteEndArray();
+    }
+
+    public virtual void ReadJson(JsonElement element)
+    {
+        try
+        {
+            // 기본 속성 복원
+            if (element.TryGetProperty("Name", out var nameElement))
+                Name = nameElement.GetString() ?? Name;
+            if (element.TryGetProperty("Description", out var descElement))
+                Description = descElement.GetString() ?? Description;
+            if (element.TryGetProperty("X", out var xElement))
+                X = xElement.GetDouble();
+            if (element.TryGetProperty("Y", out var yElement))
+                Y = yElement.GetDouble();
+            if (element.TryGetProperty("IsVisible", out var visibleElement))
+                IsVisible = visibleElement.GetBoolean();
+
+            // 프로퍼티 상태 복원
+            if (element.TryGetProperty("Properties", out var propertiesElement))
+            {
+                foreach (var propertyElement in propertiesElement.EnumerateArray())
+                {
+                    if (propertyElement.TryGetProperty("Key", out var keyElement))
+                    {
+                        var key = keyElement.GetString();
+                        if (key != null && Properties.TryGetValue(key, out var property) && 
+                            property is IJsonSerializable serializable)
+                        {
+                            serializable.ReadJson(propertyElement);
+                        }
+                    }
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new JsonException($"노드 {Name} ({GetType().Name}) 역직렬화 중 오류 발생", ex);
+        }
+    }
 } 

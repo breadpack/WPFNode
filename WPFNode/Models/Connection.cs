@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using WPFNode.Exceptions;
 using WPFNode.Interfaces;
@@ -65,5 +66,24 @@ public class Connection : IConnection
         // 양쪽 포트에서 연결 제거
         Source.RemoveConnection(this);
         Target.RemoveConnection(this);
+    }
+
+    public void WriteJson(Utf8JsonWriter writer)
+    {
+        writer.WriteString("Id", Id.ToString());
+        writer.WriteString("SourceNodeId", Source.Node!.Id.ToString());
+        writer.WriteNumber("SourcePortIndex", Source.GetPortIndex());
+        writer.WriteString("TargetNodeId", Target.Node!.Id.ToString());
+        writer.WriteNumber("TargetPortIndex", Target.GetPortIndex());
+        writer.WriteBoolean("IsEnabled", IsEnabled);
+    }
+
+    public void ReadJson(JsonElement element)
+    {
+        // 가변 상태만 복원
+        if (element.TryGetProperty("IsEnabled", out var isEnabledElement))
+        {
+            IsEnabled = isEnabledElement.GetBoolean();
+        }
     }
 } 

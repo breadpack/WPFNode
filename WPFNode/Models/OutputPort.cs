@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Text.Json;
 using WPFNode.Exceptions;
 using WPFNode.Interfaces;
 
@@ -49,6 +50,22 @@ public class OutputPort<T> : IOutputPort, INotifyPropertyChanged {
     public object? Value {
         get => _value;
         set {
+            // 현재 실행 중인 스택 추적을 확인
+            var stackTrace = new System.Diagnostics.StackTrace();
+            var isCalledFromProcess = stackTrace.GetFrames()
+                ?.Any(frame => {
+                    var method = frame.GetMethod();
+                    return method?.Name == nameof(INode.ProcessAsync) ||
+                           method?.Name == "WriteJson" || // 직렬화는 허용
+                           method?.Name == "ReadJson";    // 역직렬화는 허용
+                }) ?? false;
+
+            if (!isCalledFromProcess)
+            {
+                throw new InvalidOperationException(
+                    "OutputPort의 값은 Node의 ProcessAsync 메서드 내에서만 설정할 수 있습니다.");
+            }
+
             if (value is T typedValue && !Equals(_value, typedValue)) {
                 _value = typedValue;
                 OnPropertyChanged(nameof(Value));
@@ -104,5 +121,32 @@ public class OutputPort<T> : IOutputPort, INotifyPropertyChanged {
 
     protected virtual void OnPropertyChanged(string propertyName) {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    public void WriteJson(Utf8JsonWriter writer)
+    {
+        writer.WriteStartObject();
+        writer.WriteString("Name", Name);
+        writer.WriteString("Type", DataType.AssemblyQualifiedName);
+        writer.WriteNumber("Index", GetPortIndex());
+        writer.WriteBoolean("IsVisible", IsVisible);
+        if (_value != null)
+        {
+            writer.WritePropertyName("Value");
+            JsonSerializer.Serialize(writer, _value);
+        }
+        writer.WriteEndObject();
+    }
+
+    public void ReadJson(JsonElement element)
+    {
+        if (element.TryGetProperty("Name", out var nameElement))
+            Name = nameElement.GetString()!;
+        if (element.TryGetProperty("IsVisible", out var visibleElement))
+            IsVisible = visibleElement.GetBoolean();
+        if (element.TryGetProperty("Value", out var valueElement))
+        {
+            Value = JsonSerializer.Deserialize<T>(valueElement.GetRawText());
+        }
     }
 }

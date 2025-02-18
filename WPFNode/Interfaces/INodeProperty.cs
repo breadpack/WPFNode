@@ -3,7 +3,7 @@ using WPFNode.Constants;
 
 namespace WPFNode.Interfaces;
 
-public interface INodeProperty : INotifyPropertyChanged
+public interface INodeProperty : INotifyPropertyChanged, IJsonSerializable
 {
     string DisplayName { get; }
     NodePropertyControlType ControlType { get; }

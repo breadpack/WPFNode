@@ -3,7 +3,7 @@ using WPFNode.Models;
 
 namespace WPFNode.Interfaces;
 
-public interface IPort : INotifyPropertyChanged
+public interface IPort : INotifyPropertyChanged, IJsonSerializable
 {
     PortId Id { get; }
     string Name { get; set; }
@@ -22,6 +22,7 @@ public interface IInputPort : IPort
 {
     bool CanAcceptType(Type type);
     object? Value { get; }
+    IConnection Connect(IOutputPort source);
 }
 
 public interface IOutputPort : IPort

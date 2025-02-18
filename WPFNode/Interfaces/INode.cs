@@ -1,8 +1,9 @@
 using System.ComponentModel;
+using System.Text.Json;
 
 namespace WPFNode.Interfaces;
 
-public interface INode : INotifyPropertyChanged
+public interface INode : INotifyPropertyChanged, IJsonSerializable
 {
     Guid Id { get; }
     string Name { get; set; }

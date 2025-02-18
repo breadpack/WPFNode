@@ -1,6 +1,8 @@
 using System.ComponentModel;
+using System.Text.Json;
 using WPFNode.Interfaces;
 using WPFNode.Utilities;
+using WPFNode.Exceptions;
 
 namespace WPFNode.Models;
 
@@ -102,15 +104,53 @@ public class InputPort<T> : IInputPort, INotifyPropertyChanged {
         OnPropertyChanged(nameof(IsConnected));
     }
 
-    public void RemoveConnection(IConnection connection) {
+    public void RemoveConnection(IConnection connection)
+    {
         if (connection == null)
-            throw new ArgumentNullException(nameof(connection));
+            throw new NodeConnectionException("연결이 null입니다.");
+        if (!connection.Target.Equals(this))
+            throw new NodeConnectionException("연결의 타겟 포트가 일치하지 않습니다.", this, connection.Target);
+            
         _connections.Remove(connection);
         OnPropertyChanged(nameof(Connections));
         OnPropertyChanged(nameof(IsConnected));
     }
 
+    public IConnection Connect(IOutputPort source)
+    {
+        if (source == null)
+            throw new NodeConnectionException("소스 포트가 null입니다.");
+            
+        if (!CanAcceptType(source.DataType))
+            throw new NodeConnectionException("타입이 호환되지 않습니다.", source, this);
+            
+        if (source.Node == Node)
+            throw new NodeConnectionException("같은 노드의 포트와는 연결할 수 없습니다.", source, this);
+            
+        // Canvas를 통해 연결 생성
+        var canvas = ((NodeBase)Node!).Canvas;
+        return canvas.Connect(source, this);
+    }
+
     protected virtual void OnPropertyChanged(string propertyName) {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    public void WriteJson(Utf8JsonWriter writer)
+    {
+        writer.WriteStartObject();
+        writer.WriteString("Name", Name);
+        writer.WriteString("Type", DataType.AssemblyQualifiedName);
+        writer.WriteNumber("Index", GetPortIndex());
+        writer.WriteBoolean("IsVisible", IsVisible);
+        writer.WriteEndObject();
+    }
+
+    public void ReadJson(JsonElement element)
+    {
+        if (element.TryGetProperty("Name", out var nameElement))
+            Name = nameElement.GetString()!;
+        if (element.TryGetProperty("IsVisible", out var visibleElement))
+            IsVisible = visibleElement.GetBoolean();
     }
 }
