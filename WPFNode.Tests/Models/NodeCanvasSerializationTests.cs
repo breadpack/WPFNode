@@ -315,8 +315,7 @@ public class NodeCanvasSerializationTests : IDisposable
         var dynamicNode = _canvas.CreateDynamicNode(
             "TestDynamicNode",
             "Test",
-            "Dynamic node for testing",
-            async (node) => await Task.CompletedTask
+            "Dynamic node for testing"
         );
 
         // 동적 포트 추가
@@ -370,8 +369,7 @@ public class NodeCanvasSerializationTests : IDisposable
         var dynamicNode = _canvas.CreateDynamicNode(
             "TestDynamicNode",
             "Test",
-            "Dynamic node for testing",
-            async (node) => await Task.CompletedTask
+            "Dynamic node for testing"
         );
 
         // 동적 프로퍼티 추가
@@ -437,7 +435,6 @@ public class NodeCanvasSerializationTests : IDisposable
             "TestDynamicNode",
             "Test",
             "Dynamic node for testing",
-            async (node) => await Task.CompletedTask,
             200, 100
         );
         var targetNode = _canvas.CreateNode<ConsoleWriteNode>(300, 100);
@@ -491,8 +488,7 @@ public class NodeCanvasSerializationTests : IDisposable
         var dynamicNode = _canvas.CreateDynamicNode(
             "TestDynamicNode",
             "Test",
-            "Dynamic node for testing",
-            async (node) => await Task.CompletedTask
+            "Dynamic node for testing"
         );
 
         // 포트 및 프로퍼티 추가
@@ -588,33 +584,30 @@ public class NodeCanvasSerializationTests : IDisposable
         var dynamicNode = _canvas.CreateDynamicNode(
             "TestDynamicNode",
             "Test",
-            "Dynamic node for testing",
-            async (node) => {
-                // ProcessAsync 내에서 출력 포트 값 설정
-                var port1 = node.OutputPorts[0];
-                var port2 = node.OutputPorts[1];
-                port1.Value = 42;
-                port2.Value = "Test Value";
-            }
+            "Dynamic node for testing"
         );
 
-        // 출력 포트 추가
-        var outputPort1 = dynamicNode.AddOutputPort<int>("Output1");
-        var outputPort2 = dynamicNode.AddOutputPort<string>("Output2");
-        
-        outputPort1.IsVisible = false;
+        // 내부 캔버스에 출력 노드 추가
+        var innerOutput1 = dynamicNode.CreateGraphOutput<double>("Output1");
+        var innerOutput2 = dynamicNode.CreateGraphOutput<string>("Output2");
 
-        // ProcessAsync 실행하여 값 설정
-        await dynamicNode.ProcessAsync();
+        // 가시성 설정
+        ((OutputPort<double>)dynamicNode.OutputPorts[0]).IsVisible = false;
 
-        // 2. 저장
-        var json = JsonSerializer.Serialize(_canvas, _jsonOptions);
-        var loadedCanvas = JsonSerializer.Deserialize<NodeCanvas>(json, _jsonOptions);
+        // 내부 출력 노드의 입력 포트에 값 설정
+        var doubleInput1 = dynamicNode.InnerCanvas.CreateNode<DoubleInputNode>();
+        var stringInput1 = dynamicNode.InnerCanvas.CreateNode<StringInputNode>();
+        ((DoubleInputNode)doubleInput1).Value = 42.0;
+        ((StringInputNode)stringInput1).Value = "Test Value";
+        innerOutput1.Input.Connect(doubleInput1.OutputPorts[0]);
+        innerOutput2.Input.Connect(stringInput1.OutputPorts[0]);
 
-        // 3. 검증
-        Assert.IsNotNull(loadedCanvas);
-        var loadedNode = loadedCanvas.Nodes[0] as DynamicNode;
-        Assert.IsNotNull(loadedNode);
+        // 직렬화
+        var json = _canvas.ToJson();
+
+        // 역직렬화
+        var loadedCanvas = NodeCanvas.FromJson(json);
+        var loadedNode = (DynamicNode)loadedCanvas.SerializableNodes[0];
 
         // 포트 수 검증
         Assert.AreEqual(2, loadedNode.OutputPorts.Count);
@@ -623,7 +616,7 @@ public class NodeCanvasSerializationTests : IDisposable
         var loadedPort1 = loadedNode.OutputPorts[0];
         var loadedPort2 = loadedNode.OutputPorts[1];
 
-        Assert.AreEqual(typeof(int), loadedPort1.DataType);
+        Assert.AreEqual(typeof(double), loadedPort1.DataType);
         Assert.AreEqual(typeof(string), loadedPort2.DataType);
         Assert.AreEqual("Output1", loadedPort1.Name);
         Assert.AreEqual("Output2", loadedPort2.Name);
@@ -631,12 +624,18 @@ public class NodeCanvasSerializationTests : IDisposable
         Assert.IsTrue(loadedPort2.IsVisible);
 
         // ProcessAsync 실행 전에는 값이 기본값
-        Assert.AreEqual(0, loadedPort1.Value);
+        Assert.AreEqual(0.0, loadedPort1.Value);
         Assert.AreEqual(null, loadedPort2.Value);
 
+        // 출력 노드 추가 및 연결
+        var consoleNode1 = loadedCanvas.CreateNode<ConsoleWriteNode>();
+        var consoleNode2 = loadedCanvas.CreateNode<ConsoleWriteNode>();
+        loadedPort1.Connect(consoleNode1.InputPorts[0]);
+        loadedPort2.Connect(consoleNode2.InputPorts[0]);
+
         // ProcessAsync 실행 후 값 검증
-        await loadedNode.ProcessAsync();
-        Assert.AreEqual(42, loadedPort1.Value);
+        await loadedCanvas.ExecuteAsync();
+        Assert.AreEqual(42.0, loadedPort1.Value);
         Assert.AreEqual("Test Value", loadedPort2.Value);
     }
 
@@ -647,8 +646,7 @@ public class NodeCanvasSerializationTests : IDisposable
         var dynamicNode = _canvas.CreateDynamicNode(
             "TestDynamicNode",
             "Test",
-            "Dynamic node for testing",
-            async (node) => await Task.CompletedTask
+            "Dynamic node for testing"
         );
 
         // 다양한 형식과 컨트롤 타입을 가진 프로퍼티 추가
@@ -709,6 +707,79 @@ public class NodeCanvasSerializationTests : IDisposable
         Assert.AreEqual(NodePropertyControlType.NumberBox, loadedNumberProperty.ControlType);
         Assert.AreEqual(NodePropertyControlType.TextBox, loadedTimeProperty.ControlType);
         Assert.AreEqual(NodePropertyControlType.ComboBox, loadedEnumProperty.ControlType);
+    }
+
+    [TestMethod]
+    public async Task SaveAndLoad_DynamicNode_WithInnerGraph_ShouldWorkCorrectly()
+    {
+        // 1. DynamicNode 생성 및 설정
+        var dynamicNode = _canvas.CreateDynamicNode(
+            "Calculator",
+            "Math",
+            "간단한 계산기 노드"
+        );
+
+        // 2. 입출력 포트 및 내부 그래프 구성
+        var inputA = dynamicNode.CreateGraphInput<double>("A");
+        var inputB = dynamicNode.CreateGraphInput<double>("B");
+        var output = dynamicNode.CreateGraphOutput<double>("Result");
+
+        // 내부 그래프 로직 구성
+        var addNode = dynamicNode.InnerCanvas.CreateNode<AdditionNode>();
+
+        // 연결 구성
+        addNode.InputPorts[0].Connect(inputA.Output);
+        addNode.InputPorts[1].Connect(inputB.Output);
+        output.Input.Connect(addNode.OutputPorts[0]);
+
+        // 3. 저장
+        var json = JsonSerializer.Serialize(_canvas, _jsonOptions);
+        var loadedCanvas = JsonSerializer.Deserialize<NodeCanvas>(json, _jsonOptions);
+
+        // 4. 검증
+        Assert.IsNotNull(loadedCanvas);
+        Assert.AreEqual(1, loadedCanvas.Nodes.Count);
+
+        var loadedNode = loadedCanvas.Nodes[0] as DynamicNode;
+        Assert.IsNotNull(loadedNode);
+
+        // 기본 속성 검증
+        Assert.AreEqual("Calculator", loadedNode.Name);
+        Assert.AreEqual("Math", loadedNode.Category);
+        Assert.AreEqual("간단한 계산기 노드", loadedNode.Description);
+
+        // 포트 검증
+        Assert.AreEqual(2, loadedNode.InputPorts.Count);
+        Assert.AreEqual(1, loadedNode.OutputPorts.Count);
+
+        // 내부 그래프 검증
+        Assert.AreEqual(4, loadedNode.InnerCanvas.Nodes.Count); // 2개의 입력 노드 + 1개의 처리 노드 + 1개의 출력 노드
+        Assert.AreEqual(3, loadedNode.InnerCanvas.Connections.Count);
+
+        // 입력 값 설정 및 실행
+        var num1 = 10.0;
+        var num2 = 5.0;
+
+        // 입력 노드에 값 설정
+        var sourceNodeA = loadedCanvas.CreateNode<DoubleInputNode>();
+        var sourceNodeB = loadedCanvas.CreateNode<DoubleInputNode>();
+        ((DoubleInputNode)sourceNodeA).Value = num1;
+        ((DoubleInputNode)sourceNodeB).Value = num2;
+
+        // 입력 노드를 DynamicNode의 입력 포트에 연결
+        sourceNodeA.OutputPorts[0].Connect(loadedNode.InputPorts[0]);
+        sourceNodeB.OutputPorts[0].Connect(loadedNode.InputPorts[1]);
+
+        // 출력 노드 추가 및 연결
+        var consoleNode = loadedCanvas.CreateNode<ConsoleWriteNode>();
+        loadedNode.OutputPorts[0].Connect(consoleNode.InputPorts[0]);
+
+        // 전체 캔버스 실행
+        await loadedCanvas.ExecuteAsync();
+
+        // 결과 검증
+        var result = ((OutputPort<double>)loadedNode.OutputPorts[0]).Value;
+        Assert.AreEqual(15.0, result);
     }
 
     public void Dispose()

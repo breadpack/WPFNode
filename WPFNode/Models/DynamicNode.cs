@@ -4,15 +4,24 @@ using System.Text.Json.Serialization;
 using WPFNode.Constants;
 using WPFNode.Interfaces;
 using WPFNode.Models.Properties;
+using WPFNode.Models.Serialization;
+using System.Reflection;
+using WPFNode.Attributes;
 
 namespace WPFNode.Models;
 
 public class DynamicNode : NodeBase
 {
-    private Func<DynamicNode, Task> _processLogic;
+    private NodeCanvas _innerCanvas;
     private string _category;
+    private readonly Dictionary<string, INode> _inputs;
+    private readonly Dictionary<string, INode> _outputs;
+    private readonly Dictionary<string, INodeProperty> _properties;
 
-    private record PortDefinition(string Name, Type Type, int Index, bool IsVisible);
+    private record PortDefinition(string Name, Type Type, int Index, bool IsVisible)
+    {
+        public JsonElement? Value { get; init; }
+    }
     private record PropertyDefinition(
         string Name, 
         string DisplayName, 
@@ -27,31 +36,66 @@ public class DynamicNode : NodeBase
     public DynamicNode(INodeCanvas canvas, Guid id) 
         : base(canvas, id)
     {
-        _processLogic = node => Task.CompletedTask;
+        _innerCanvas = NodeCanvas.Create();
         _category = "Dynamic";
+        _inputs = new Dictionary<string, INode>();
+        _outputs = new Dictionary<string, INode>();
     }
 
     public DynamicNode(
-        INodeCanvas canvas, 
+        INodeCanvas canvas,
         Guid id,
         string name,
         string category,
-        string description,
-        Func<DynamicNode, Task> processLogic) 
+        string description)
         : base(canvas, id)
     {
         Name = name;
         _category = category;
         Description = description;
-        _processLogic = processLogic;
-    }
-
-    public void SetProcessLogic(Func<DynamicNode, Task> processLogic)
-    {
-        _processLogic = processLogic;
+        _innerCanvas = NodeCanvas.Create();
+        _inputs = new Dictionary<string, INode>();
+        _outputs = new Dictionary<string, INode>();
+        _properties = new Dictionary<string, INodeProperty>();
     }
 
     public override string Category => _category;
+
+    public NodeCanvas InnerCanvas => _innerCanvas;
+
+    public GraphInputNode<T> CreateGraphInput<T>(string name)
+    {
+        var inputPort = CreateInputPort<T>(name);
+        var inputNode = new GraphInputNode<T>(_innerCanvas, Guid.NewGuid(), (InputPort<T>)inputPort);
+        inputNode.Name = name;
+        _innerCanvas.SerializableNodes.Add(inputNode);
+        
+        _inputs[name] = inputNode;
+        return inputNode;
+    }
+
+    public GraphOutputNode<T> CreateGraphOutput<T>(string name)
+    {
+        var outputPort = CreateOutputPort<T>(name);
+        var outputNode = new GraphOutputNode<T>(_innerCanvas, Guid.NewGuid(), (OutputPort<T>)outputPort);
+        outputNode.Name = name;
+        _innerCanvas.SerializableNodes.Add(outputNode);
+        
+        // 출력 노드의 _parentOutput 필드 설정
+        var field = typeof(GraphOutputNode<T>).GetField("_parentOutput", BindingFlags.NonPublic | BindingFlags.Instance);
+        if (field != null)
+        {
+            field.SetValue(outputNode, outputPort);
+        }
+        
+        _outputs[name] = outputNode;
+        return outputNode;
+    }
+
+    public override async Task ProcessAsync()
+    {
+        await _innerCanvas.ExecuteAsync();
+    }
 
     public InputPort<T> AddInputPort<T>(string name)
     {
@@ -104,11 +148,6 @@ public class DynamicNode : NodeBase
         return OutputPorts.OfType<OutputPort<T>>().FirstOrDefault(p => p.Name == name);
     }
 
-    public override Task ProcessAsync()
-    {
-        return _processLogic(this);
-    }
-
     public override void WriteJson(Utf8JsonWriter writer)
     {
         base.WriteJson(writer);
@@ -126,6 +165,11 @@ public class DynamicNode : NodeBase
             writer.WriteString("Type", port.DataType.AssemblyQualifiedName);
             writer.WriteNumber("Index", port.GetPortIndex());
             writer.WriteBoolean("IsVisible", port.IsVisible);
+            if (port.Value != null || port.DataType.IsValueType)
+            {
+                writer.WritePropertyName("Value");
+                JsonSerializer.Serialize(writer, port.Value, port.DataType);
+            }
             writer.WriteEndObject();
         }
         writer.WriteEndArray();
@@ -163,6 +207,33 @@ public class DynamicNode : NodeBase
             writer.WriteEndObject();
         }
         writer.WriteEndArray();
+
+        // 내부 그래프 상태 저장
+        writer.WritePropertyName("InnerCanvas");
+        JsonSerializer.Serialize(writer, _innerCanvas, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            Converters = { new NodeCanvasJsonConverter() }
+        });
+
+        // 입출력 노드 매핑 정보 저장
+        writer.WriteStartObject("Mappings");
+        
+        writer.WriteStartObject("Inputs");
+        foreach (var input in _inputs)
+        {
+            writer.WriteString(input.Key, input.Value.Id.ToString());
+        }
+        writer.WriteEndObject();
+        
+        writer.WriteStartObject("Outputs");
+        foreach (var output in _outputs)
+        {
+            writer.WriteString(output.Key, output.Value.Id.ToString());
+        }
+        writer.WriteEndObject();
+        
+        writer.WriteEndObject();
     }
 
     private IEnumerable<PortDefinition> CollectInputPortDefinitions(JsonElement element)
@@ -236,10 +307,14 @@ public class DynamicNode : NodeBase
             var type = Type.GetType(typeName);
             var index = portDef.GetProperty("Index").GetInt32();
             var isVisible = portDef.GetProperty("IsVisible").GetBoolean();
+            JsonElement? value = portDef.TryGetProperty("Value", out var valueElement) ? valueElement : null;
 
             if (type != null)
             {
-                yield return new PortDefinition(name, type, index, isVisible);
+                yield return new PortDefinition(name, type, index, isVisible) with 
+                { 
+                    Value = value 
+                };
             }
         }
     }
@@ -252,6 +327,13 @@ public class DynamicNode : NodeBase
         {
             ResetNode();
 
+            // Category 값 복원
+            if (element.TryGetProperty("Category", out var categoryElement))
+            {
+                _category = categoryElement.GetString() ?? "Dynamic";
+            }
+
+            // 기본 포트와 프로퍼티 복원
             var inputPorts = CollectInputPortDefinitions(element).ToList();
             var properties = CollectPropertyDefinitions(element).ToList();
             var outputPorts = CollectOutputPortDefinitions(element).ToList();
@@ -263,6 +345,7 @@ public class DynamicNode : NodeBase
                     (Definition: new PortDefinition(p.Name, p.Type, p.Index, true), IsProperty: true)))
                 .OrderBy(x => x.Definition.Index);
 
+            // 포트와 프로퍼티 생성
             foreach (var item in orderedItems)
             {
                 if (item.IsProperty)
@@ -290,11 +373,141 @@ public class DynamicNode : NodeBase
                 }
             }
 
-            // 출력 포트 복원
+            // 출력 포트 생성 및 값 복원
             foreach (var portDef in outputPorts)
             {
                 var port = CreateOutputPort(portDef.Name, portDef.Type);
-                port.IsVisible = portDef.IsVisible;
+                
+                if (port != null)
+                {
+                    port.IsVisible = portDef.IsVisible;
+                    
+                    if (portDef.Value.HasValue)
+                    {
+                        var value = JsonSerializer.Deserialize(portDef.Value.Value.GetRawText(), portDef.Type);
+                        if (value != null)
+                        {
+                            port.Value = value;
+                        }
+                    }
+                }
+            }
+
+            // 내부 그래프 복원
+            if (element.TryGetProperty("InnerCanvas", out var innerCanvasElement))
+            {
+                // 먼저 입력/출력 노드 매핑 정보를 수집
+                var inputMappings = new Dictionary<Guid, (string Name, IInputPort Port, JsonElement? Value)>();
+                var outputMappings = new Dictionary<Guid, (string Name, IOutputPort Port)>();
+                
+                if (element.TryGetProperty("Mappings", out var mappings))
+                {
+                    // 입력 매핑 수집
+                    if (mappings.TryGetProperty("Inputs", out var inputs))
+                    {
+                        foreach (var inputMapping in inputs.EnumerateObject())
+                        {
+                            var nodeId = Guid.Parse(inputMapping.Value.GetString()!);
+                            var inputPort = InputPorts.FirstOrDefault(p => p.Name == inputMapping.Name);
+                            if (inputPort != null)
+                            {
+                                // 입력 포트의 값 찾기
+                                JsonElement? value = null;
+                                if (element.TryGetProperty("InputPortDefinitions", out var inputPortDefs))
+                                {
+                                    foreach (var portDef in inputPortDefs.EnumerateArray())
+                                    {
+                                        if (portDef.GetProperty("Name").GetString() == inputMapping.Name &&
+                                            portDef.TryGetProperty("Value", out var valueElement))
+                                        {
+                                            value = valueElement;
+                                            break;
+                                        }
+                                    }
+                                }
+                                inputMappings[nodeId] = (inputMapping.Name, inputPort, value);
+                            }
+                        }
+                    }
+
+                    // 출력 매핑 수집
+                    if (mappings.TryGetProperty("Outputs", out var outputs))
+                    {
+                        foreach (var outputMapping in outputs.EnumerateObject())
+                        {
+                            var nodeId = Guid.Parse(outputMapping.Value.GetString()!);
+                            var outputPort = OutputPorts.FirstOrDefault(p => p.Name == outputMapping.Name);
+                            if (outputPort != null)
+                            {
+                                outputMappings[nodeId] = (outputMapping.Name, outputPort);
+                            }
+                        }
+                    }
+                }
+
+                // 내부 그래프 복원 전에 노드 생성 이벤트 핸들러 등록
+                var originalNodes = new List<INode>();
+                void OnNodeCreated(object? sender, INode node)
+                {
+                    // 입력 노드 처리
+                    if (inputMappings.TryGetValue(node.Id, out var inputMapping))
+                    {
+                        var nodeType = node.GetType();
+                        if (nodeType.IsGenericType && nodeType.GetGenericTypeDefinition() == typeof(GraphInputNode<>))
+                        {
+                            // _parentInput 필드 설정
+                            var field = nodeType.GetField("_parentInput", BindingFlags.NonPublic | BindingFlags.Instance);
+                            if (field != null)
+                            {
+                                field.SetValue(node, inputMapping.Port);
+                            }
+                            _inputs[inputMapping.Name] = node;
+                        }
+                    }
+
+                    // 출력 노드 처리
+                    if (outputMappings.TryGetValue(node.Id, out var outputMapping))
+                    {
+                        var nodeType = node.GetType();
+                        if (nodeType.IsGenericType && nodeType.GetGenericTypeDefinition() == typeof(GraphOutputNode<>))
+                        {
+                            var field = nodeType.GetField("_parentOutput", BindingFlags.NonPublic | BindingFlags.Instance);
+                            if (field != null)
+                            {
+                                field.SetValue(node, outputMapping.Port);
+                            }
+                            _outputs[outputMapping.Name] = node;
+                        }
+                    }
+
+                    originalNodes.Add(node);
+                }
+
+                _innerCanvas.NodeCreated += OnNodeCreated;
+
+                // 내부 그래프 복원
+                var deserializedCanvas = JsonSerializer.Deserialize<NodeCanvas>(
+                    innerCanvasElement.GetRawText(),
+                    new JsonSerializerOptions
+                    {
+                        Converters = { new NodeCanvasJsonConverter() }
+                    })!;
+
+                // 기존 캔버스의 노드와 연결을 모두 제거
+                foreach (var node in _innerCanvas.Nodes.ToList())
+                {
+                    _innerCanvas.RemoveNode(node);
+                }
+
+                // 역직렬화된 캔버스의 노드와 연결을 기존 캔버스로 복사
+                _innerCanvas.SerializableNodes = deserializedCanvas.SerializableNodes;
+                foreach (var connection in deserializedCanvas.SerializableConnections)
+                {
+                    _innerCanvas.SerializableConnections.Add(connection);
+                }
+
+                // 이벤트 핸들러 제거
+                _innerCanvas.NodeCreated -= OnNodeCreated;
             }
 
             // 프로퍼티 포트의 가시성 복원
@@ -313,7 +526,7 @@ public class DynamicNode : NodeBase
         }
         catch (Exception ex)
         {
-            throw new JsonException("프로퍼티 정의 복원 중 오류 발생", ex);
+            throw new JsonException("DynamicNode 복원 중 오류 발생", ex);
         }
     }
 } 

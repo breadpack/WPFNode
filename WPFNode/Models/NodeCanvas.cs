@@ -19,10 +19,16 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
     private readonly INodePluginService _pluginService;
 
     public event PropertyChangedEventHandler? PropertyChanged;
+    public event EventHandler<INode>? NodeCreated;
 
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    protected virtual void OnNodeCreated(INode node)
+    {
+        NodeCreated?.Invoke(this, node);
     }
 
     [JsonIgnore]
@@ -110,6 +116,7 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
 
         _nodes.Add(node);
         OnPropertyChanged(nameof(Nodes));
+        OnNodeCreated(node);
     }
 
     public void RemoveNode(INode node)
@@ -376,11 +383,10 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         string name,
         string category,
         string description,
-        Func<DynamicNode, Task> processLogic,
         double x = 0,
         double y = 0)
     {
-        var node = new DynamicNode(this, Guid.NewGuid(), name, category, description, processLogic);
+        var node = new DynamicNode(this, Guid.NewGuid(), name, category, description);
         node.X = x;
         node.Y = y;
         SerializableNodes.Add(node);

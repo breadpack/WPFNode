@@ -57,7 +57,8 @@ public class OutputPort<T> : IOutputPort, INotifyPropertyChanged {
                     var method = frame.GetMethod();
                     return method?.Name == nameof(INode.ProcessAsync) ||
                            method?.Name == "WriteJson" || // 직렬화는 허용
-                           method?.Name == "ReadJson";    // 역직렬화는 허용
+                           method?.Name == "ReadJson" ||  // 역직렬화는 허용
+                           method?.DeclaringType?.Name == "DynamicNode"; // DynamicNode에서의 호출 허용
                 }) ?? false;
 
             if (!isCalledFromProcess)

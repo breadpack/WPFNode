@@ -240,6 +240,25 @@ public class NodeProperty<T> : INodeProperty, IInputPort
         }
     }
 
+    public IConnection Connect(IOutputPort source)
+    {
+        if (!CanConnectToPort)
+            throw new NodeConnectionException("이 프로퍼티는 포트 연결을 허용하지 않습니다.");
+            
+        if (source == null)
+            throw new NodeConnectionException("소스 포트가 null입니다.");
+            
+        if (!CanAcceptType(source.DataType))
+            throw new NodeConnectionException("타입이 호환되지 않습니다.", source, this);
+            
+        if (source.Node == Node)
+            throw new NodeConnectionException("같은 노드의 포트와는 연결할 수 없습니다.", source, this);
+            
+        // Canvas를 통해 연결 생성
+        var canvas = ((NodeBase)Node!).Canvas;
+        return canvas.Connect(source, this);
+    }
+
     public void WriteJson(Utf8JsonWriter writer)
     {
         writer.WriteStartObject();
