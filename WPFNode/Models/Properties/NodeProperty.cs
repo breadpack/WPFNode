@@ -1,9 +1,9 @@
 using System.ComponentModel;
 using System.Text.Json;
-using WPFNode.Constants;
 using WPFNode.Exceptions;
 using WPFNode.Interfaces;
 using WPFNode.Utilities;
+using WPFNode.Models.Serialization;
 
 namespace WPFNode.Models.Properties;
 
@@ -20,7 +20,6 @@ public class NodeProperty<T> : INodeProperty, IInputPort
 
     public NodeProperty(
         string displayName,
-        NodePropertyControlType controlType,
         INode node,
         int portIndex,
         string? format = null,
@@ -28,7 +27,6 @@ public class NodeProperty<T> : INodeProperty, IInputPort
     {
         DisplayName = displayName;
         Name = displayName;
-        ControlType = controlType;
         Format = format;
         PropertyType = typeof(T);
         ElementType = GetElementType(PropertyType);
@@ -43,7 +41,6 @@ public class NodeProperty<T> : INodeProperty, IInputPort
 
     // INodeProperty 구현
     public string DisplayName { get; }
-    public NodePropertyControlType ControlType { get; }
     public string? Format { get; }
     public bool CanConnectToPort 
     { 
@@ -220,6 +217,43 @@ public class NodeProperty<T> : INodeProperty, IInputPort
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
+    public void WriteJson(Utf8JsonWriter writer)
+    {
+        writer.WriteStartObject();
+        writer.WriteString("Name", Name);
+        writer.WriteString("DisplayName", DisplayName);
+        writer.WriteString("Type", PropertyType.AssemblyQualifiedName);
+        writer.WriteString("Format", Format);
+        writer.WriteBoolean("CanConnectToPort", CanConnectToPort);
+        writer.WriteBoolean("IsVisible", IsVisible);
+        
+        // 값이 있는 경우에만 직렬화
+        if (_value != null || typeof(T).IsValueType)
+        {
+            writer.WritePropertyName("Value");
+            JsonSerializer.Serialize(writer, _value, typeof(T), NodeCanvasJsonConverter.SerializerOptions);
+        }
+        writer.WriteEndObject();
+    }
+
+    public void ReadJson(JsonElement element)
+    {
+        if (element.TryGetProperty("Value", out var valueElement))
+        {
+            Value = JsonSerializer.Deserialize<T>(valueElement.GetRawText(), NodeCanvasJsonConverter.SerializerOptions);
+        }
+        
+        if (element.TryGetProperty("IsVisible", out var isVisibleElement))
+        {
+            IsVisible = isVisibleElement.GetBoolean();
+        }
+        
+        if (element.TryGetProperty("CanConnectToPort", out var canConnectElement))
+        {
+            CanConnectToPort = canConnectElement.GetBoolean();
+        }
+    }
+
     public void ConnectToPort(IInputPort port)
     {
         // 이미 자신이 InputPort이므로 구현 불필요
@@ -257,62 +291,5 @@ public class NodeProperty<T> : INodeProperty, IInputPort
         // Canvas를 통해 연결 생성
         var canvas = ((NodeBase)Node!).Canvas;
         return canvas.Connect(source, this);
-    }
-
-    public void WriteJson(Utf8JsonWriter writer)
-    {
-        writer.WriteStartObject();
-        writer.WriteString("Name", Name);
-        writer.WriteString("DisplayName", DisplayName);
-        writer.WriteString("Type", PropertyType.AssemblyQualifiedName);
-        writer.WriteNumber("ControlType", (int)ControlType);
-        writer.WriteString("Format", Format);
-        writer.WriteBoolean("CanConnectToPort", CanConnectToPort);
-        writer.WriteBoolean("IsVisible", IsVisible);
-        
-        // 값이 있는 경우에만 직렬화
-        if (_value != null || typeof(T).IsValueType)
-        {
-            writer.WritePropertyName("Value");
-            JsonSerializer.Serialize(writer, _value, typeof(T));
-        }
-        writer.WriteEndObject();
-    }
-
-    public void ReadJson(JsonElement element)
-    {
-        if (element.TryGetProperty("IsVisible", out var visibleElement))
-            IsVisible = visibleElement.GetBoolean();
-        if (element.TryGetProperty("CanConnectToPort", out var connectElement))
-            CanConnectToPort = connectElement.GetBoolean();
-        if (element.TryGetProperty("Value", out var valueElement))
-        {
-            try
-            {
-                var deserializedValue = JsonSerializer.Deserialize<T>(valueElement.GetRawText());
-                if (deserializedValue != null || typeof(T).IsValueType)
-                {
-                    Value = deserializedValue;
-                }
-                else if (!typeof(T).IsValueType)
-                {
-                    // 참조 타입이고 null이 허용되는 경우
-                    Value = default;
-                }
-                else
-                {
-                    // 값 타입인데 null이 반환된 경우 (이는 오류 상황)
-                    throw new JsonException($"값 타입 {typeof(T).Name}에 대해 null이 반환되었습니다.");
-                }
-            }
-            catch (JsonException)
-            {
-                throw; // JsonException은 그대로 전파
-            }
-            catch (Exception ex)
-            {
-                throw new JsonException($"타입 {typeof(T).Name}의 값 역직렬화 중 오류 발생", ex);
-            }
-        }
     }
 } 

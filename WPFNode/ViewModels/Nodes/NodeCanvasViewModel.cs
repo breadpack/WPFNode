@@ -75,30 +75,53 @@ public partial class NodeCanvasViewModel : ObservableObject
         PasteCommand = new RelayCommand(PasteNodes);
 
         // Model 변경 감지를 위한 이벤트 핸들러 등록
-        SynchronizeWithModel();
+        _canvas.NodeAdded += OnNodeAdded;
+        _canvas.NodeRemoved += OnNodeRemoved;
+        _canvas.ConnectionAdded += OnConnectionAdded;
+        _canvas.ConnectionRemoved += OnConnectionRemoved;
+        _canvas.GroupAdded += OnGroupAdded;
+        _canvas.GroupRemoved += OnGroupRemoved;
     }
 
-    private void SynchronizeWithModel()
+    private void OnNodeAdded(object? sender, INode node)
     {
-        // 노드 동기화
-        Nodes.Clear();
-        foreach (var node in _canvas.Nodes)
-        {
-            Nodes.Add(CreateNodeViewModel(node));
-        }
+        Nodes.Add(CreateNodeViewModel(node));
+    }
 
-        // 연결 동기화
-        Connections.Clear();
-        foreach (var connection in _canvas.Connections)
+    private void OnNodeRemoved(object? sender, INode node)
+    {
+        var viewModel = Nodes.FirstOrDefault(vm => vm.Model == node);
+        if (viewModel != null)
         {
-            Connections.Add(new ConnectionViewModel(connection, this));
+            Nodes.Remove(viewModel);
         }
+    }
 
-        // 그룹 동기화
-        Groups.Clear();
-        foreach (var group in _canvas.Groups)
+    private void OnConnectionAdded(object? sender, IConnection connection)
+    {
+        Connections.Add(new ConnectionViewModel(connection, this));
+    }
+
+    private void OnConnectionRemoved(object? sender, IConnection connection)
+    {
+        var viewModel = Connections.FirstOrDefault(vm => vm.Model == connection);
+        if (viewModel != null)
         {
-            Groups.Add(new NodeGroupViewModel(group, this));
+            Connections.Remove(viewModel);
+        }
+    }
+
+    private void OnGroupAdded(object? sender, NodeGroup group)
+    {
+        Groups.Add(new NodeGroupViewModel(group, this));
+    }
+
+    private void OnGroupRemoved(object? sender, NodeGroup group)
+    {
+        var viewModel = Groups.FirstOrDefault(vm => vm.Model == group);
+        if (viewModel != null)
+        {
+            Groups.Remove(viewModel);
         }
     }
 
@@ -131,8 +154,6 @@ public partial class NodeCanvasViewModel : ObservableObject
         
         var command = new AddNodeCommand(_canvas, nodeType);
         _commandManager.Execute(command);
-        
-        SynchronizeWithModel();
     }
 
     private void ExecuteRemoveNode(NodeViewModel? nodeViewModel)
@@ -141,8 +162,6 @@ public partial class NodeCanvasViewModel : ObservableObject
         
         var command = new RemoveNodeCommand(_canvas, nodeViewModel.Model);
         _commandManager.Execute(command);
-        
-        SynchronizeWithModel();
     }
 
     private bool IsValidConnection(NodePortViewModel sourcePort, NodePortViewModel targetPort)
@@ -188,11 +207,7 @@ public partial class NodeCanvasViewModel : ObservableObject
         }
 
         // 새 연결 생성
-        var connection = _canvas.Connect(source.Model, target.Model);
-        if (connection != null)
-        {
-            SynchronizeWithModel();
-        }
+        _canvas.Connect(source.Model, target.Model);
     }
 
     private void ExecuteDisconnect((NodePortViewModel source, NodePortViewModel target) ports)
@@ -204,20 +219,17 @@ public partial class NodeCanvasViewModel : ObservableObject
         if (connection != null)
         {
             _canvas.Disconnect(connection);
-            SynchronizeWithModel();
         }
     }
 
     private void ExecuteUndo()
     {
         _commandManager.Undo();
-        SynchronizeWithModel();
     }
 
     private void ExecuteRedo()
     {
         _commandManager.Redo();
-        SynchronizeWithModel();
     }
 
     private bool CanExecuteUndo() => _commandManager.CanUndo;
@@ -236,7 +248,6 @@ public partial class NodeCanvasViewModel : ObservableObject
         {
             var command = new AddGroupCommand(_canvas, group.Name, selectedNodes);
             _commandManager.Execute(command);
-            SynchronizeWithModel();
         }
     }
 
@@ -246,7 +257,6 @@ public partial class NodeCanvasViewModel : ObservableObject
         
         var command = new RemoveGroupCommand(_canvas, groupVM.Model);
         _commandManager.Execute(command);
-        SynchronizeWithModel();
     }
 
     public NodePortViewModel FindPortViewModel(IPort port)
@@ -263,7 +273,7 @@ public partial class NodeCanvasViewModel : ObservableObject
 
     public void OnPortsChanged()
     {
-        SynchronizeWithModel();
+        // SynchronizeWithModel();
     }
 
     public NodeCanvas Model => _canvas;
@@ -304,7 +314,7 @@ public partial class NodeCanvasViewModel : ObservableObject
                     nodeBase.Name = node.Name;
                 }
             }
-            SynchronizeWithModel();
+            // SynchronizeWithModel();
         }
     }
 } 

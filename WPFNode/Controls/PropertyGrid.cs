@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using WPFNode.Constants;
 using WPFNode.Interfaces;
+using WPFNode.Services;
 using WPFNode.ViewModels;
 using WPFNode.ViewModels.Nodes;
 using NodeCanvasViewModel = WPFNode.ViewModels.Nodes.NodeCanvasViewModel;
@@ -80,9 +81,21 @@ public class PropertyGrid : Control, INotifyPropertyChanged
     {
         if (d is PropertyGrid propertyGrid)
         {
+            if (e.OldValue is NodeViewModel oldNode) {
+                oldNode.PropertyChanged -= propertyGrid.OnSelectedNodePropertyChanged;
+            }
             propertyGrid._selectedNode = e.NewValue as NodeViewModel;
+            if (propertyGrid._selectedNode != null) {
+                propertyGrid._selectedNode.PropertyChanged += propertyGrid.OnSelectedNodePropertyChanged;
+            }
             propertyGrid.UpdateProperties();
         }
+    }
+
+    private void OnSelectedNodePropertyChanged(object? sender, PropertyChangedEventArgs e) {
+        if (e.PropertyName == nameof(NodeViewModel.Properties)) {
+            UpdateProperties();
+        }        
     }
 
     public string SearchText
@@ -225,28 +238,8 @@ public class PropertyGrid : Control, INotifyPropertyChanged
             return CreateComplexTypeControl(property);
         }
 
-        // 3. 커스텀 템플릿 검색
-        var template = TryFindTemplateForType(property.PropertyType);
-        if (template != null)
-        {
-            return new ContentPresenter
-            {
-                Content = property,
-                ContentTemplate = template
-            };
-        }
-
-        // 4. 기본 컨트롤 타입에 따른 컨트롤 생성
-        return property.ControlType switch
-        {
-            NodePropertyControlType.TextBox => CreateTextBox(property),
-            NodePropertyControlType.NumberBox => CreateNumberBox(property),
-            NodePropertyControlType.CheckBox => CreateCheckBox(property),
-            NodePropertyControlType.ColorPicker => CreateColorPicker(property),
-            NodePropertyControlType.ComboBox => CreateComboBox(property),
-            NodePropertyControlType.MultilineText => CreateMultilineTextBox(property),
-            _ => CreateDefaultControl(property)
-        };
+        // 3. PropertyControlProviderRegistry를 통해 컨트롤 생성
+        return NodeServices.PropertyControlProviderRegistry.CreateControl(property);
     }
 
     private bool IsComplexType(Type type)
@@ -365,69 +358,6 @@ public class PropertyGrid : Control, INotifyPropertyChanged
         var textBox = new TextBox
         {
             Text = property.Value?.ToString()
-        };
-        
-        textBox.TextChanged += (s, e) =>
-        {
-            property.Value = textBox.Text;
-        };
-        
-        return textBox;
-    }
-
-    private FrameworkElement CreateNumberBox(INodeProperty property)
-    {
-        // 숫자 입력 전용 TextBox 구현
-        var numberBox = new TextBox
-        {
-            Text = property.Value?.ToString()
-        };
-        
-        numberBox.TextChanged += (s, e) =>
-        {
-            if (double.TryParse(numberBox.Text, out var number))
-            {
-                property.Value = number;
-            }
-        };
-        
-        return numberBox;
-    }
-
-    private FrameworkElement CreateCheckBox(INodeProperty property)
-    {
-        var checkBox = new CheckBox
-        {
-            IsChecked = (bool?)property.Value
-        };
-        
-        checkBox.Checked += (s, e) => property.Value = true;
-        checkBox.Unchecked += (s, e) => property.Value = false;
-        
-        return checkBox;
-    }
-
-    private FrameworkElement CreateColorPicker(INodeProperty property)
-    {
-        // 색상 선택기 구현
-        // 실제 구현에서는 적절한 색상 선택 컨트롤을 사용
-        return new Button { Content = "색상 선택" };
-    }
-
-    private FrameworkElement CreateComboBox(INodeProperty property)
-    {
-        // 콤보박스 구현
-        return new ComboBox();
-    }
-
-    private FrameworkElement CreateMultilineTextBox(INodeProperty property)
-    {
-        var textBox = new TextBox
-        {
-            Text = property.Value?.ToString(),
-            AcceptsReturn = true,
-            TextWrapping = TextWrapping.Wrap,
-            MinHeight = 60
         };
         
         textBox.TextChanged += (s, e) =>

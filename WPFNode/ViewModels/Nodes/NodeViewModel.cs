@@ -64,6 +64,22 @@ public class NodeViewModel : ViewModelBase
             }
         }
     }
+
+    public string Description
+    {
+        get => _model.Description;
+        set => _model.Description = value;
+    }
+
+    public string Category => _model.Category;
+
+    public bool IsVisible
+    {
+        get => _model.IsVisible;
+        set => _model.IsVisible = value;
+    }
+
+    public IReadOnlyDictionary<string, INodeProperty> Properties => _model.Properties;
     
     public Point Position
     {
@@ -126,21 +142,47 @@ public class NodeViewModel : ViewModelBase
 
     private void Model_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(INode.InputPorts))
+        switch (e.PropertyName)
         {
-            OnPropertyChanged(nameof(InputPorts));
-        }
-        else if (e.PropertyName == nameof(NodeBase.X))
-        {
-            Position = new Point(_model.X, _model.Y);
-        }
-        else if (e.PropertyName == nameof(NodeBase.Y))
-        {
-            Position = new Point(_model.X, _model.Y);
-        }
-        else if (e.PropertyName == nameof(NodeBase.Name))
-        {
-            Name = _model.Name;
+            case nameof(INode.InputPorts):
+                InputPorts.Clear();
+                foreach (var port in _model.InputPorts)
+                {
+                    InputPorts.Add(new NodePortViewModel(port, _canvas));
+                }
+                break;
+            case nameof(INode.OutputPorts):
+                OutputPorts.Clear();
+                foreach (var port in _model.OutputPorts)
+                {
+                    OutputPorts.Add(new NodePortViewModel(port, _canvas));
+                }
+                break;
+            case nameof(INode.Properties):
+                OnPropertyChanged(nameof(Properties));
+                // Properties가 변경되면 InputPorts도 함께 갱신
+                InputPorts.Clear();
+                foreach (var port in _model.InputPorts)
+                {
+                    InputPorts.Add(new NodePortViewModel(port, _canvas));
+                }
+                break;
+            case nameof(NodeBase.X):
+            case nameof(NodeBase.Y):
+                Position = new Point(_model.X, _model.Y);
+                break;
+            case nameof(NodeBase.Name):
+                Name = _model.Name;
+                break;
+            case nameof(NodeBase.Description):
+                OnPropertyChanged(nameof(Description));
+                break;
+            case nameof(NodeBase.IsVisible):
+                OnPropertyChanged(nameof(IsVisible));
+                break;
+            case nameof(NodeBase.Category):
+                OnPropertyChanged(nameof(Category));
+                break;
         }
     }
 } 

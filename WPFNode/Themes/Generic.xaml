@@ -498,80 +498,80 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-
+                        
                         <!-- 검색 박스 -->
                         <TextBox Grid.Row="0" 
-                                Text="{Binding SearchText, RelativeSource={RelativeSource TemplatedParent}, UpdateSourceTrigger=PropertyChanged}"
-                                Margin="2"
-                                Padding="2"/>
-
-                        <!-- 속성 목록 -->
-                        <DataGrid Grid.Row="1"
-                                ItemsSource="{Binding FilteredProperties, RelativeSource={RelativeSource TemplatedParent}}"
-                                AutoGenerateColumns="False"
-                                CanUserAddRows="False"
-                                CanUserDeleteRows="False"
-                                CanUserReorderColumns="False"
-                                HeadersVisibility="Column"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="속성" 
-                                                  Binding="{Binding DisplayName}" 
-                                                  Width="120"
-                                                  IsReadOnly="True"/>
-                                <DataGridTemplateColumn Header="값" Width="*">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                
-                                                <ContentPresenter Grid.Column="0"
-                                                                Content="{Binding}"
-                                                                ContentTemplate="{Binding ControlTemplate}"/>
-                                                
-                                                <ToggleButton Grid.Column="1"
-                                                            Width="16" Height="16"
-                                                            Margin="4,0,0,0"
-                                                            IsChecked="{Binding CanConnectToPort, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                            ToolTip="포트로 사용">
-                                                    <ToggleButton.Style>
-                                                        <Style TargetType="ToggleButton">
-                                                            <Setter Property="Template">
-                                                                <Setter.Value>
-                                                                    <ControlTemplate TargetType="ToggleButton">
-                                                                        <Border x:Name="border"
-                                                                                BorderThickness="1"
-                                                                                BorderBrush="#FF606060"
-                                                                                Background="Transparent">
-                                                                            <Path x:Name="icon"
-                                                                                  Width="10" Height="10"
-                                                                                  Stretch="Uniform"
-                                                                                  Fill="#FF606060"
-                                                                                  Data="M12,3C7.58,3 4,4.79 4,7C4,9.21 7.58,11 12,11C16.42,11 20,9.21 20,7C20,4.79 16.42,3 12,3M4,9V12C4,14.21 7.58,16 12,16C16.42,16 20,14.21 20,12V9C20,11.21 16.42,13 12,13C7.58,13 4,11.21 4,9M4,14V17C4,19.21 7.58,21 12,21C16.42,21 20,19.21 20,17V14C20,16.21 16.42,18 12,18C7.58,18 4,16.21 4,14Z"/>
-                                                                        </Border>
-                                                                        <ControlTemplate.Triggers>
-                                                                            <Trigger Property="IsChecked" Value="True">
-                                                                                <Setter TargetName="border" Property="Background" Value="#FF404040"/>
-                                                                                <Setter TargetName="icon" Property="Fill" Value="#FFFFFFFF"/>
-                                                                            </Trigger>
-                                                                        </ControlTemplate.Triggers>
-                                                                    </ControlTemplate>
-                                                                </Setter.Value>
-                                                            </Setter>
-                                                        </Style>
-                                                    </ToggleButton.Style>
-                                                </ToggleButton>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                            </DataGrid.Columns>
-                        </DataGrid>
+                                 Text="{Binding SearchText, RelativeSource={RelativeSource TemplatedParent}, UpdateSourceTrigger=PropertyChanged}"
+                                 Margin="5"
+                                 Padding="5"
+                                 BorderThickness="1"
+                                 BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}"
+                                 Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}"
+                                 Foreground="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}"
+                                 VerticalContentAlignment="Center"/>
+                        
+                        <!-- 프로퍼티 목록 -->
+                        <ScrollViewer Grid.Row="1" 
+                                    VerticalScrollBarVisibility="Auto"
+                                    HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding FilteredProperties, RelativeSource={RelativeSource TemplatedParent}}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="5,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" MinWidth="100"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            
+                                            <!-- 프로퍼티 이름 -->
+                                            <TextBlock Grid.Column="0" 
+                                                       Text="{Binding DisplayName}"
+                                                       VerticalAlignment="Center"
+                                                       Margin="0,0,10,0"/>
+                                            
+                                            <!-- 프로퍼티 값 컨트롤 -->
+                                            <ContentPresenter Grid.Column="1"
+                                                            Content="{Binding Control}"/>
+                                            
+                                            <!-- 포트 연결 토글 버튼 -->
+                                            <ToggleButton Grid.Column="2"
+                                                        Width="16" Height="16"
+                                                        Margin="4,0,0,0"
+                                                        IsChecked="{Binding CanConnectToPort, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                        ToolTip="포트로 사용">
+                                                <ToggleButton.Style>
+                                                    <Style TargetType="ToggleButton">
+                                                        <Setter Property="Template">
+                                                            <Setter.Value>
+                                                                <ControlTemplate TargetType="ToggleButton">
+                                                                    <Border x:Name="border"
+                                                                            BorderThickness="1"
+                                                                            BorderBrush="#FF606060"
+                                                                            Background="Transparent">
+                                                                        <Path x:Name="icon"
+                                                                              Width="10" Height="10"
+                                                                              Stretch="Uniform"
+                                                                              Fill="#FF606060"
+                                                                              Data="M12,3C7.58,3 4,4.79 4,7C4,9.21 7.58,11 12,11C16.42,11 20,9.21 20,7C20,4.79 16.42,3 12,3M4,9V12C4,14.21 7.58,16 12,16C16.42,16 20,14.21 20,12V9C20,11.21 16.42,13 12,13C7.58,13 4,11.21 4,9M4,14V17C4,19.21 7.58,21 12,21C16.42,21 20,19.21 20,17V14C20,16.21 16.42,18 12,18C7.58,18 4,16.21 4,14Z"/>
+                                                                    </Border>
+                                                                    <ControlTemplate.Triggers>
+                                                                        <Trigger Property="IsChecked" Value="True">
+                                                                            <Setter TargetName="border" Property="Background" Value="#FF404040"/>
+                                                                            <Setter TargetName="icon" Property="Fill" Value="#FFFFFFFF"/>
+                                                                        </Trigger>
+                                                                    </ControlTemplate.Triggers>
+                                                                </ControlTemplate>
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                    </Style>
+                                                </ToggleButton.Style>
+                                            </ToggleButton>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>

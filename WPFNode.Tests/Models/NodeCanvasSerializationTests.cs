@@ -375,18 +375,15 @@ public class NodeCanvasSerializationTests : IDisposable
         // 동적 프로퍼티 추가
         var intProperty = dynamicNode.AddProperty<int>(
             "IntProperty",
-            "Integer Property",
-            NodePropertyControlType.NumberBox
+            "Integer Property"
         );
         var stringProperty = dynamicNode.AddProperty<string>(
             "StringProperty",
-            "String Property",
-            NodePropertyControlType.TextBox
+            "String Property"
         );
         var boolProperty = dynamicNode.AddProperty<bool>(
             "BoolProperty",
             "Boolean Property",
-            NodePropertyControlType.CheckBox,
             null,
             true  // 포트로 사용 가능
         );
@@ -445,7 +442,6 @@ public class NodeCanvasSerializationTests : IDisposable
         var property = dynamicNode.AddProperty<double>(
             "Value",
             "Value Property",
-            NodePropertyControlType.NumberBox,
             null,
             true
         );
@@ -499,14 +495,12 @@ public class NodeCanvasSerializationTests : IDisposable
         var property1 = dynamicNode.AddProperty<int>(
             "Property1",
             "Property 1",
-            NodePropertyControlType.NumberBox,
             null,
             true  // 포트로 사용 가능하도록 설정
         );
         var property2 = dynamicNode.AddProperty<string>(
             "Property2",
-            "Property 2",
-            NodePropertyControlType.TextBox
+            "Property 2"
         );
 
         // 일부 포트와 프로퍼티 제거
@@ -521,7 +515,6 @@ public class NodeCanvasSerializationTests : IDisposable
         var newProperty = loadedNode.AddProperty<bool>(
             "NewProperty",
             "New Property",
-            NodePropertyControlType.CheckBox,
             null,
             true  // 포트로 사용 가능하도록 설정
         );
@@ -653,21 +646,18 @@ public class NodeCanvasSerializationTests : IDisposable
         var numberProperty = dynamicNode.AddProperty<double>(
             "NumberProperty",
             "Number Property",
-            NodePropertyControlType.NumberBox,
             "F2"  // 소수점 2자리 형식
         );
 
         var timeProperty = dynamicNode.AddProperty<TimeSpan>(
             "TimeProperty",
             "Time Property",
-            NodePropertyControlType.TextBox,
             "hh\\:mm\\:ss"
         );
 
         var enumProperty = dynamicNode.AddProperty<DayOfWeek>(
             "EnumProperty",
-            "Enum Property",
-            NodePropertyControlType.ComboBox
+            "Enum Property"
         );
 
         // 값 설정
@@ -702,11 +692,6 @@ public class NodeCanvasSerializationTests : IDisposable
         // 형식 검증
         Assert.AreEqual("F2", loadedNumberProperty.Format);
         Assert.AreEqual("hh\\:mm\\:ss", loadedTimeProperty.Format);
-
-        // 컨트롤 타입 검증
-        Assert.AreEqual(NodePropertyControlType.NumberBox, loadedNumberProperty.ControlType);
-        Assert.AreEqual(NodePropertyControlType.TextBox, loadedTimeProperty.ControlType);
-        Assert.AreEqual(NodePropertyControlType.ComboBox, loadedEnumProperty.ControlType);
     }
 
     [TestMethod]

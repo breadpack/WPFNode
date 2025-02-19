@@ -19,13 +19,6 @@ public class IntegerInputNode : NumberInputNodeBase<int>
         Value = 0;
     }
 
-    [NodeProperty("Value", NodePropertyControlType.NumberBox)]
-    public override int Value
-    {
-        get => base.Value;
-        set => base.Value = value;
-    }
-
     protected override void OnIncrement()
     {
         Value++;

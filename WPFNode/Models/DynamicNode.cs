@@ -26,7 +26,6 @@ public class DynamicNode : NodeBase
         string Name, 
         string DisplayName, 
         Type Type, 
-        NodePropertyControlType ControlType, 
         string? Format, 
         bool CanConnectToPort, 
         int Index,
@@ -120,22 +119,20 @@ public class DynamicNode : NodeBase
     public NodeProperty<T> AddProperty<T>(
         string name,
         string displayName,
-        NodePropertyControlType controlType,
         string? format = null,
         bool canConnectToPort = false)
     {
-        return CreateProperty<T>(name, displayName, controlType, format, canConnectToPort);
+        return CreateProperty<T>(name, displayName, format, canConnectToPort);
     }
 
     public INodeProperty AddProperty(
         string name,
         string displayName,
         Type type,
-        NodePropertyControlType controlType,
         string? format = null,
         bool canConnectToPort = false)
     {
-        return CreateProperty(name, displayName, type, controlType, format, canConnectToPort);
+        return CreateProperty(name, displayName, type, format, canConnectToPort);
     }
 
     public InputPort<T>? GetInputPort<T>(string name)
@@ -200,7 +197,6 @@ public class DynamicNode : NodeBase
             writer.WriteString("Name", prop.Key);
             writer.WriteString("DisplayName", prop.Value.DisplayName);
             writer.WriteString("Type", prop.Value.PropertyType.AssemblyQualifiedName);
-            writer.WriteNumber("ControlType", (int)prop.Value.ControlType);
             writer.WriteString("Format", prop.Value.Format);
             writer.WriteBoolean("CanConnectToPort", prop.Value.CanConnectToPort);
             writer.WriteNumber("Index", ((IInputPort)prop.Value).GetPortIndex());
@@ -267,7 +263,6 @@ public class DynamicNode : NodeBase
             var displayName = propDef.GetProperty("DisplayName").GetString()!;
             var typeName = propDef.GetProperty("Type").GetString()!;
             var type = Type.GetType(typeName);
-            var controlType = (NodePropertyControlType)propDef.GetProperty("ControlType").GetInt32();
             var format = propDef.GetProperty("Format").GetString();
             var canConnectToPort = propDef.GetProperty("CanConnectToPort").GetBoolean();
             var index = propDef.GetProperty("Index").GetInt32();
@@ -289,7 +284,7 @@ public class DynamicNode : NodeBase
             if (type != null)
             {
                 yield return new PropertyDefinition(
-                    name, displayName, type, controlType, format, 
+                    name, displayName, type, format, 
                     canConnectToPort, index, value);
             }
         }
@@ -355,7 +350,6 @@ public class DynamicNode : NodeBase
                         prop.Name,
                         prop.DisplayName,
                         prop.Type,
-                        prop.ControlType,
                         prop.Format,
                         prop.CanConnectToPort);
 

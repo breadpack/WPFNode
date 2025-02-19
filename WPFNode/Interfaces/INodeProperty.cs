@@ -6,7 +6,6 @@ namespace WPFNode.Interfaces;
 public interface INodeProperty : INotifyPropertyChanged, IJsonSerializable
 {
     string DisplayName { get; }
-    NodePropertyControlType ControlType { get; }
     string? Format { get; }
     bool CanConnectToPort { get; set; }
     Type PropertyType { get; }

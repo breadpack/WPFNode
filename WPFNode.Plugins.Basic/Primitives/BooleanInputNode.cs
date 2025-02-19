@@ -18,11 +18,4 @@ public class BooleanInputNode : InputNodeBase<bool>
         // 기본값 설정
         Value = false;
     }
-
-    [NodeProperty("Value", NodePropertyControlType.CheckBox)]
-    public override bool Value
-    {
-        get => base.Value;
-        set => base.Value = value;
-    }
 } 

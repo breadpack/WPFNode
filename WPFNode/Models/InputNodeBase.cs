@@ -19,12 +19,11 @@ public abstract class InputNodeBase<T> : NodeBase
         // AddProperty를 사용하여 Value 속성 추가
         InputProperty = CreateProperty<T>(
             "Value",
-            "Value",
-            NodePropertyControlType.TextBox);
+            "Value");
     }
 
 
-    public virtual T Value
+    public T Value
     {
         get => InputProperty.Value!;
         set => InputProperty.Value = value;

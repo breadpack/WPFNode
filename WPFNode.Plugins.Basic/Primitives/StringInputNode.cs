@@ -18,11 +18,4 @@ public class StringInputNode : InputNodeBase<string>
         // 기본값 설정
         Value = string.Empty;
     }
-
-    [NodeProperty("Value", NodePropertyControlType.TextBox)]
-    public override string Value
-    {
-        get => base.Value;
-        set => base.Value = value;
-    }
 } 

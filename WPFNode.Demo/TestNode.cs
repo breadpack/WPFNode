@@ -20,29 +20,24 @@ public class TestNode : NodeBase {
 
         TextProperty = CreateProperty<string>(
             "TextValue",
-            "텍스트",
-            NodePropertyControlType.TextBox);
+            "텍스트");
 
         NumberProperty = CreateProperty<double>(
             "NumberValue",
             "숫자",
-            NodePropertyControlType.NumberBox,
             "F2");
 
         BooleanProperty = CreateProperty<bool>(
             "BoolValue",
-            "참/거짓",
-            NodePropertyControlType.CheckBox);
+            "참/거짓");
 
         MultilineTextProperty = CreateProperty<string>(
             "MultilineText",
-            "여러 줄 텍스트",
-            NodePropertyControlType.MultilineText);
+            "여러 줄 텍스트");
 
         ColorProperty = CreateProperty<Color>(
             "ColorValue",
-            "색상",
-            NodePropertyControlType.ColorPicker);
+            "색상");
     }
 
     public NodeProperty<Color> ColorProperty { get; }

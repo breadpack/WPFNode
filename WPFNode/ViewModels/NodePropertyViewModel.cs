@@ -1,19 +1,21 @@
 ﻿using System.ComponentModel;
 using System.Windows;
-using WPFNode.Constants;
 using WPFNode.Interfaces;
+using WPFNode.Services;
 
 namespace WPFNode.ViewModels;
 
 public class NodePropertyViewModel : INotifyPropertyChanged
 {
     private readonly INodeProperty _property;
+    private FrameworkElement? _control;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public NodePropertyViewModel(INodeProperty property)
     {
         _property = property;
+        _control = NodeServices.PropertyControlProviderRegistry.CreateControl(property);
 
         if (_property is INotifyPropertyChanged notifyPropertyChanged)
         {
@@ -36,7 +38,6 @@ public class NodePropertyViewModel : INotifyPropertyChanged
     }
 
     public string                  DisplayName => _property.DisplayName;
-    public NodePropertyControlType ControlType => _property.ControlType;
     public string?                 Format      => _property.Format;
     
     public bool CanConnectToPort
@@ -87,24 +88,7 @@ public class NodePropertyViewModel : INotifyPropertyChanged
         }
     }
 
-    public DataTemplate? ControlTemplate
-    {
-        get
-        {
-            var key = ControlType switch
-            {
-                NodePropertyControlType.TextBox       => "TextBoxTemplate",
-                NodePropertyControlType.NumberBox     => "NumberBoxTemplate",
-                NodePropertyControlType.CheckBox      => "CheckBoxTemplate",
-                NodePropertyControlType.ColorPicker   => "ColorPickerTemplate",
-                NodePropertyControlType.ComboBox      => "ComboBoxTemplate",
-                NodePropertyControlType.MultilineText => "MultilineTextTemplate",
-                _                                     => "TextBoxTemplate"
-            };
-
-            return Application.Current.FindResource(key) as DataTemplate;
-        }
-    }
+    public FrameworkElement? Control => _control;
 
     protected virtual void OnPropertyChanged(string propertyName)
     {

@@ -14,7 +14,18 @@ public class PropertySerializationData
 
 public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
 {
-    public override NodeCanvas Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    private static readonly JsonSerializerOptions _serializerOptions = new()
+    {
+        WriteIndented = true,
+        Converters = 
+        {
+            new TypeJsonConverter()
+        }
+    };
+
+    public static JsonSerializerOptions SerializerOptions => _serializerOptions;
+
+    public override NodeCanvas? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         try
         {
@@ -273,8 +284,8 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
         {
             writer.WriteStartObject();
             
-            WriteNodes(writer, value, options);
-            WriteConnections(writer, value);
+            WriteNodes(writer, value, _serializerOptions);
+            WriteConnections(writer, value, _serializerOptions);
             WriteGroups(writer, value);
             
             writer.WriteEndObject();
@@ -315,7 +326,7 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
         writer.WriteEndArray();
     }
 
-    private void WriteConnections(Utf8JsonWriter writer, NodeCanvas canvas)
+    private void WriteConnections(Utf8JsonWriter writer, NodeCanvas canvas, JsonSerializerOptions options)
     {
         writer.WriteStartArray("Connections");
         foreach (var connection in canvas.Connections)

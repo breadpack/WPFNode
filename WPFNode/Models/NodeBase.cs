@@ -8,6 +8,7 @@ using WPFNode.Attributes;
 using WPFNode.Constants;
 using WPFNode.Interfaces;
 using WPFNode.Models.Properties;
+using WPFNode.Models.Serialization;
 
 namespace WPFNode.Models;
 
@@ -135,13 +136,11 @@ public abstract class NodeBase : INode
     protected virtual NodeProperty<T> CreateProperty<T>(
         string name,
         string displayName,
-        NodePropertyControlType controlType,
         string? format = null,
         bool canConnectToPort = false)
     {
         var property = new NodeProperty<T>(
             displayName,
-            controlType,
             this,
             _inputPorts.Count,
             format,
@@ -164,8 +163,10 @@ public abstract class NodeBase : INode
         if (property is IInputPort inputPort)
         {
             _inputPorts.Add(inputPort);
+            OnPropertyChanged(nameof(InputPorts));
         }
 
+        OnPropertyChanged(nameof(Properties));
         return property;
     }
 
@@ -173,13 +174,12 @@ public abstract class NodeBase : INode
         string name,
         string displayName,
         Type type,
-        NodePropertyControlType controlType,
         string? format = null,
         bool canConnectToPort = false)
     {
         var property = (INodeProperty)Activator.CreateInstance(
             typeof(NodeProperty<>).MakeGenericType(type),
-            displayName, controlType, this, _inputPorts.Count, format, canConnectToPort)!;
+            displayName, this, _inputPorts.Count, format, canConnectToPort)!;
         _properties[name] = property;
 
         // 프로퍼티 변경 이벤트 구독
@@ -198,8 +198,10 @@ public abstract class NodeBase : INode
         if (property is IInputPort inputPort)
         {
             _inputPorts.Add(inputPort);
+            OnPropertyChanged(nameof(InputPorts));
         }
 
+        OnPropertyChanged(nameof(Properties));
         return property;
     }
 
@@ -224,8 +226,18 @@ public abstract class NodeBase : INode
                 _inputPorts.Remove(inputPort);
                 OnPropertyChanged(nameof(InputPorts));
             }
+            _properties.Remove(name);
+            OnPropertyChanged(nameof(Properties));
         }
-        _properties.Remove(name);
+    }
+
+    protected void RemoveProperty(INodeProperty property)
+    {
+        var entry = _properties.FirstOrDefault(x => x.Value == property);
+        if (!string.IsNullOrEmpty(entry.Key))
+        {
+            RemoveProperty(entry.Key);
+        }
     }
 
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
@@ -270,6 +282,7 @@ public abstract class NodeBase : INode
         if (port == null)
             throw new ArgumentNullException(nameof(port));
         _inputPorts.Add(port);
+        OnPropertyChanged(nameof(InputPorts));
     }
 
     private void RegisterOutputPort(IOutputPort port)
@@ -277,6 +290,7 @@ public abstract class NodeBase : INode
         if (port == null)
             throw new ArgumentNullException(nameof(port));
         _outputPorts.Add(port);
+        OnPropertyChanged(nameof(OutputPorts));
     }
 
     protected void ClearPorts()
@@ -325,7 +339,6 @@ public abstract class NodeBase : INode
                 writer.WriteString("Name", property.Value.DisplayName);
                 writer.WriteString("DisplayName", property.Value.DisplayName);
                 writer.WriteString("Type", property.Value.PropertyType.AssemblyQualifiedName);
-                writer.WriteNumber("ControlType", (int)property.Value.ControlType);
                 writer.WriteString("Format", property.Value.Format);
                 writer.WriteBoolean("CanConnectToPort", property.Value.CanConnectToPort);
                 writer.WriteBoolean("IsVisible", property.Value.IsVisible);
@@ -334,7 +347,7 @@ public abstract class NodeBase : INode
                 if (property.Value.Value != null || property.Value.PropertyType.IsValueType)
                 {
                     writer.WritePropertyName("Value");
-                    JsonSerializer.Serialize(writer, property.Value.Value, property.Value.PropertyType);
+                    JsonSerializer.Serialize(writer, property.Value.Value, property.Value.PropertyType, NodeCanvasJsonConverter.SerializerOptions);
                 }
                 
                 writer.WriteEndObject();

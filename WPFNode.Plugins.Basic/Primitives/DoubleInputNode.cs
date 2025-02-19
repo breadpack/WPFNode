@@ -19,13 +19,6 @@ public class DoubleInputNode : NumberInputNodeBase<double>
         Value = 0.0;
     }
 
-    [NodeProperty("Value", NodePropertyControlType.NumberBox)]
-    public override double Value
-    {
-        get => base.Value;
-        set => base.Value = value;
-    }
-
     protected override void OnIncrement()
     {
         Value += 1.0;

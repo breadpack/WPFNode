@@ -305,6 +305,9 @@ public class NodeControl : ContentControl, INodeControl
         {
             UpdateCenteredPosition();
         }
+        else if (e.PropertyName == nameof(NodeViewModel.Properties)) {
+            
+        }
     }
 
     private Canvas? ParentCanvas

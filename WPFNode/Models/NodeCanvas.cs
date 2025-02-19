@@ -20,6 +20,12 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public event EventHandler<INode>? NodeCreated;
+    public event EventHandler<INode>? NodeAdded;
+    public event EventHandler<INode>? NodeRemoved;
+    public event EventHandler<IConnection>? ConnectionAdded;
+    public event EventHandler<IConnection>? ConnectionRemoved;
+    public event EventHandler<NodeGroup>? GroupAdded;
+    public event EventHandler<NodeGroup>? GroupRemoved;
 
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
@@ -29,6 +35,36 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
     protected virtual void OnNodeCreated(INode node)
     {
         NodeCreated?.Invoke(this, node);
+    }
+
+    protected virtual void OnNodeAdded(INode node)
+    {
+        NodeAdded?.Invoke(this, node);
+    }
+
+    protected virtual void OnNodeRemoved(INode node)
+    {
+        NodeRemoved?.Invoke(this, node);
+    }
+
+    protected virtual void OnConnectionAdded(IConnection connection)
+    {
+        ConnectionAdded?.Invoke(this, connection);
+    }
+
+    protected virtual void OnConnectionRemoved(IConnection connection)
+    {
+        ConnectionRemoved?.Invoke(this, connection);
+    }
+
+    protected virtual void OnGroupAdded(NodeGroup group)
+    {
+        GroupAdded?.Invoke(this, group);
+    }
+
+    protected virtual void OnGroupRemoved(NodeGroup group)
+    {
+        GroupRemoved?.Invoke(this, group);
     }
 
     [JsonIgnore]
@@ -257,6 +293,7 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
             throw new NodeValidationException("이미 존재하는 그룹입니다.");
         
         _groups.Add(group);
+        OnGroupAdded(group);
     }
 
     public void RemoveGroup(NodeGroup group)
@@ -267,6 +304,7 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
             throw new NodeValidationException("존재하지 않는 그룹입니다.");
         
         _groups.Remove(group);
+        OnGroupRemoved(group);
     }
 
     public async Task ExecuteAsync(CancellationToken cancellationToken = default)
