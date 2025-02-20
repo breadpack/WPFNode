@@ -32,7 +32,7 @@ public class NodeCanvasControl : Control
     public bool IsDraggingPort => _dragStartPort != null;
     public NodePortViewModel? DraggingPort => _dragStartPort;
 
-    public NodeCanvasViewModel? ViewModel => DataContext as NodeCanvasViewModel;
+    public INodeCanvasViewModel? ViewModel => DataContext as INodeCanvasViewModel;
 
     static NodeCanvasControl()
     {

@@ -5,12 +5,13 @@ using CommunityToolkit.Mvvm.Input;
 using WPFNode.Commands;
 using WPFNode.Interfaces;
 using WPFNode.Models;
+using WPFNode.Services;
 using CommandManager = WPFNode.Commands.CommandManager;
 using IWpfCommand = System.Windows.Input.ICommand;
 
 namespace WPFNode.ViewModels.Nodes;
 
-public partial class NodeCanvasViewModel : ObservableObject
+public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewModel
 {
     private readonly NodeCanvas _canvas;
     private readonly INodePluginService _pluginService;
@@ -45,21 +46,18 @@ public partial class NodeCanvasViewModel : ObservableObject
     public IWpfCommand CopyCommand { get; }
     public IWpfCommand PasteCommand { get; }
 
-    public NodeCanvasViewModel(
-        NodeCanvas canvas,
-        INodePluginService pluginService,
-        INodeCommandService commandService)
+    public NodeCanvasViewModel()
     {
-        _canvas = canvas;
-        _pluginService = pluginService;
-        _commandService = commandService;
-        _commandManager = new CommandManager();
-        
+        _canvas = new NodeCanvas();
+        _pluginService = NodeServices.PluginService;
+        _commandService = NodeServices.CommandService;
+        _commandManager = _canvas.CommandManager;
+
         Nodes = new ObservableCollection<NodeViewModel>(
-            canvas.Nodes.Select(n => CreateNodeViewModel(n)));
-        
+            _canvas.Nodes.Select(n => CreateNodeViewModel(n)));
+
         Connections = new ObservableCollection<ConnectionViewModel>(
-            canvas.Connections.Select(c => new ConnectionViewModel(c, this)));
+            _canvas.Connections.Select(c => new ConnectionViewModel(c, this)));
         Groups = new ObservableCollection<NodeGroupViewModel>();
 
         AddNodeCommand = new RelayCommand<Type>(ExecuteAddNode);
@@ -81,6 +79,24 @@ public partial class NodeCanvasViewModel : ObservableObject
         _canvas.ConnectionRemoved += OnConnectionRemoved;
         _canvas.GroupAdded += OnGroupAdded;
         _canvas.GroupRemoved += OnGroupRemoved;
+    }
+
+    public NodeCanvasViewModel(NodeCanvas canvas) : this()
+    {
+        _canvas = canvas;
+        _commandManager = canvas.CommandManager;
+
+        Nodes.Clear();
+        foreach (var node in canvas.Nodes)
+        {
+            Nodes.Add(CreateNodeViewModel(node));
+        }
+
+        Connections.Clear();
+        foreach (var connection in canvas.Connections)
+        {
+            Connections.Add(new ConnectionViewModel(connection, this));
+        }
     }
 
     private void OnNodeAdded(object? sender, INode node)
@@ -129,7 +145,7 @@ public partial class NodeCanvasViewModel : ObservableObject
     {
         if (node is not NodeBase nodeBase)
             throw new ArgumentException("노드는 NodeBase 타입이어야 합니다.");
-            
+
         var viewModel = new NodeViewModel(nodeBase, _commandService, this);
         viewModel.PropertyChanged += (s, e) =>
         {
@@ -151,7 +167,7 @@ public partial class NodeCanvasViewModel : ObservableObject
     private void ExecuteAddNode(Type? nodeType)
     {
         if (nodeType == null) return;
-        
+
         var command = new AddNodeCommand(_canvas, nodeType);
         _commandManager.Execute(command);
     }
@@ -159,7 +175,7 @@ public partial class NodeCanvasViewModel : ObservableObject
     private void ExecuteRemoveNode(NodeViewModel? nodeViewModel)
     {
         if (nodeViewModel == null) return;
-        
+
         var command = new RemoveNodeCommand(_canvas, nodeViewModel.Model);
         _commandManager.Execute(command);
     }
@@ -169,11 +185,11 @@ public partial class NodeCanvasViewModel : ObservableObject
         if (sourcePort == null || targetPort == null) return false;
 
         // 같은 노드의 포트인 경우 연결 불가
-        var sourceNode = Nodes.FirstOrDefault(n => 
+        var sourceNode = Nodes.FirstOrDefault(n =>
             n.InputPorts.Contains(sourcePort) || n.OutputPorts.Contains(sourcePort));
-        var targetNode = Nodes.FirstOrDefault(n => 
+        var targetNode = Nodes.FirstOrDefault(n =>
             n.InputPorts.Contains(targetPort) || n.OutputPorts.Contains(targetPort));
-            
+
         if (sourceNode == null || targetNode == null || sourceNode == targetNode)
             return false;
 
@@ -182,7 +198,7 @@ public partial class NodeCanvasViewModel : ObservableObject
             return false;
 
         // 이미 연결된 포트인지 확인
-        if (Connections.Any(c => 
+        if (Connections.Any(c =>
             (c.Source == sourcePort && c.Target == targetPort) ||
             (c.Source == targetPort && c.Target == sourcePort)))
             return false;
@@ -197,7 +213,7 @@ public partial class NodeCanvasViewModel : ObservableObject
             return;
 
         var (source, target) = ports;
-        
+
         // 입력 포트에 기존 연결이 있는지 확인하고 제거
         var inputPort = source.IsInput ? source : target;
         var existingConnection = inputPort.Connections.FirstOrDefault()?.Model;
@@ -238,12 +254,12 @@ public partial class NodeCanvasViewModel : ObservableObject
     private void AddGroup(NodeGroup? group)
     {
         if (group == null) return;
-        
+
         var selectedNodes = Nodes
             .Where(n => n.IsSelected)
             .Select(n => (NodeBase)n.Model)
             .ToList();
-            
+
         if (selectedNodes.Any())
         {
             var command = new AddGroupCommand(_canvas, group.Name, selectedNodes);
@@ -254,7 +270,7 @@ public partial class NodeCanvasViewModel : ObservableObject
     private void RemoveGroup(NodeGroupViewModel? groupVM)
     {
         if (groupVM?.Model == null) return;
-        
+
         var command = new RemoveGroupCommand(_canvas, groupVM.Model);
         _commandManager.Execute(command);
     }
@@ -317,4 +333,4 @@ public partial class NodeCanvasViewModel : ObservableObject
             // SynchronizeWithModel();
         }
     }
-} 
+}

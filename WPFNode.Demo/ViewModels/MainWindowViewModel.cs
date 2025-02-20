@@ -107,8 +107,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
     private void CreateNewCanvas()
     {
-        var canvas = new NodeCanvas();
-        NodeCanvasViewModel = new NodeCanvasViewModel(canvas, _pluginService, _commandService)
+        NodeCanvasViewModel = new NodeCanvasViewModel()
         {
             Scale = 1.0,
             OffsetX = 0,
