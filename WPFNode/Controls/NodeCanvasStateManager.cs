@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
+using WPFNode.Interfaces;
 using WPFNode.ViewModels.Nodes;
 using NodeCanvasViewModel = WPFNode.ViewModels.Nodes.NodeCanvasViewModel;
 
@@ -177,7 +178,7 @@ public class NodeCanvasStateManager
         return portControl;
     }
 
-    private void InitializeControlCache(NodeCanvasViewModel viewModel)
+    private void InitializeControlCache(INodeCanvasViewModel viewModel)
     {
         foreach (var node in viewModel.Nodes)
         {

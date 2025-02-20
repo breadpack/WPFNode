@@ -10,6 +10,8 @@ using WPFNode.Services;
 using WPFNode.Utilities;
 using WPFNode.ViewModels.Nodes;
 using NodeCanvasViewModel = WPFNode.ViewModels.Nodes.NodeCanvasViewModel;
+using IWpfCommand = System.Windows.Input.ICommand;
+using CommunityToolkit.Mvvm.Input;
 
 namespace WPFNode.Controls;
 
@@ -25,6 +27,102 @@ public class NodeCanvasControl : Control
     
     private readonly NodeCanvasStateManager _stateManager;
     private bool _isUpdatingLayout;
+
+    #region Dependency Properties
+
+    public static readonly DependencyProperty AutoCenterOnLoadProperty =
+        DependencyProperty.Register(
+            nameof(AutoCenterOnLoad),
+            typeof(bool),
+            typeof(NodeCanvasControl),
+            new PropertyMetadata(true));
+
+    public static readonly DependencyProperty MinScaleProperty =
+        DependencyProperty.Register(
+            nameof(MinScale),
+            typeof(double),
+            typeof(NodeCanvasControl),
+            new PropertyMetadata(0.25));
+
+    public static readonly DependencyProperty MaxScaleProperty =
+        DependencyProperty.Register(
+            nameof(MaxScale),
+            typeof(double),
+            typeof(NodeCanvasControl),
+            new PropertyMetadata(2.0));
+
+    public static readonly DependencyProperty ZoomSpeedProperty =
+        DependencyProperty.Register(
+            nameof(ZoomSpeed),
+            typeof(double),
+            typeof(NodeCanvasControl),
+            new PropertyMetadata(0.001));
+
+    #region Commands
+
+    public static readonly DependencyProperty CenterViewCommandProperty =
+        DependencyProperty.Register(
+            nameof(CenterViewCommand),
+            typeof(IWpfCommand),
+            typeof(NodeCanvasControl));
+
+    public static readonly DependencyProperty ZoomToFitCommandProperty =
+        DependencyProperty.Register(
+            nameof(ZoomToFitCommand),
+            typeof(IWpfCommand),
+            typeof(NodeCanvasControl));
+
+    public static readonly DependencyProperty ResetViewCommandProperty =
+        DependencyProperty.Register(
+            nameof(ResetViewCommand),
+            typeof(IWpfCommand),
+            typeof(NodeCanvasControl));
+
+    public IWpfCommand CenterViewCommand
+    {
+        get => (IWpfCommand)GetValue(CenterViewCommandProperty);
+        set => SetValue(CenterViewCommandProperty, value);
+    }
+
+    public IWpfCommand ZoomToFitCommand
+    {
+        get => (IWpfCommand)GetValue(ZoomToFitCommandProperty);
+        set => SetValue(ZoomToFitCommandProperty, value);
+    }
+
+    public IWpfCommand ResetViewCommand
+    {
+        get => (IWpfCommand)GetValue(ResetViewCommandProperty);
+        set => SetValue(ResetViewCommandProperty, value);
+    }
+
+    #endregion
+
+    public bool AutoCenterOnLoad
+    {
+        get => (bool)GetValue(AutoCenterOnLoadProperty);
+        set => SetValue(AutoCenterOnLoadProperty, value);
+    }
+
+    public double MinScale
+    {
+        get => (double)GetValue(MinScaleProperty);
+        set => SetValue(MinScaleProperty, value);
+    }
+
+    public double MaxScale
+    {
+        get => (double)GetValue(MaxScaleProperty);
+        set => SetValue(MaxScaleProperty, value);
+    }
+
+    public double ZoomSpeed
+    {
+        get => (double)GetValue(ZoomSpeedProperty);
+        set => SetValue(ZoomSpeedProperty, value);
+    }
+
+    #endregion
 
     public INodePluginService PluginService { get; }
     public INodeCommandService CommandService { get; }
@@ -78,6 +176,12 @@ public class NodeCanvasControl : Control
         _stateManager = new NodeCanvasStateManager(this);
         DataContextChanged += OnDataContextChanged;
         Loaded += OnControlLoaded;
+
+        // Initialize Commands
+        CenterViewCommand = new RelayCommand(CenterView);
+        ZoomToFitCommand = new RelayCommand(ZoomToFit);
+        ResetViewCommand = new RelayCommand(ResetView);
+
         Initialize();
     }
 
@@ -104,7 +208,7 @@ public class NodeCanvasControl : Control
         }
 
         // 스크롤 위치를 중앙으로 초기화
-        if (_scrollViewer != null && _dragCanvas != null)
+        if (_scrollViewer != null && _dragCanvas != null && AutoCenterOnLoad)
         {
             bool isInitialized = false;
             EventHandler? layoutUpdatedHandler = null;
@@ -348,9 +452,9 @@ public class NodeCanvasControl : Control
         if (ViewModel == null) return;
 
         var zoomCenter = e.GetPosition(_dragCanvas);
-        var delta = e.Delta * 0.001;
+        var delta = e.Delta * ZoomSpeed;
         var newScale = ViewModel.Scale + delta;
-        newScale = Math.Max(0.25, Math.Min(2.0, newScale));
+        newScale = Math.Max(MinScale, Math.Min(MaxScale, newScale));
 
         // 줌 중심점 기준으로 스케일 조정
         var scrollX = _scrollViewer?.HorizontalOffset ?? 0;
@@ -483,4 +587,101 @@ public class NodeCanvasControl : Control
     {
         _dragStartPort = null;
     }
+
+    #region Public Methods
+
+    /// <summary>
+    /// 뷰를 캔버스의 중앙으로 이동합니다.
+    /// </summary>
+    public void CenterView()
+    {
+        if (_scrollViewer == null || _dragCanvas == null) return;
+        _scrollViewer.ScrollToHorizontalOffset((_dragCanvas.Width - _scrollViewer.ViewportWidth) / 2);
+        _scrollViewer.ScrollToVerticalOffset((_dragCanvas.Height - _scrollViewer.ViewportHeight) / 2);
+    }
+
+    /// <summary>
+    /// 모든 노드가 보이도록 뷰를 조정합니다.
+    /// </summary>
+    public void ZoomToFit()
+    {
+        if (ViewModel?.Nodes == null || !ViewModel.Nodes.Any() || 
+            _scrollViewer == null || _dragCanvas == null) return;
+
+        // 모든 노드의 영역 계산
+        var bounds = GetNodesBounds();
+        if (!bounds.HasValue) return;
+
+        // 여백 추가
+        var padding = 50;
+        bounds = new Rect(
+            bounds.Value.X - padding,
+            bounds.Value.Y - padding,
+            bounds.Value.Width + padding * 2,
+            bounds.Value.Height + padding * 2
+        );
+
+        // 스케일 계산
+        var scaleX = _scrollViewer.ViewportWidth / bounds.Value.Width;
+        var scaleY = _scrollViewer.ViewportHeight / bounds.Value.Height;
+        var scale = Math.Min(scaleX, scaleY);
+        scale = Math.Max(MinScale, Math.Min(MaxScale, scale));
+
+        // 스케일 적용
+        ViewModel.Scale = scale;
+
+        // 중앙 정렬
+        _scrollViewer.ScrollToHorizontalOffset(bounds.Value.X * scale + (bounds.Value.Width * scale - _scrollViewer.ViewportWidth) / 2);
+        _scrollViewer.ScrollToVerticalOffset(bounds.Value.Y * scale + (bounds.Value.Height * scale - _scrollViewer.ViewportHeight) / 2);
+    }
+
+    /// <summary>
+    /// 특정 노드로 뷰를 이동합니다.
+    /// </summary>
+    public void ScrollToNode(NodeViewModel node)
+    {
+        if (_scrollViewer == null || _dragCanvas == null) return;
+
+        var nodeX = node.Model.X + _dragCanvas.Width / 2;
+        var nodeY = node.Model.Y + _dragCanvas.Height / 2;
+
+        _scrollViewer.ScrollToHorizontalOffset(nodeX - _scrollViewer.ViewportWidth / 2);
+        _scrollViewer.ScrollToVerticalOffset(nodeY - _scrollViewer.ViewportHeight / 2);
+    }
+
+    /// <summary>
+    /// 뷰를 초기 상태로 되돌립니다.
+    /// </summary>
+    public void ResetView()
+    {
+        if (ViewModel == null) return;
+        ViewModel.Scale = 1.0;
+        CenterView();
+    }
+
+    #endregion
+
+    #region Private Methods
+
+    private Rect? GetNodesBounds()
+    {
+        if (ViewModel?.Nodes == null || !ViewModel.Nodes.Any()) return null;
+
+        var minX = double.MaxValue;
+        var minY = double.MaxValue;
+        var maxX = double.MinValue;
+        var maxY = double.MinValue;
+
+        foreach (var node in ViewModel.Nodes)
+        {
+            minX = Math.Min(minX, node.Model.X);
+            minY = Math.Min(minY, node.Model.Y);
+            maxX = Math.Max(maxX, node.Model.X);
+            maxY = Math.Max(maxY, node.Model.Y);
+        }
+
+        return new Rect(minX, minY, maxX - minX, maxY - minY);
+    }
+
+    #endregion
 } 

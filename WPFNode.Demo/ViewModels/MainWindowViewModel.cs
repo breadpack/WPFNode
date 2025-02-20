@@ -149,7 +149,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
         {
             var json = File.ReadAllText(_saveFilePath);
             var canvas = NodeCanvas.FromJson(json);
-            NodeCanvasViewModel = new NodeCanvasViewModel(canvas, _pluginService, _commandService);
+            NodeCanvasViewModel = new NodeCanvasViewModel(canvas);
         }
         catch (Exception ex)
         {

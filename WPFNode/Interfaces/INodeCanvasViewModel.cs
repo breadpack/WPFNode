@@ -27,6 +27,8 @@ public interface INodeCanvasViewModel
     IWpfCommand ExecuteCommand { get; }
     IWpfCommand CopyCommand { get; }
     IWpfCommand PasteCommand { get; }
+    IWpfCommand SaveCommand { get; }
+    IWpfCommand LoadCommand { get; }
 
     NodePortViewModel FindPortViewModel(IPort port);
     void OnPortsChanged();

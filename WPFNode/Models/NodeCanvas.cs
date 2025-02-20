@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -429,6 +430,41 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         node.Y = y;
         SerializableNodes.Add(node);
         return node;
+    }
+
+    public async Task SaveToFileAsync(string filePath)
+    {
+        var json = JsonSerializer.Serialize(this, DefaultJsonOptions);
+        await File.WriteAllTextAsync(filePath, json);
+    }
+
+    public async Task LoadFromFileAsync(string filePath)
+    {
+        var json = await File.ReadAllTextAsync(filePath);
+        var canvas = JsonSerializer.Deserialize<NodeCanvas>(json, DefaultJsonOptions);
+        if (canvas == null) throw new Exception("Failed to deserialize canvas");
+
+        // 현재 캔버스의 상태를 로드된 상태로 업데이트
+        _nodes.Clear();
+        _connections.Clear();
+        _groups.Clear();
+
+        foreach (var node in canvas.SerializableNodes)
+        {
+            AddNodeInternal(node);
+        }
+
+        foreach (var connection in canvas.SerializableConnections)
+        {
+            _connections.Add(connection);
+            OnConnectionAdded(connection);
+        }
+
+        foreach (var group in canvas.SerializableGroups)
+        {
+            _groups.Add(group);
+            OnGroupAdded(group);
+        }
     }
 }
 
