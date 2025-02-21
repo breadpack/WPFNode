@@ -16,7 +16,7 @@ public class TypeSelectorDialog : Window
     private readonly TextBox _searchBox;
     private readonly TreeView _namespaceTree;
     private Type? _selectedType;
-    private IEnumerable<NamespaceTypeNode>? _allNodes;
+    private IEnumerable<NamespaceTypeNode>? _allNodes;  // 이미 최상위 노드들만 포함
 
     public Type? SelectedType => _selectedType;
 
@@ -164,8 +164,8 @@ public class TypeSelectorDialog : Window
                 })
                 .Where(t => !t.IsAbstract && !t.IsGenericTypeDefinition && !t.IsInterface);
 
-        // 네임스페이스별로 그룹화하여 노드 생성
-        _allNodes = NamespaceTypeNode.CreateRootNodes(_pluginOnly).ToList();
+        // 네임스페이스별로 그룹화하여 노드 생성 (이미 최상위 노드만 반환)
+        _allNodes = CreateNamespaceNodes(allTypes).ToList();
     }
 
     private void InitializeNamespaceTree()
@@ -183,7 +183,7 @@ public class TypeSelectorDialog : Window
             {
                 node.SetFilteredTypes(null);
             }
-            InitializeNamespaceTree();
+            _namespaceTree.ItemsSource = _allNodes;
             return;
         }
 
@@ -192,11 +192,11 @@ public class TypeSelectorDialog : Window
 
         // 검색 조건에 맞는 타입들을 찾음
         var matchedTypes = _allNodes!
-            .SelectMany(n => n.Types)
+            .SelectMany(n => n.GetAllTypesInHierarchy())
             .Where(t => IsFuzzyMatch(t, terms))
             .ToList();
 
-        // 각 네임스페이스 노드에 필터링된 타입 설정
+        // 최상위 네임스페이스 노드들에만 필터링된 타입 설정
         foreach (var node in _allNodes!)
         {
             node.SetFilteredTypes(matchedTypes);
@@ -205,11 +205,6 @@ public class TypeSelectorDialog : Window
         // 매칭된 타입이 있는 노드만 표시
         var filteredNodes = _allNodes!
             .Where(n => n.HasMatchedTypes())
-            .Select(n => 
-            {
-                n.IsExpanded = true;
-                return n;
-            })
             .OrderBy(n => n.Name);
 
         _namespaceTree.ItemsSource = filteredNodes;
@@ -217,27 +212,69 @@ public class TypeSelectorDialog : Window
 
     private bool IsFuzzyMatch(Type type, string[] searchTerms)
     {
-        var typeName = type.Name.ToLower();
-        var namespaceName = (type.Namespace ?? "(No Namespace)").ToLower();
-        var fullName = $"{namespaceName}.{typeName}";
-
+        var typeName = type.Name;
+        var namespaceName = type.Namespace ?? "(No Namespace)";
+        
         return searchTerms.All(term =>
         {
-            var termChars = term.ToCharArray();
-            var currentPos = 0;
+            term = term.ToLower();
+            
+            // 1. 정확한 단어 매칭 (대소문자 구분 없이)
+            if (typeName.Equals(term, StringComparison.OrdinalIgnoreCase))
+                return true;
 
-            // 각 검색어의 문자가 순서대로 존재하는지 확인
-            foreach (var c in termChars)
+            // 2. 타입 이름이 검색어로 시작하는 경우
+            if (typeName.StartsWith(term, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            // 3. 파스칼 케이스 단어 매칭
+            var words = SplitPascalCase(typeName);
+            if (words.Any(w => w.Equals(term, StringComparison.OrdinalIgnoreCase)))
+                return true;
+
+            // 4. 약어 매칭 (대문자로만 구성된 검색어의 경우)
+            if (term.All(char.IsUpper) && term.Length >= 2)
             {
-                currentPos = fullName.IndexOf(c, currentPos);
-                if (currentPos == -1)
-                {
-                    return false;
-                }
-                currentPos++;
+                var acronym = string.Concat(words.Select(w => w.FirstOrDefault()));
+                if (acronym.Contains(term, StringComparison.OrdinalIgnoreCase))
+                    return true;
             }
-            return true;
+
+            // 5. 네임스페이스 매칭 (전체 또는 마지막 부분)
+            var nsWords = namespaceName.Split('.');
+            var lastNs = nsWords.LastOrDefault() ?? "";
+            return lastNs.Equals(term, StringComparison.OrdinalIgnoreCase) ||
+                   namespaceName.Equals(term, StringComparison.OrdinalIgnoreCase);
         });
+    }
+
+    private static IEnumerable<string> SplitPascalCase(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            yield break;
+
+        var currentWord = new System.Text.StringBuilder(input[0].ToString());
+        
+        for (int i = 1; i < input.Length; i++)
+        {
+            if (char.IsUpper(input[i]) && 
+                (char.IsLower(input[i - 1]) || 
+                 (i + 1 < input.Length && char.IsLower(input[i + 1]))))
+            {
+                yield return currentWord.ToString();
+                currentWord.Clear();
+            }
+            currentWord.Append(input[i]);
+        }
+        
+        if (currentWord.Length > 0)
+            yield return currentWord.ToString();
+    }
+
+    private string? GetParentNamespace(string fullNamespace)
+    {
+        var lastDotIndex = fullNamespace.LastIndexOf('.');
+        return lastDotIndex > 0 ? fullNamespace.Substring(0, lastDotIndex) : null;
     }
 
     private void OnTreeViewSelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
@@ -246,5 +283,48 @@ public class TypeSelectorDialog : Window
         {
             _selectedType = type;
         }
+    }
+
+    private IEnumerable<NamespaceTypeNode> CreateNamespaceNodes(IEnumerable<Type> types)
+    {
+        var namespaceGroups = types.GroupBy(t => t.Namespace ?? "(No Namespace)");
+        var nodes = new Dictionary<string, NamespaceTypeNode>();
+
+        foreach (var group in namespaceGroups)
+        {
+            var ns = group.Key;
+            var parts = ns.Split('.');
+            var currentNs = "";
+
+            for (int i = 0; i < parts.Length; i++)
+            {
+                var part = parts[i];
+                var fullNs = i == 0 ? part : $"{currentNs}.{part}";
+
+                if (!nodes.ContainsKey(fullNs))
+                {
+                    var node = new NamespaceTypeNode(fullNs, _pluginOnly);
+                    nodes[fullNs] = node;
+
+                    if (i > 0 && nodes.TryGetValue(currentNs, out var parentNode))
+                    {
+                        parentNode.AddChild(node);
+                    }
+                }
+
+                if (i == parts.Length - 1)
+                {
+                    foreach (var type in group.OrderBy(t => t.Name))
+                    {
+                        nodes[fullNs].Types.Add(type);
+                    }
+                }
+
+                currentNs = fullNs;
+            }
+        }
+
+        // 최상위 노드만 반환 (부모가 없는 노드들)
+        return nodes.Values.Where(n => !n.FullNamespace.Contains('.'));
     }
 } 
