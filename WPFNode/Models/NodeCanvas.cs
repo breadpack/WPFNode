@@ -20,7 +20,6 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
     private readonly INodePluginService _pluginService;
 
     public event PropertyChangedEventHandler? PropertyChanged;
-    public event EventHandler<INode>? NodeCreated;
     public event EventHandler<INode>? NodeAdded;
     public event EventHandler<INode>? NodeRemoved;
     public event EventHandler<IConnection>? ConnectionAdded;
@@ -31,11 +30,6 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
-
-    protected virtual void OnNodeCreated(INode node)
-    {
-        NodeCreated?.Invoke(this, node);
     }
 
     protected virtual void OnNodeAdded(INode node)
@@ -153,7 +147,7 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
 
         _nodes.Add(node);
         OnPropertyChanged(nameof(Nodes));
-        OnNodeCreated(node);
+        OnNodeAdded(node);
     }
 
     public void RemoveNode(INode node)
@@ -181,6 +175,7 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
 
         _nodes.Remove(nodeBase);
         OnPropertyChanged(nameof(Nodes));
+        OnNodeRemoved(node);
     }
 
     public IConnection Connect(IPort source, IPort target)

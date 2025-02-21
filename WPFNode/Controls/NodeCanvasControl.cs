@@ -12,8 +12,23 @@ using WPFNode.ViewModels.Nodes;
 using NodeCanvasViewModel = WPFNode.ViewModels.Nodes.NodeCanvasViewModel;
 using IWpfCommand = System.Windows.Input.ICommand;
 using CommunityToolkit.Mvvm.Input;
+using System.Collections.Specialized;
 
 namespace WPFNode.Controls;
+
+public class ViewportChangedEventArgs : EventArgs
+{
+    public double Scale { get; }
+    public double OffsetX { get; }
+    public double OffsetY { get; }
+
+    public ViewportChangedEventArgs(double scale, double offsetX, double offsetY)
+    {
+        Scale = scale;
+        OffsetX = offsetX;
+        OffsetY = offsetY;
+    }
+}
 
 public class NodeCanvasControl : Control
 {
@@ -132,6 +147,57 @@ public class NodeCanvasControl : Control
 
     public INodeCanvasViewModel? ViewModel => DataContext as INodeCanvasViewModel;
 
+    #region Events
+    public event EventHandler<NodeViewModel>? NodeAdded;
+    public event EventHandler<NodeViewModel>? NodeRemoved;
+    public event EventHandler<ConnectionViewModel>? ConnectionAdded;
+    public event EventHandler<ConnectionViewModel>? ConnectionRemoved;
+    public event EventHandler<NodeViewModel>? NodeMoved;
+    public event EventHandler<NodeViewModel>? NodeSelected;
+    public event EventHandler<NodeViewModel>? NodeDeselected;
+    public event EventHandler<ViewportChangedEventArgs>? ViewportChanged;
+
+    protected virtual void OnNodeAdded(NodeViewModel node)
+    {
+        NodeAdded?.Invoke(this, node);
+    }
+
+    protected virtual void OnNodeRemoved(NodeViewModel node)
+    {
+        NodeRemoved?.Invoke(this, node);
+    }
+
+    protected virtual void OnConnectionAdded(ConnectionViewModel connection)
+    {
+        ConnectionAdded?.Invoke(this, connection);
+    }
+
+    protected virtual void OnConnectionRemoved(ConnectionViewModel connection)
+    {
+        ConnectionRemoved?.Invoke(this, connection);
+    }
+
+    protected virtual void OnNodeMoved(NodeViewModel node)
+    {
+        NodeMoved?.Invoke(this, node);
+    }
+
+    protected virtual void OnNodeSelected(NodeViewModel node)
+    {
+        NodeSelected?.Invoke(this, node);
+    }
+
+    protected virtual void OnNodeDeselected(NodeViewModel node)
+    {
+        NodeDeselected?.Invoke(this, node);
+    }
+
+    protected virtual void OnViewportChanged(double scale, double offsetX, double offsetY)
+    {
+        ViewportChanged?.Invoke(this, new ViewportChangedEventArgs(scale, offsetX, offsetY));
+    }
+    #endregion
+
     static NodeCanvasControl()
     {
         DefaultStyleKeyProperty.OverrideMetadata(typeof(NodeCanvasControl),
@@ -190,11 +256,105 @@ public class NodeCanvasControl : Control
         if (e.OldValue is NodeCanvasViewModel oldViewModel)
         {
             _stateManager.Cleanup(oldViewModel);
+            UnsubscribeFromViewModelEvents(oldViewModel);
         }
 
         if (e.NewValue is NodeCanvasViewModel newViewModel)
         {
             _stateManager.Initialize(newViewModel);
+            SubscribeToViewModelEvents(newViewModel);
+        }
+    }
+
+    private void SubscribeToViewModelEvents(NodeCanvasViewModel viewModel)
+    {
+        viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        ((INotifyCollectionChanged)viewModel.Nodes).CollectionChanged += OnNodesCollectionChanged;
+        ((INotifyCollectionChanged)viewModel.Connections).CollectionChanged += OnConnectionsCollectionChanged;
+    }
+
+    private void UnsubscribeFromViewModelEvents(NodeCanvasViewModel viewModel)
+    {
+        viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        ((INotifyCollectionChanged)viewModel.Nodes).CollectionChanged -= OnNodesCollectionChanged;
+        ((INotifyCollectionChanged)viewModel.Connections).CollectionChanged -= OnConnectionsCollectionChanged;
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (sender is NodeCanvasViewModel viewModel)
+        {
+            switch (e.PropertyName)
+            {
+                case nameof(NodeCanvasViewModel.Scale):
+                case nameof(NodeCanvasViewModel.OffsetX):
+                case nameof(NodeCanvasViewModel.OffsetY):
+                    OnViewportChanged(viewModel.Scale, viewModel.OffsetX, viewModel.OffsetY);
+                    break;
+                case nameof(NodeCanvasViewModel.SelectedNode):
+                    if (viewModel.SelectedNode != null)
+                        OnNodeSelected(viewModel.SelectedNode);
+                    break;
+            }
+        }
+    }
+
+    private void OnNodesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        switch (e.Action)
+        {
+            case NotifyCollectionChangedAction.Add:
+                foreach (NodeViewModel node in e.NewItems!)
+                {
+                    OnNodeAdded(node);
+                    node.PropertyChanged += OnNodePropertyChanged;
+                }
+                break;
+            case NotifyCollectionChangedAction.Remove:
+                foreach (NodeViewModel node in e.OldItems!)
+                {
+                    OnNodeRemoved(node);
+                    node.PropertyChanged -= OnNodePropertyChanged;
+                }
+                break;
+        }
+    }
+
+    private void OnConnectionsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        switch (e.Action)
+        {
+            case NotifyCollectionChangedAction.Add:
+                foreach (ConnectionViewModel connection in e.NewItems!)
+                {
+                    OnConnectionAdded(connection);
+                }
+                break;
+            case NotifyCollectionChangedAction.Remove:
+                foreach (ConnectionViewModel connection in e.OldItems!)
+                {
+                    OnConnectionRemoved(connection);
+                }
+                break;
+        }
+    }
+
+    private void OnNodePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (sender is NodeViewModel node)
+        {
+            switch (e.PropertyName)
+            {
+                case nameof(NodeViewModel.Position):
+                    OnNodeMoved(node);
+                    break;
+                case nameof(NodeViewModel.IsSelected):
+                    if (node.IsSelected)
+                        OnNodeSelected(node);
+                    else
+                        OnNodeDeselected(node);
+                    break;
+            }
         }
     }
 

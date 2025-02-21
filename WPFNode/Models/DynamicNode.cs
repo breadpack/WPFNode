@@ -477,7 +477,7 @@ public class DynamicNode : NodeBase
                     originalNodes.Add(node);
                 }
 
-                _innerCanvas.NodeCreated += OnNodeCreated;
+                _innerCanvas.NodeAdded += OnNodeCreated;
 
                 // 내부 그래프 복원
                 var deserializedCanvas = JsonSerializer.Deserialize<NodeCanvas>(
@@ -501,7 +501,7 @@ public class DynamicNode : NodeBase
                 }
 
                 // 이벤트 핸들러 제거
-                _innerCanvas.NodeCreated -= OnNodeCreated;
+                _innerCanvas.NodeAdded -= OnNodeCreated;
             }
 
             // 프로퍼티 포트의 가시성 복원
