@@ -12,6 +12,9 @@ using IWpfCommand = System.Windows.Input.ICommand;
 using System.Windows.Data;
 using System.Collections;
 using System.ComponentModel;
+using System.Threading.Tasks;
+using System.Linq;
+using System.Threading;
 
 namespace WPFNode.ViewModels.Nodes;
 
@@ -91,20 +94,7 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
     private void InitializeCanvas()
     {
         // 캔버스의 현재 상태로 컬렉션 초기화
-        foreach (var node in _canvas.Nodes)
-        {
-            var nodeViewModel = CreateNodeViewModel(node);
-            RegisterNodeEvents(nodeViewModel);
-            Nodes.Add(nodeViewModel);
-        }
-
-        foreach (var connection in _canvas.Connections)
-        {
-            var connectionViewModel = new ConnectionViewModel(connection, this);
-            RegisterConnectionEvents(connectionViewModel);
-            Connections.Add(connectionViewModel);
-        }
-
+        SynchronizeWithModel();
         RegisterCanvasEvents();
     }
 
@@ -117,6 +107,81 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
         _canvas.ConnectionRemoved += OnConnectionRemoved;
         _canvas.GroupAdded += OnGroupAdded;
         _canvas.GroupRemoved += OnGroupRemoved;
+    }
+
+    private void UnregisterCanvasEvents()
+    {
+        // Model 변경 감지를 위한 이벤트 핸들러 해제
+        _canvas.NodeAdded -= OnNodeAdded;
+        _canvas.NodeRemoved -= OnNodeRemoved;
+        _canvas.ConnectionAdded -= OnConnectionAdded;
+        _canvas.ConnectionRemoved -= OnConnectionRemoved;
+        _canvas.GroupAdded -= OnGroupAdded;
+        _canvas.GroupRemoved -= OnGroupRemoved;
+    }
+
+    /// <summary>
+    /// 캔버스의 모든 내용을 제거합니다.
+    /// </summary>
+    private void ClearCanvas()
+    {
+        foreach (var connection in _canvas.Connections.ToList())
+        {
+            _canvas.Disconnect(connection);
+        }
+        foreach (var node in _canvas.Nodes.ToList())
+        {
+            _canvas.RemoveNode(node);
+        }
+        foreach (var group in _canvas.Groups.ToList())
+        {
+            _canvas.RemoveGroup(group);
+        }
+    }
+
+    /// <summary>
+    /// 소스 캔버스의 내용을 현재 캔버스로 복사합니다.
+    /// </summary>
+    private void CopyFromCanvas(NodeCanvas sourceCanvas)
+    {
+        // 새 캔버스의 내용을 복사
+        foreach (var node in sourceCanvas.Nodes)
+        {
+            var newNode = _canvas.CreateNodeWithId(node.Id, node.GetType(), node.X, node.Y);
+            if (newNode is NodeBase newNodeBase && node is NodeBase sourceNodeBase)
+            {
+                newNodeBase.Name = sourceNodeBase.Name;
+                newNodeBase.Description = sourceNodeBase.Description;
+            }
+        }
+        foreach (var connection in sourceCanvas.Connections)
+        {
+            var sourcePort = _canvas.Nodes
+                .SelectMany(n => n.OutputPorts)
+                .FirstOrDefault(p => p.Id == connection.SourcePortId);
+            var targetPort = _canvas.Nodes
+                .SelectMany(n => n.InputPorts)
+                .FirstOrDefault(p => p.Id == connection.TargetPortId);
+            
+            if (sourcePort != null && targetPort != null)
+            {
+                Console.WriteLine($"연결 복원 시도: {connection.Id}");
+                _canvas.ConnectWithId(connection.Id, sourcePort, targetPort);
+                Console.WriteLine($"연결 복원 성공: {connection.Id}");
+            }
+        }
+        foreach (var group in sourceCanvas.Groups)
+        {
+            var nodes = group.Nodes
+                .Select(n => _canvas.Nodes.FirstOrDefault(cn => cn.Id == n.Id))
+                .Where(n => n != null)
+                .Cast<NodeBase>()
+                .ToList();
+            if (nodes.Any())
+            {
+                _canvas.CreateGroupWithId(group.Id, nodes, group.Name);
+            }
+        }
     }
 
     private void OnNodeAdded(object? sender, INode node)
@@ -175,48 +240,39 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
     /// </summary>
     private void SynchronizeWithModel()
     {
-        // 기존 이벤트 핸들러 정리
-        foreach (var node in Nodes)
+        // 컬렉션 동기화 일시 중지
+        BindingOperations.DisableCollectionSynchronization(Nodes);
+        BindingOperations.DisableCollectionSynchronization(Connections);
+        BindingOperations.DisableCollectionSynchronization(Groups);
+
+        Nodes.Clear();
+        foreach (var node in _canvas.Nodes)
         {
-            UnregisterNodeEvents(node);
-        }
-        foreach (var connection in Connections)
-        {
-            UnregisterConnectionEvents(connection);
-        }
-        foreach (var group in Groups)
-        {
-            UnregisterGroupEvents(group);
+            var nodeViewModel = CreateNodeViewModel(node);
+            RegisterNodeEvents(nodeViewModel);
+            Nodes.Add(nodeViewModel);
         }
 
-        using (var nodes = new DeferredCollectionChange(Nodes))
-        using (var connections = new DeferredCollectionChange(Connections))
-        using (var groups = new DeferredCollectionChange(Groups))
+        Connections.Clear();
+        foreach (var connection in _canvas.Connections)
         {
-            Nodes.Clear();
-            foreach (var node in _canvas.Nodes)
-            {
-                var nodeViewModel = CreateNodeViewModel(node);
-                RegisterNodeEvents(nodeViewModel);
-                Nodes.Add(nodeViewModel);
-            }
-
-            Connections.Clear();
-            foreach (var connection in _canvas.Connections)
-            {
-                var connectionViewModel = new ConnectionViewModel(connection, this);
-                RegisterConnectionEvents(connectionViewModel);
-                Connections.Add(connectionViewModel);
-            }
-
-            Groups.Clear();
-            foreach (var group in _canvas.Groups)
-            {
-                var groupViewModel = new NodeGroupViewModel(group, this);
-                RegisterGroupEvents(groupViewModel);
-                Groups.Add(groupViewModel);
-            }
+            var connectionViewModel = new ConnectionViewModel(connection, this);
+            RegisterConnectionEvents(connectionViewModel);
+            Connections.Add(connectionViewModel);
         }
+
+        Groups.Clear();
+        foreach (var group in _canvas.Groups)
+        {
+            var groupViewModel = new NodeGroupViewModel(group, this);
+            RegisterGroupEvents(groupViewModel);
+            Groups.Add(groupViewModel);
+        }
+
+        // 컬렉션 동기화 재개
+        BindingOperations.EnableCollectionSynchronization(Nodes, new object());
+        BindingOperations.EnableCollectionSynchronization(Connections, new object());
+        BindingOperations.EnableCollectionSynchronization(Groups, new object());
     }
 
     private void RegisterNodeEvents(NodeViewModel node)
@@ -342,7 +398,19 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
         }
 
         // 새 연결 생성
-        _canvas.Connect(source.Model, target.Model);
+        var sourcePort = _canvas.Nodes
+            .SelectMany(n => n.InputPorts.Cast<IPort>().Concat(n.OutputPorts.Cast<IPort>()))
+            .FirstOrDefault(p => p.Id == ports.source.Id);
+        var targetPort = _canvas.Nodes
+            .SelectMany(n => n.InputPorts.Cast<IPort>().Concat(n.OutputPorts.Cast<IPort>()))
+            .FirstOrDefault(p => p.Id == ports.target.Id);
+        
+        if (sourcePort != null && targetPort != null)
+        {
+            Console.WriteLine($"연결 복원 시도: {ports.source.Id}");
+            _canvas.Connect(sourcePort, targetPort);
+            Console.WriteLine($"연결 복원 성공: {ports.source.Id}");
+        }
     }
 
     private void ExecuteDisconnect((NodePortViewModel source, NodePortViewModel target) ports)
@@ -465,7 +533,7 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
         {
             try
             {
-                await _canvas.SaveToFileAsync(dialog.FileName);
+                await SaveAsync(dialog.FileName);
                 MessageBox.Show("캔버스가 저장되었습니다.", "저장 완료", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
@@ -487,14 +555,90 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
         {
             try
             {
-                await _canvas.LoadFromFileAsync(dialog.FileName);
-                SynchronizeWithModel();
+                await LoadAsync(dialog.FileName);
                 MessageBox.Show("캔버스를 불러왔습니다.", "불러오기 완료", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"불러오기 중 오류가 발생했습니다: {ex.Message}", "불러오기 오류", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+    }
+
+    public async Task SaveAsync(string filePath)
+    {
+        ArgumentNullException.ThrowIfNull(filePath);
+        await _canvas.SaveToFileAsync(filePath);
+    }
+
+    public async Task LoadAsync(string filePath)
+    {
+        ArgumentNullException.ThrowIfNull(filePath);
+        await _canvas.LoadFromFileAsync(filePath);
+        SynchronizeWithModel();
+    }
+
+    public async Task<string> ToJsonAsync()
+    {
+        return await Task.Run(() => _canvas.ToJson());
+    }
+
+    public async Task LoadFromJsonAsync(string json)
+    {
+        ArgumentNullException.ThrowIfNull(json);
+        
+        // JSON 파싱은 백그라운드 스레드에서 수행
+        var newCanvas = await Task.Run(() => NodeCanvas.FromJson(json));
+        
+        // UI 관련 작업은 메인 스레드에서 수행
+        var context = SynchronizationContext.Current;
+        if (context != null)
+        {
+            var tcs = new TaskCompletionSource();
+            context.Post(_ =>
+            {
+                try
+                {
+                    // 컬렉션 동기화 일시 중지
+                    BindingOperations.DisableCollectionSynchronization(Nodes);
+                    BindingOperations.DisableCollectionSynchronization(Connections);
+                    BindingOperations.DisableCollectionSynchronization(Groups);
+
+                    UnregisterCanvasEvents();
+                    ClearCanvas();
+                    
+                    // 이벤트 핸들러 등록
+                    _canvas.NodeAdded += OnNodeAdded;
+                    _canvas.NodeRemoved += OnNodeRemoved;
+                    _canvas.ConnectionAdded += OnConnectionAdded;
+                    _canvas.ConnectionRemoved += OnConnectionRemoved;
+                    _canvas.GroupAdded += OnGroupAdded;
+                    _canvas.GroupRemoved += OnGroupRemoved;
+                    
+                    CopyFromCanvas(newCanvas);
+                    SynchronizeWithModel();
+
+                    // 컬렉션 동기화 재개
+                    BindingOperations.EnableCollectionSynchronization(Nodes, new object());
+                    BindingOperations.EnableCollectionSynchronization(Connections, new object());
+                    BindingOperations.EnableCollectionSynchronization(Groups, new object());
+
+                    tcs.SetResult();
+                }
+                catch (Exception ex)
+                {
+                    tcs.SetException(ex);
+                }
+            }, null);
+            await tcs.Task;
+        }
+        else
+        {
+            UnregisterCanvasEvents();
+            ClearCanvas();
+            CopyFromCanvas(newCanvas);
+            RegisterCanvasEvents();
+            SynchronizeWithModel();
         }
     }
 }

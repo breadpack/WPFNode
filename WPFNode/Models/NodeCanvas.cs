@@ -229,6 +229,7 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         source.AddConnection(connection);
         target.AddConnection(connection);
         _connections.Add(connection);
+        OnConnectionAdded(connection);
         OnPropertyChanged(nameof(Connections));
         return connection;
     }
@@ -385,6 +386,7 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         source.AddConnection(connection);
         target.AddConnection(connection);
         _connections.Add(connection);
+        OnConnectionAdded(connection);
         OnPropertyChanged(nameof(Connections));
         return connection;
     }

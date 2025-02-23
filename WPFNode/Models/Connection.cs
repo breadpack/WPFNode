@@ -71,10 +71,8 @@ public class Connection : IConnection
     public void WriteJson(Utf8JsonWriter writer)
     {
         writer.WriteString("Id", Id.ToString());
-        writer.WriteString("SourceNodeId", Source.Node!.Id.ToString());
-        writer.WriteNumber("SourcePortIndex", Source.GetPortIndex());
-        writer.WriteString("TargetNodeId", Target.Node!.Id.ToString());
-        writer.WriteNumber("TargetPortIndex", Target.GetPortIndex());
+        writer.WriteString("SourcePortId", Source.Id.ToString());
+        writer.WriteString("TargetPortId", Target.Id.ToString());
         writer.WriteBoolean("IsEnabled", IsEnabled);
     }
 
