@@ -15,7 +15,7 @@ public class Connection : IConnection
     {
     }
 
-    public Connection(Guid id, IOutputPort source, IInputPort target)
+    public Connection(Guid guid, IOutputPort source, IInputPort target)
     {
         if (source == null)
             throw new NodeConnectionException("소스 포트가 null입니다.");
@@ -26,7 +26,7 @@ public class Connection : IConnection
         if (target.Node == null)
             throw new NodeConnectionException("타겟 포트가 노드에 연결되어 있지 않습니다.", source, target);
 
-        Id = id;
+        Guid = guid;
         Source = source;
         Target = target;
         
@@ -36,7 +36,7 @@ public class Connection : IConnection
     }
 
     [JsonPropertyName("id")]
-    public Guid Id { get; }
+    public Guid Guid { get; }
     
     [JsonPropertyName("source")]
     public IOutputPort Source { get; }
@@ -70,7 +70,7 @@ public class Connection : IConnection
 
     public void WriteJson(Utf8JsonWriter writer)
     {
-        writer.WriteString("Id", Id.ToString());
+        writer.WriteString("Guid", Guid.ToString());
         writer.WriteString("SourcePortId", Source.Id.ToString());
         writer.WriteString("TargetPortId", Target.Id.ToString());
         writer.WriteBoolean("IsEnabled", IsEnabled);

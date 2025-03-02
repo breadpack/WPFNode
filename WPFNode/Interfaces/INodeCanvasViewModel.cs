@@ -59,4 +59,25 @@ public interface INodeCanvasViewModel
     /// </summary>
     /// <param name="json">캔버스의 JSON 표현</param>
     Task LoadFromJsonAsync(string json);
+
+    /// <summary>
+    /// ID로 노드를 찾습니다.
+    /// </summary>
+    /// <param name="nodeId">찾을 노드의 ID</param>
+    /// <returns>찾은 노드의 ViewModel, 없으면 null</returns>
+    NodeViewModel? FindNodeById(Guid nodeId);
+
+    /// <summary>
+    /// 이름으로 노드를 찾습니다.
+    /// </summary>
+    /// <param name="name">찾을 노드의 이름</param>
+    /// <returns>찾은 노드들의 ViewModel 목록</returns>
+    IEnumerable<NodeViewModel> FindNodesByName(string name);
+
+    /// <summary>
+    /// 타입으로 노드를 찾습니다.
+    /// </summary>
+    /// <param name="nodeType">찾을 노드의 타입</param>
+    /// <returns>찾은 노드들의 ViewModel 목록</returns>
+    IEnumerable<NodeViewModel> FindNodesByType(Type nodeType);
 } 

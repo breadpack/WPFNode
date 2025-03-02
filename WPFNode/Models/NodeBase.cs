@@ -9,28 +9,32 @@ using WPFNode.Constants;
 using WPFNode.Interfaces;
 using WPFNode.Models.Properties;
 using WPFNode.Models.Serialization;
+using System.Windows;
+using Microsoft.Extensions.Logging;
 
 namespace WPFNode.Models;
 
-public abstract class NodeBase : INode
-{
-    private string _name = string.Empty;
-    private readonly string _category;
-    private string _description = string.Empty;
-    private double _x;
-    private double _y;
-    private bool _isVisible = true;
-    private readonly List<IInputPort> _inputPorts = new();
-    private readonly List<IOutputPort> _outputPorts = new();
-    private readonly Dictionary<string, INodeProperty> _properties = new();
-    private bool _isInitialized;
-    private readonly INodeCanvas _canvas;
+public abstract class NodeBase : INode, INotifyPropertyChanged {
+    private          string                            _id   = string.Empty;
+    private          string                            _name = string.Empty;
+    private readonly string                            _category;
+    private          string                            _description = string.Empty;
+    private          double                            _x;
+    private          double                            _y;
+    private          bool                              _isVisible   = true;
+    private readonly List<IInputPort>                  _inputPorts  = new();
+    private readonly List<IOutputPort>                 _outputPorts = new();
+    private readonly Dictionary<string, INodeProperty> _properties  = new();
+    private          bool                              _isInitialized;
+    private readonly INodeCanvas                       _canvas;
+    protected readonly ILogger? Logger;
 
     [JsonConstructor]
-    protected NodeBase(INodeCanvas canvas, Guid id)
+    protected NodeBase(INodeCanvas canvas, Guid guid, ILogger? logger = null)
     {
         _canvas = canvas ?? throw new ArgumentNullException(nameof(canvas));
-        Id      = id;
+        Guid      = guid;
+        Logger = logger;
 
         // 어트리뷰트에서 직접 값을 가져옴
         var type = GetType();
@@ -45,7 +49,13 @@ public abstract class NodeBase : INode
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public Guid Id { get; internal set; }
+    public Guid Guid { get; private set; }
+    
+    public string Id
+    {
+        get => _id;
+        set => SetField(ref _id, value);
+    }
 
     public string Name
     {
@@ -85,17 +95,7 @@ public abstract class NodeBase : INode
     public IReadOnlyList<IOutputPort> OutputPorts => _outputPorts;
     public IReadOnlyDictionary<string, INodeProperty> Properties => _properties;
 
-    public bool IsInitialized => _isInitialized;
-
     internal INodeCanvas Canvas => _canvas;
-
-    public virtual void Initialize()
-    {
-        if (_isInitialized)
-            return;
-
-        _isInitialized = true;
-    }
 
     protected virtual InputPort<T> CreateInputPort<T>(string name)
     {
@@ -263,16 +263,15 @@ public abstract class NodeBase : INode
         throw new NotSupportedException($"명령 {commandName}을(를) 처리할 수 없습니다.");
     }
 
-    public virtual NodeBase CreateCopy(double offsetX = 20, double offsetY = 20)
+    public NodeBase CreateCopy(double offsetX = 20, double offsetY = 20)
     {
         var copy = (NodeBase)MemberwiseClone();
-        copy.Id = Guid.NewGuid();
+        copy.Guid = Guid.NewGuid();
         copy.X += offsetX;
         copy.Y += offsetY;
 
         copy._inputPorts.Clear();
         copy._outputPorts.Clear();
-        copy.Initialize();
 
         return copy;
     }
@@ -315,15 +314,19 @@ public abstract class NodeBase : INode
         ClearProperties();
     }
 
-    public abstract Task ProcessAsync();
+    public virtual async Task ExecuteAsync(CancellationToken cancellationToken = default)
+    {
+        Logger?.LogDebug("Executing node {NodeName}", Name);
+        await ProcessAsync(cancellationToken);
+    }
+
+    protected abstract Task ProcessAsync(CancellationToken cancellationToken = default);
 
     public virtual void WriteJson(Utf8JsonWriter writer)
     {
-        writer.WriteString("Id", Id.ToString());
+        writer.WriteString("Guid", Guid.ToString());
+        writer.WriteString("Id", Id);
         writer.WriteString("Type", GetType().AssemblyQualifiedName);
-        writer.WriteString("Name", Name);
-        writer.WriteString("Category", Category);
-        writer.WriteString("Description", Description);
         writer.WriteNumber("X", X);
         writer.WriteNumber("Y", Y);
         writer.WriteBoolean("IsVisible", IsVisible);
@@ -336,7 +339,6 @@ public abstract class NodeBase : INode
             {
                 writer.WriteStartObject();
                 writer.WriteString("Key", property.Key);
-                writer.WriteString("Name", property.Value.DisplayName);
                 writer.WriteString("DisplayName", property.Value.DisplayName);
                 writer.WriteString("Type", property.Value.PropertyType.AssemblyQualifiedName);
                 writer.WriteString("Format", property.Value.Format);
@@ -361,10 +363,8 @@ public abstract class NodeBase : INode
         try
         {
             // 기본 속성 복원
-            if (element.TryGetProperty("Name", out var nameElement))
-                Name = nameElement.GetString() ?? Name;
-            if (element.TryGetProperty("Description", out var descElement))
-                Description = descElement.GetString() ?? Description;
+            if (element.TryGetProperty("Id", out var idElement))
+                Id = idElement.GetString() ?? string.Empty;
             if (element.TryGetProperty("X", out var xElement))
                 X = xElement.GetDouble();
             if (element.TryGetProperty("Y", out var yElement))
@@ -397,5 +397,12 @@ public abstract class NodeBase : INode
         {
             throw new JsonException($"노드 {Name} ({GetType().Name}) 역직렬화 중 오류 발생", ex);
         }
+    }
+
+    public virtual async Task SetParameterAsync(object parameter)
+    {
+        // 기본 구현은 아무것도 하지 않습니다.
+        // 파생 클래스에서 필요한 경우 이 메서드를 재정의하여 파라미터를 처리할 수 있습니다.
+        await Task.CompletedTask;
     }
 } 

@@ -11,32 +11,30 @@ using WPFNode.Models.Serialization;
 using WPFNode.Services;
 using WPFNode.ViewModels.Nodes;
 using ICommand = System.Windows.Input.ICommand;
+using System.Windows.Input;
+using CommunityToolkit.Mvvm.ComponentModel;
+using System.Threading.Tasks;
+using WPFNode.Demo.Models;
+using WPFNode.Demo.Nodes;
 
 namespace WPFNode.Demo.ViewModels;
 
-public class MainWindowViewModel : INotifyPropertyChanged
+public partial class MainWindowViewModel : ObservableObject
 {
     private readonly INodePluginService _pluginService;
     private readonly INodeCommandService _commandService;
-    private NodeCanvasViewModel? _nodeCanvasViewModel;
     private readonly string _saveFilePath;
     private readonly JsonSerializerOptions _jsonOptions;
 
-    public event PropertyChangedEventHandler? PropertyChanged;
+    [ObservableProperty]
+    private NodeCanvasViewModel _nodeCanvasViewModel;
 
-    public NodeCanvasViewModel? NodeCanvasViewModel
-    {
-        get => _nodeCanvasViewModel;
-        private set
-        {
-            _nodeCanvasViewModel = value;
-            OnPropertyChanged();
-        }
-    }
+    public event PropertyChangedEventHandler? PropertyChanged;
 
     public ICommand AutoLayoutCommand { get; }
     public ICommand SaveCommand { get; }
     public ICommand LoadCommand { get; }
+    public ICommand LoadedCommand { get; }
 
     public MainWindowViewModel()
     {
@@ -60,6 +58,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
         AutoLayoutCommand = new RelayCommand(ExecuteAutoLayout, CanExecuteAutoLayout);
         SaveCommand = new RelayCommand(SaveCanvas);
         LoadCommand = new RelayCommand(LoadCanvas);
+        LoadedCommand = new AsyncRelayCommand(OnLoadedAsync);
 
         Initialize();
     }
@@ -113,6 +112,36 @@ public class MainWindowViewModel : INotifyPropertyChanged
             OffsetX = 0,
             OffsetY = 0
         };
+
+        // 기본 노드 생성
+        var canvas = NodeCanvasViewModel.Model;
+        canvas.CreateNode(typeof(TableInputNode), 100, 100);
+    }
+
+    private async Task OnLoadedAsync()
+    {
+        try
+        {
+            var canvas = NodeCanvasViewModel.Model;
+            
+            // 각 노드 타입별로 필요한 초기 데이터 설정
+            var parameters = new Dictionary<Guid, object>();
+
+            // TableInputNode가 있다면 데이터 설정
+            var tableInputNode = canvas.Q<TableInputNode>();
+            if (tableInputNode != null)
+            {
+                var employeeData = TableDataGenerator.CreateSampleEmployeeData();
+                parameters[tableInputNode.Guid] = employeeData;
+            }
+
+            // 파라미터와 함께 실행
+            await canvas.ExecuteAsync(parameters);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"노드 실행 중 오류 발생: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     public void SaveCanvas()

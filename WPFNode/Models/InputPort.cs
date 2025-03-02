@@ -6,11 +6,11 @@ using WPFNode.Exceptions;
 
 namespace WPFNode.Models;
 
-public class InputPort<T> : IInputPort, INotifyPropertyChanged {
-    private readonly List<IConnection>                 _connections = new();
-    private readonly Dictionary<Type, Func<object, T>> _converters  = new();
+public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
+    private readonly Dictionary<Type, Func<object, T>> _converters = new();
     private readonly int                               _index;
-    private bool                                      _isVisible = true;
+    private          bool                              _isVisible = true;
+    private          IConnection?                      _connection;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -20,32 +20,27 @@ public class InputPort<T> : IInputPort, INotifyPropertyChanged {
         _index = index;
     }
 
-    public PortId                     Id             => new(Node.Id, true, _index);
-    public string                     Name           { get; set; }
-    public Type                       DataType       => typeof(T);
-    public bool                       IsInput        => true;
-    public bool                       IsConnected    => _connections.Count > 0;
-    public bool                       IsVisible      
-    {
+    public PortId Id          => new(Node.Guid, true, _index);
+    public string Name        { get; set; }
+    public Type   DataType    => typeof(T);
+    public bool   IsInput     => true;
+    public bool   IsConnected => _connection != null;
+
+    public bool IsVisible {
         get => _isVisible;
-        set
-        {
-            if (_isVisible != value)
-            {
-                if (!value && IsConnected)
-                {
-                    // IsVisible이 false로 설정되고 연결이 있는 경우에만 연결 해제
-                    foreach (var connection in Connections.ToArray())
-                    {
-                        connection.Disconnect();
-                    }
+        set {
+            if (_isVisible != value) {
+                if (!value && IsConnected) {
+                    _connection?.Disconnect();
                 }
+
                 _isVisible = value;
                 OnPropertyChanged(nameof(IsVisible));
             }
         }
     }
-    public IReadOnlyList<IConnection> Connections    => _connections;
+
+    public IReadOnlyList<IConnection> Connections    => _connection != null ? new[] { _connection } : Array.Empty<IConnection>();
     public INode                      Node           { get; private set; }
     public int                        GetPortIndex() => _index;
 
@@ -69,65 +64,61 @@ public class InputPort<T> : IInputPort, INotifyPropertyChanged {
         return sourceType.CanImplicitlyConvertTo(typeof(T));
     }
 
-    public object? Value {
-        get {
-            // 연결된 OutputPort로부터 값을 가져옴
-            if (_connections.Count > 0 && _connections[0].Source is IOutputPort outputPort) {
-                var sourceValue = outputPort.Value;
-                if (sourceValue == null) return default(T);
-
-                // 1. 컨버터를 통한 변환 시도
-                if (_converters.TryGetValue(sourceValue.GetType(), out var converter)) {
-                    return converter(sourceValue);
-                }
-
-                // 2. 타입 변환 시도
-                if (sourceValue.TryConvertTo(out T? convertedValue)) {
-                    return convertedValue;
-                }
-            }
-
-            return default(T);
-        }
-    }
-
     public T? GetValueOrDefault(T? defaultValue = default) {
-        var value = Value;
-        return value is T typedValue ? typedValue : defaultValue;
+        if (_connection?.Source is { } outputPort) {
+            var sourceValue = outputPort.Value;
+            if (sourceValue == null) return defaultValue;
+
+            if (_converters.TryGetValue(sourceValue.GetType(), out var converter)) {
+                return converter(sourceValue);
+            }
+            
+            if (sourceValue.TryConvertTo(out T? convertedValue)) {
+                return convertedValue;
+            }
+        }
+        return defaultValue;
     }
 
     public void AddConnection(IConnection connection) {
         if (connection == null)
             throw new ArgumentNullException(nameof(connection));
-        _connections.Add(connection);
+
+        // 기존 연결이 있으면 제거
+        _connection?.Disconnect();
+
+        _connection = connection;
         OnPropertyChanged(nameof(Connections));
         OnPropertyChanged(nameof(IsConnected));
     }
 
-    public void RemoveConnection(IConnection connection)
-    {
+    public void RemoveConnection(IConnection connection) {
         if (connection == null)
             throw new NodeConnectionException("연결이 null입니다.");
         if (!connection.Target.Equals(this))
             throw new NodeConnectionException("연결의 타겟 포트가 일치하지 않습니다.", this, connection.Target);
-            
-        _connections.Remove(connection);
-        OnPropertyChanged(nameof(Connections));
-        OnPropertyChanged(nameof(IsConnected));
+
+        if (_connection == connection) {
+            _connection = null;
+            OnPropertyChanged(nameof(Connections));
+            OnPropertyChanged(nameof(IsConnected));
+        }
     }
 
-    public IConnection Connect(IOutputPort source)
-    {
+    public IConnection Connect(IOutputPort source) {
         if (source == null)
             throw new NodeConnectionException("소스 포트가 null입니다.");
-            
+
         if (!CanAcceptType(source.DataType))
             throw new NodeConnectionException("타입이 호환되지 않습니다.", source, this);
-            
+
         if (source.Node == Node)
             throw new NodeConnectionException("같은 노드의 포트와는 연결할 수 없습니다.", source, this);
-            
-        // Canvas를 통해 연결 생성
+
+        // 기존 연결이 있으면 삭제
+        _connection?.Disconnect();
+
+        // Canvas를 통해 새로운 연결 생성
         var canvas = ((NodeBase)Node!).Canvas;
         return canvas.Connect(source, this);
     }
@@ -136,8 +127,7 @@ public class InputPort<T> : IInputPort, INotifyPropertyChanged {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
-    public void WriteJson(Utf8JsonWriter writer)
-    {
+    public void WriteJson(Utf8JsonWriter writer) {
         writer.WriteStartObject();
         writer.WriteString("Name", Name);
         writer.WriteString("Type", DataType.AssemblyQualifiedName);
@@ -146,8 +136,7 @@ public class InputPort<T> : IInputPort, INotifyPropertyChanged {
         writer.WriteEndObject();
     }
 
-    public void ReadJson(JsonElement element)
-    {
+    public void ReadJson(JsonElement element) {
         if (element.TryGetProperty("Name", out var nameElement))
             Name = nameElement.GetString()!;
         if (element.TryGetProperty("IsVisible", out var visibleElement))

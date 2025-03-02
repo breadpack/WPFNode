@@ -20,7 +20,7 @@ public class OutputPort<T> : IOutputPort, INotifyPropertyChanged {
         _index = index;
     }
 
-    public PortId                     Id             => new(Node.Id, false, _index);
+    public PortId                     Id             => new(Node.Guid, false, _index);
     public string                     Name           { get; set; }
     public Type                       DataType       => typeof(T);
     public bool                       IsInput        => false;
@@ -50,23 +50,6 @@ public class OutputPort<T> : IOutputPort, INotifyPropertyChanged {
     public object? Value {
         get => _value;
         set {
-            // 현재 실행 중인 스택 추적을 확인
-            var stackTrace = new System.Diagnostics.StackTrace();
-            var isCalledFromProcess = stackTrace.GetFrames()
-                ?.Any(frame => {
-                    var method = frame.GetMethod();
-                    return method?.Name == nameof(INode.ProcessAsync) ||
-                           method?.Name == "WriteJson" || // 직렬화는 허용
-                           method?.Name == "ReadJson" ||  // 역직렬화는 허용
-                           method?.DeclaringType?.Name == "DynamicNode"; // DynamicNode에서의 호출 허용
-                }) ?? false;
-
-            if (!isCalledFromProcess)
-            {
-                throw new InvalidOperationException(
-                    "OutputPort의 값은 Node의 ProcessAsync 메서드 내에서만 설정할 수 있습니다.");
-            }
-
             if (value is T typedValue && !Equals(_value, typedValue)) {
                 _value = typedValue;
                 OnPropertyChanged(nameof(Value));

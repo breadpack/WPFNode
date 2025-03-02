@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
@@ -10,7 +11,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\WPFNode.Plugins.Basic\WPFNode.Plugins.Basic.csproj"/>
+    <ProjectReference Include="..\WPFNode\WPFNode.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.77" />
+    <PackageReference Include="ClosedXML" Version="0.102.2" />
   </ItemGroup>
 
 </Project> 

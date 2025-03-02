@@ -13,7 +13,7 @@ namespace WPFNode.Plugins.Basic.Primitives;
 [NodeStyle(StyleKeys.Input.String)]
 public class StringInputNode : InputNodeBase<string>
 {
-    public StringInputNode(INodeCanvas canvas, Guid id) : base(canvas, id)
+    public StringInputNode(INodeCanvas canvas, Guid guid) : base(canvas, guid)
     {
         // 기본값 설정
         Value = string.Empty;

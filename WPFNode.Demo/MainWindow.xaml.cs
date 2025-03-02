@@ -2,6 +2,7 @@ using System.Windows;
 using WPFNode.Demo.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using WPFNode.Controls;
+using WPFNode.Models;
 using WPFNode.ViewModels.Nodes;
 
 namespace WPFNode.Demo
@@ -11,28 +12,30 @@ namespace WPFNode.Demo
     /// </summary>
     public partial class MainWindow : Window
     {
-        private readonly NodeCanvasControl _nodeCanvas;
+        private readonly NodeCanvasControl _nodeCanvasControl;
+
+        public NodeCanvas NodeCanvas => (DataContext as MainWindowViewModel)?.NodeCanvasViewModel?.Model;
 
         public MainWindow()
         {
             InitializeComponent();
-            _nodeCanvas = (NodeCanvasControl)FindName("NodeCanvas");
+            _nodeCanvasControl = (NodeCanvasControl)FindName("NodeCanvasControl");
             
-            if (_nodeCanvas != null)
+            if (_nodeCanvasControl != null)
             {
                 // 노드 관련 이벤트
-                _nodeCanvas.NodeAdded += OnNodeAdded;
-                _nodeCanvas.NodeRemoved += OnNodeRemoved;
-                _nodeCanvas.NodeMoved += OnNodeMoved;
-                _nodeCanvas.NodeSelected += OnNodeSelected;
-                _nodeCanvas.NodeDeselected += OnNodeDeselected;
+                _nodeCanvasControl.NodeAdded += OnNodeAdded;
+                _nodeCanvasControl.NodeRemoved += OnNodeRemoved;
+                _nodeCanvasControl.NodeMoved += OnNodeMoved;
+                _nodeCanvasControl.NodeSelected += OnNodeSelected;
+                _nodeCanvasControl.NodeDeselected += OnNodeDeselected;
 
                 // 연결 관련 이벤트
-                _nodeCanvas.ConnectionAdded += OnConnectionAdded;
-                _nodeCanvas.ConnectionRemoved += OnConnectionRemoved;
+                _nodeCanvasControl.ConnectionAdded += OnConnectionAdded;
+                _nodeCanvasControl.ConnectionRemoved += OnConnectionRemoved;
 
                 // 뷰포트 변경 이벤트
-                _nodeCanvas.ViewportChanged += OnViewportChanged;
+                _nodeCanvasControl.ViewportChanged += OnViewportChanged;
             }
         }
 
@@ -71,14 +74,14 @@ namespace WPFNode.Demo
 
         private void OnConnectionAdded(object? sender, ConnectionViewModel connection)
         {
-            LogEvent($"연결 추가됨: {connection.Model.Id}, " +
+            LogEvent($"연결 추가됨: {connection.Model.Guid}, " +
                     $"시작: {connection.Model.Source.Node.Id}, " +
                     $"끝: {connection.Model.Target.Node.Id}");
         }
 
         private void OnConnectionRemoved(object? sender, ConnectionViewModel connection)
         {
-            LogEvent($"연결 제거됨: {connection.Model.Id}");
+            LogEvent($"연결 제거됨: {connection.Model.Guid}");
         }
 
         private void OnViewportChanged(object? sender, ViewportChangedEventArgs e)

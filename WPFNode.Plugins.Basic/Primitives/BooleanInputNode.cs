@@ -13,7 +13,7 @@ namespace WPFNode.Plugins.Basic.Primitives;
 [NodeStyle(StyleKeys.Input.Boolean)]
 public class BooleanInputNode : InputNodeBase<bool>
 {
-    public BooleanInputNode(INodeCanvas canvas, Guid id) : base(canvas, id)
+    public BooleanInputNode(INodeCanvas canvas, Guid guid) : base(canvas, guid)
     {
         // 기본값 설정
         Value = false;

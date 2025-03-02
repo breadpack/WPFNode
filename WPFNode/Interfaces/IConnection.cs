@@ -3,7 +3,7 @@ using WPFNode.Models;
 namespace WPFNode.Interfaces;
 
 public interface IConnection : IJsonSerializable {
-    Guid        Id             { get; }
+    Guid        Guid             { get; }
     IOutputPort  Source         { get; }
     IInputPort Target         { get; }
     PortId SourcePortId { get; }

@@ -15,7 +15,7 @@ public class NodeCommandService : INodeCommandService
     public void RegisterNode(INode node)
     {
         if (node == null) throw new ArgumentNullException(nameof(node));
-        _nodes[node.Id] = node;
+        _nodes[node.Guid] = node;
     }
 
     public void UnregisterNode(Guid nodeId)

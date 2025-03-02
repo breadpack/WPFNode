@@ -13,12 +13,12 @@ public class ConsoleWriteNode : NodeBase {
     
     public InputPort<string> Input => _input;
 
-    public ConsoleWriteNode(INodeCanvas canvas, Guid id) : base(canvas, id) {
+    public ConsoleWriteNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) {
         _input = CreateInputPort<string>("Text");
     }
 
-    public override Task ProcessAsync() {
-        Console.WriteLine(_input.Value);
+    protected override Task ProcessAsync(CancellationToken cancellationToken = default) {
+        Console.WriteLine(_input.GetValueOrDefault(string.Empty));
         return Task.CompletedTask;
     }
 }

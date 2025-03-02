@@ -18,13 +18,13 @@ public class DivisionNode : NodeBase
     public InputPort<double> InputB => _inputB;
     public OutputPort<double> Result => _output;
 
-    public DivisionNode(INodeCanvas canvas, Guid id) : base(canvas, id) {
+    public DivisionNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) {
         _inputA = CreateInputPort<double>("A");
         _inputB = CreateInputPort<double>("B");
         _output = CreateOutputPort<double>("결과");
     }
 
-    public override async Task ProcessAsync()
+    protected override async Task ProcessAsync(CancellationToken cancellationToken = default)
     {
         var a = _inputA.GetValueOrDefault(0.0);
         var b = _inputB.GetValueOrDefault(1.0); // 0으로 나누는 것을 방지하기 위해 기본값을 1.0으로 설정

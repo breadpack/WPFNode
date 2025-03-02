@@ -6,10 +6,16 @@
         xmlns:local="clr-namespace:WPFNode.Demo"
         xmlns:vm="clr-namespace:WPFNode.Demo.ViewModels"
         xmlns:controls="clr-namespace:WPFNode.Controls;assembly=WPFNode"
+        xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
         mc:Ignorable="d"
         Title="Node Editor" Height="450" Width="800"
         WindowStartupLocation="CenterScreen"
         Closing="Window_Closing">
+    <i:Interaction.Triggers>
+        <i:EventTrigger EventName="Loaded">
+            <i:InvokeCommandAction Command="{Binding LoadedCommand}"/>
+        </i:EventTrigger>
+    </i:Interaction.Triggers>
     <Window.DataContext>
         <vm:MainWindowViewModel/>
     </Window.DataContext>
@@ -37,7 +43,7 @@
         </ToolBar>
 
         <controls:NodeCanvasControl
-            x:Name="NodeCanvas"
+            x:Name="NodeCanvasControl"
             Grid.Row="1"
             HorizontalAlignment="Stretch"
             VerticalAlignment="Stretch"

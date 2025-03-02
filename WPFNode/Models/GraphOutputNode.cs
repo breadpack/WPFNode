@@ -11,16 +11,16 @@ public class GraphOutputNode<T> : NodeBase
     private readonly OutputPort<T> _parentOutput;
 
     [JsonConstructor]
-    public GraphOutputNode(INodeCanvas canvas, Guid id) 
-        : base(canvas, id)
+    public GraphOutputNode(INodeCanvas canvas, Guid guid) 
+        : base(canvas, guid)
     {
         _input = CreateInputPort<T>("Value");
         // 직렬화 시에는 _parentOutput이 null이 될 수 있음
         _parentOutput = null!;
     }
 
-    public GraphOutputNode(INodeCanvas canvas, Guid id, OutputPort<T> parentOutput) 
-        : base(canvas, id)
+    public GraphOutputNode(INodeCanvas canvas, Guid guid, OutputPort<T> parentOutput) 
+        : base(canvas, guid)
     {
         _parentOutput = parentOutput;
         _input = CreateInputPort<T>("Value");
@@ -28,7 +28,7 @@ public class GraphOutputNode<T> : NodeBase
 
     public InputPort<T> Input => _input;
 
-    public override async Task ProcessAsync()
+    protected override async Task ProcessAsync(CancellationToken cancellationToken = default)
     {
         if (_parentOutput != null)
         {

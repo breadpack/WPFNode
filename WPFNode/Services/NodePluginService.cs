@@ -253,7 +253,6 @@ public class NodePluginService : INodePluginService, IDisposable
         try
         {
             var node = (INode)Activator.CreateInstance(nodeType)!;
-            node.Initialize();
             return node;
         }
         catch (Exception ex)

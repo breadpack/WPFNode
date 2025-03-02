@@ -75,17 +75,17 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                 }
 
                 // 2. 노드 생성
-                var nodeId = Guid.Parse(nodeElement.GetProperty("Id").GetString()!);
+                var nodeGuid = Guid.Parse(nodeElement.GetProperty("Guid").GetString()!);
                 var x = nodeElement.GetProperty("X").GetDouble();
                 var y = nodeElement.GetProperty("Y").GetDouble();
-                var node = canvas.CreateNodeWithId(nodeId, nodeType, x, y);
+                var node = canvas.CreateNodeWithId(nodeGuid, nodeType, x, y);
                 
                 if (node == null)
                 {
                     throw new JsonException($"노드 생성에 실패했습니다: {nodeType.Name}");
                 }
                 
-                nodesById[node.Id] = node;
+                nodesById[node.Guid] = node;
 
                 // 3. 노드 상태 복원
                 if (node is IJsonSerializable serializable)
@@ -125,8 +125,7 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
         }
 
         // 노드 정보 추가
-        try
-        {
+        try {
             var nodeInfo = new List<string>();
             if (nodeElement.TryGetProperty("Id", out var idElement))
                 nodeInfo.Add($"Id: {idElement.GetString()}");
@@ -134,9 +133,9 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                 nodeInfo.Add($"Name: {nameElement.GetString()}");
             if (nodeElement.TryGetProperty("Type", out var typeElement))
                 nodeInfo.Add($"Type: {typeElement.GetString()}");
-            
+
             details.Add($"노드 데이터: {string.Join(", ", nodeInfo)}");
-            
+
             // JSON 데이터 추가
             details.Add($"전체 JSON: {nodeElement.GetRawText()}");
         }
@@ -159,7 +158,7 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
             try
             {
                 // 1. 연결 생성에 필요한 기본 정보 파싱
-                var connectionId = Guid.Parse(connectionElement.GetProperty("Id").GetString()!);
+                var connectionId = Guid.Parse(connectionElement.GetProperty("Guid").GetString()!);
                 var sourcePortIdStr = connectionElement.GetProperty("SourcePortId").GetString()!;
                 var targetPortIdStr = connectionElement.GetProperty("TargetPortId").GetString()!;
 
@@ -235,7 +234,7 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                 }
                 else
                 {
-                    Console.WriteLine($"연결 생성 성공: {connection.Id}");
+                    Console.WriteLine($"연결 생성 성공: {connection.Guid}");
                 }
             }
             catch (Exception ex)
@@ -247,7 +246,7 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
         if (failedConnections.Any())
         {
             var errors = string.Join("\n", failedConnections.Select(f => 
-                $"- 연결 복원 실패: {f.Element.GetProperty("Id").GetString() ?? "알 수 없는 ID"}, 오류: {f.Error.Message}"));
+                $"- 연결 복원 실패: {f.Element.GetProperty("Guid").GetString() ?? "알 수 없는 ID"}, 오류: {f.Error.Message}"));
             throw new JsonException($"일부 연결 복원 실패:\n{errors}");
         }
     }
@@ -272,7 +271,7 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
 
                 // 2. 노드 찾기
                 var nodes = nodeIds
-                    .Where(id => nodesById.ContainsKey(id))
+                    .Where(nodesById.ContainsKey)
                     .Select(id => nodesById[id])
                     .Cast<NodeBase>()
                     .ToList();
@@ -376,12 +375,12 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                 }
                 else
                 {
-                    throw new JsonException($"연결 {connection.Id}이(가) IJsonSerializable을 구현하지 않았습니다.");
+                    throw new JsonException($"연결 {connection.Guid}이(가) IJsonSerializable을 구현하지 않았습니다.");
                 }
             }
             catch (Exception ex)
             {
-                throw new JsonException($"연결 {connection.Id} 직렬화 중 오류 발생", ex);
+                throw new JsonException($"연결 {connection.Guid} 직렬화 중 오류 발생", ex);
             }
         }
         writer.WriteEndArray();

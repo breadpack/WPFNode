@@ -32,8 +32,8 @@ public class DynamicNode : NodeBase
         JsonElement? Value = null);
 
     [JsonConstructor]
-    public DynamicNode(INodeCanvas canvas, Guid id) 
-        : base(canvas, id)
+    public DynamicNode(INodeCanvas canvas, Guid guid) 
+        : base(canvas, guid)
     {
         _innerCanvas = NodeCanvas.Create();
         _category = "Dynamic";
@@ -43,11 +43,11 @@ public class DynamicNode : NodeBase
 
     public DynamicNode(
         INodeCanvas canvas,
-        Guid id,
+        Guid guid,
         string name,
         string category,
         string description)
-        : base(canvas, id)
+        : base(canvas, guid)
     {
         Name = name;
         _category = category;
@@ -91,9 +91,9 @@ public class DynamicNode : NodeBase
         return outputNode;
     }
 
-    public override async Task ProcessAsync()
+    protected override async Task ProcessAsync(CancellationToken cancellationToken = default)
     {
-        await _innerCanvas.ExecuteAsync();
+        await _innerCanvas.ExecuteAsync(cancellationToken);
     }
 
     public InputPort<T> AddInputPort<T>(string name)
@@ -162,11 +162,6 @@ public class DynamicNode : NodeBase
             writer.WriteString("Type", port.DataType.AssemblyQualifiedName);
             writer.WriteNumber("Index", port.GetPortIndex());
             writer.WriteBoolean("IsVisible", port.IsVisible);
-            if (port.Value != null || port.DataType.IsValueType)
-            {
-                writer.WritePropertyName("Value");
-                JsonSerializer.Serialize(writer, port.Value, port.DataType);
-            }
             writer.WriteEndObject();
         }
         writer.WriteEndArray();
@@ -180,11 +175,6 @@ public class DynamicNode : NodeBase
             writer.WriteString("Type", port.DataType.AssemblyQualifiedName);
             writer.WriteNumber("Index", port.GetPortIndex());
             writer.WriteBoolean("IsVisible", port.IsVisible);
-            if (port.Value != null || port.DataType.IsValueType)
-            {
-                writer.WritePropertyName("Value");
-                JsonSerializer.Serialize(writer, port.Value, port.DataType);
-            }
             writer.WriteEndObject();
         }
         writer.WriteEndArray();
@@ -200,6 +190,11 @@ public class DynamicNode : NodeBase
             writer.WriteString("Format", prop.Value.Format);
             writer.WriteBoolean("CanConnectToPort", prop.Value.CanConnectToPort);
             writer.WriteNumber("Index", ((IInputPort)prop.Value).GetPortIndex());
+            if(prop.Value.Value != null)
+            {
+                writer.WritePropertyName("Value");
+                JsonSerializer.Serialize(writer, prop.Value.Value, prop.Value.PropertyType, NodeCanvasJsonConverter.SerializerOptions);
+            }
             writer.WriteEndObject();
         }
         writer.WriteEndArray();
@@ -218,14 +213,14 @@ public class DynamicNode : NodeBase
         writer.WriteStartObject("Inputs");
         foreach (var input in _inputs)
         {
-            writer.WriteString(input.Key, input.Value.Id.ToString());
+            writer.WriteString(input.Key, input.Value.Guid.ToString());
         }
         writer.WriteEndObject();
         
         writer.WriteStartObject("Outputs");
         foreach (var output in _outputs)
         {
-            writer.WriteString(output.Key, output.Value.Id.ToString());
+            writer.WriteString(output.Key, output.Value.Guid.ToString());
         }
         writer.WriteEndObject();
         
@@ -444,7 +439,7 @@ public class DynamicNode : NodeBase
                 void OnNodeCreated(object? sender, INode node)
                 {
                     // 입력 노드 처리
-                    if (inputMappings.TryGetValue(node.Id, out var inputMapping))
+                    if (inputMappings.TryGetValue(node.Guid, out var inputMapping))
                     {
                         var nodeType = node.GetType();
                         if (nodeType.IsGenericType && nodeType.GetGenericTypeDefinition() == typeof(GraphInputNode<>))
@@ -460,7 +455,7 @@ public class DynamicNode : NodeBase
                     }
 
                     // 출력 노드 처리
-                    if (outputMappings.TryGetValue(node.Id, out var outputMapping))
+                    if (outputMappings.TryGetValue(node.Guid, out var outputMapping))
                     {
                         var nodeType = node.GetType();
                         if (nodeType.IsGenericType && nodeType.GetGenericTypeDefinition() == typeof(GraphOutputNode<>))

@@ -18,7 +18,7 @@ public class TypeSelectorDemoNode : NodeBase
     private readonly OutputPort<bool> _isValueTypePort;
     private readonly OutputPort<Type> _baseTypePort;
     
-    public TypeSelectorDemoNode(INodeCanvas canvas, Guid id) : base(canvas, id)
+    public TypeSelectorDemoNode(INodeCanvas canvas, Guid guid) : base(canvas, guid)
     {
         _selectedType = CreateProperty<Type>("selectedType", "Selected Type");
         _selectedType.Value = typeof(object);
@@ -29,7 +29,7 @@ public class TypeSelectorDemoNode : NodeBase
         _baseTypePort = CreateOutputPort<Type>("Base Type");
     }
     
-    public override Task ProcessAsync()
+    protected override Task ProcessAsync(CancellationToken cancellationToken = default)
     {
         var type = (Type)_selectedType.Value!;
         _typeNamePort.Value = type.Name;

@@ -13,7 +13,7 @@ namespace WPFNode.Plugins.Basic.Primitives;
 [NodeStyle(StyleKeys.Input.Integer)]
 public class IntegerInputNode : NumberInputNodeBase<int>
 {
-    public IntegerInputNode(INodeCanvas canvas, Guid id) : base(canvas, id)
+    public IntegerInputNode(INodeCanvas canvas, Guid guid) : base(canvas, guid)
     {
         // 기본값 설정
         Value = 0;

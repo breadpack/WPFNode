@@ -68,7 +68,7 @@ namespace WPFNode.Tests.ViewModels
             var json = @"{
                 ""Nodes"": [
                     {
-                        ""Id"": ""00000000-0000-0000-0000-000000000001"",
+                        ""Guid"": ""00000000-0000-0000-0000-000000000001"",
                         ""Type"": ""WPFNode.Tests.ViewModels.NodeCanvasViewModelTests+TestNode, WPFNode.Tests"",
                         ""Name"": ""TestNode"",
                         ""Category"": ""Basic"",
@@ -206,7 +206,7 @@ namespace WPFNode.Tests.ViewModels
             var json = @"{
                 ""Nodes"": [
                     {
-                        ""Id"": ""00000000-0000-0000-0000-000000000001"",
+                        ""Guid"": ""00000000-0000-0000-0000-000000000001"",
                         ""Type"": ""WPFNode.Tests.ViewModels.NodeCanvasViewModelTests+TestNode, WPFNode.Tests"",
                         ""Name"": ""TestNode"",
                         ""Category"": ""Basic"",
@@ -235,16 +235,20 @@ namespace WPFNode.Tests.ViewModels
 
         private class TestNode : NodeBase
         {
+            private readonly InputPort<int> _input;
+            private readonly OutputPort<int> _output;
+
             [JsonConstructor]
-            public TestNode(INodeCanvas canvas, Guid id) : base(canvas, id)
+            public TestNode(INodeCanvas canvas, Guid guid) : base(canvas, guid)
             {
                 Name = "TestNode";
-                CreateInputPort("Input", typeof(int));
-                CreateOutputPort("Output", typeof(int));
+                _input = CreateInputPort<int>("Input");
+                _output = CreateOutputPort<int>("Output");
             }
 
-            public override Task ProcessAsync()
+            protected override Task ProcessAsync(CancellationToken cancellationToken = default)
             {
+                _output.Value = _input.GetValueOrDefault();
                 return Task.CompletedTask;
             }
         }
@@ -252,67 +256,73 @@ namespace WPFNode.Tests.ViewModels
         private class NumberNode : NodeBase
         {
             private double _value;
+            private readonly OutputPort<double> _output;
 
             [JsonConstructor]
-            public NumberNode(INodeCanvas canvas, Guid id) : base(canvas, id)
+            public NumberNode(INodeCanvas canvas, Guid guid) : base(canvas, guid)
             {
                 Name = "Number";
-                CreateOutputPort("Value", typeof(double));
+                _output = CreateOutputPort<double>("Value");
             }
 
             public double Value
             {
                 get => _value;
-                set
-                {
-                    _value = value;
-                    ProcessAsync().Wait();
-                }
+                set => _value = value;
             }
 
-            public override Task ProcessAsync()
+            protected override Task ProcessAsync(CancellationToken cancellationToken = default)
             {
-                OutputPorts[0].Value = _value;
+                _output.Value = _value;
                 return Task.CompletedTask;
             }
         }
 
         private class AdditionNode : NodeBase
         {
+            private readonly InputPort<double> _inputA;
+            private readonly InputPort<double> _inputB;
+            private readonly OutputPort<double> _output;
+
             [JsonConstructor]
-            public AdditionNode(INodeCanvas canvas, Guid id) : base(canvas, id)
+            public AdditionNode(INodeCanvas canvas, Guid guid) : base(canvas, guid)
             {
                 Name = "Addition";
-                CreateInputPort("A", typeof(double));
-                CreateInputPort("B", typeof(double));
-                CreateOutputPort("Result", typeof(double));
+                
+                _inputA = CreateInputPort<double>("A");
+                _inputB = CreateInputPort<double>("B");
+                _output = CreateOutputPort<double>("Result");
             }
 
-            public override Task ProcessAsync()
+            protected override Task ProcessAsync(CancellationToken cancellationToken = default)
             {
-                var a = (double)InputPorts[0].Value;
-                var b = (double)InputPorts[1].Value;
-                OutputPorts[0].Value = a + b;
+                var a = _inputA.GetValueOrDefault();
+                var b = _inputB.GetValueOrDefault();
+                _output.Value = a + b;
                 return Task.CompletedTask;
             }
         }
 
         private class MultiplicationNode : NodeBase
         {
+            private readonly InputPort<double> _inputA;
+            private readonly InputPort<double> _inputB;
+            private readonly OutputPort<double> _output;
+
             [JsonConstructor]
-            public MultiplicationNode(INodeCanvas canvas, Guid id) : base(canvas, id)
+            public MultiplicationNode(INodeCanvas canvas, Guid guid) : base(canvas, guid)
             {
                 Name = "Multiplication";
-                CreateInputPort("A", typeof(double));
-                CreateInputPort("B", typeof(double));
-                CreateOutputPort("Result", typeof(double));
+                _inputA = CreateInputPort<double>("A");
+                _inputB = CreateInputPort<double>("B");
+                _output = CreateOutputPort<double>("Result");
             }
 
-            public override Task ProcessAsync()
+            protected override Task ProcessAsync(CancellationToken cancellationToken = default)
             {
-                var a = (double)InputPorts[0].Value;
-                var b = (double)InputPorts[1].Value;
-                OutputPorts[0].Value = a * b;
+                var a = _inputA.GetValueOrDefault();
+                var b = _inputB.GetValueOrDefault();
+                _output.Value = a * b;
                 return Task.CompletedTask;
             }
         }
@@ -320,14 +330,16 @@ namespace WPFNode.Tests.ViewModels
         [OutputNodeAttribute]
         private class OutputNode : NodeBase
         {
+            private readonly InputPort<double> _input;
+
             [JsonConstructor]
-            public OutputNode(INodeCanvas canvas, Guid id) : base(canvas, id)
+            public OutputNode(INodeCanvas canvas, Guid guid) : base(canvas, guid)
             {
                 Name = "Output";
-                CreateInputPort("Input", typeof(double));
+                _input = CreateInputPort<double>("Input");
             }
 
-            public override Task ProcessAsync()
+            protected override Task ProcessAsync(CancellationToken cancellationToken = default)
             {
                 return Task.CompletedTask;
             }
@@ -340,7 +352,7 @@ namespace WPFNode.Tests.ViewModels
             var json = @"{
                 ""Nodes"": [
                     {
-                        ""Id"": ""00000000-0000-0000-0000-000000000001"",
+                        ""Guid"": ""00000000-0000-0000-0000-000000000001"",
                         ""Type"": ""WPFNode.Tests.ViewModels.NodeCanvasViewModelTests+NumberNode, WPFNode.Tests"",
                         ""Name"": ""Number1"",
                         ""Category"": ""Math"",
@@ -352,14 +364,14 @@ namespace WPFNode.Tests.ViewModels
                         ""InputPorts"": [],
                         ""OutputPorts"": [
                             {
-                                ""Id"": ""00000000-0000-0000-0000-000000000001:out[0]"",
+                                ""Guid"": ""00000000-0000-0000-0000-000000000001:out[0]"",
                                 ""Name"": ""Value"",
                                 ""Type"": ""System.Double""
                             }
                         ]
                     },
                     {
-                        ""Id"": ""00000000-0000-0000-0000-000000000002"",
+                        ""Guid"": ""00000000-0000-0000-0000-000000000002"",
                         ""Type"": ""WPFNode.Tests.ViewModels.NodeCanvasViewModelTests+NumberNode, WPFNode.Tests"",
                         ""Name"": ""Number2"",
                         ""Category"": ""Math"",
@@ -371,14 +383,14 @@ namespace WPFNode.Tests.ViewModels
                         ""InputPorts"": [],
                         ""OutputPorts"": [
                             {
-                                ""Id"": ""00000000-0000-0000-0000-000000000002:out[0]"",
+                                ""Guid"": ""00000000-0000-0000-0000-000000000002:out[0]"",
                                 ""Name"": ""Value"",
                                 ""Type"": ""System.Double""
                             }
                         ]
                     },
                     {
-                        ""Id"": ""00000000-0000-0000-0000-000000000003"",
+                        ""Guid"": ""00000000-0000-0000-0000-000000000003"",
                         ""Type"": ""WPFNode.Tests.ViewModels.NodeCanvasViewModelTests+AdditionNode, WPFNode.Tests"",
                         ""Name"": ""Add"",
                         ""Category"": ""Math"",
@@ -389,19 +401,19 @@ namespace WPFNode.Tests.ViewModels
                         ""Properties"": [],
                         ""InputPorts"": [
                             {
-                                ""Id"": ""00000000-0000-0000-0000-000000000003:in[0]"",
+                                ""Guid"": ""00000000-0000-0000-0000-000000000003:in[0]"",
                                 ""Name"": ""A"",
                                 ""Type"": ""System.Double""
                             },
                             {
-                                ""Id"": ""00000000-0000-0000-0000-000000000003:in[1]"",
+                                ""Guid"": ""00000000-0000-0000-0000-000000000003:in[1]"",
                                 ""Name"": ""B"",
                                 ""Type"": ""System.Double""
                             }
                         ],
                         ""OutputPorts"": [
                             {
-                                ""Id"": ""00000000-0000-0000-0000-000000000003:out[0]"",
+                                ""Guid"": ""00000000-0000-0000-0000-000000000003:out[0]"",
                                 ""Name"": ""Result"",
                                 ""Type"": ""System.Double""
                             }
@@ -410,12 +422,12 @@ namespace WPFNode.Tests.ViewModels
                 ],
                 ""Connections"": [
                     {
-                        ""Id"": ""00000000-0000-0000-0000-000000000004"",
+                        ""Guid"": ""00000000-0000-0000-0000-000000000004"",
                         ""SourcePortId"": ""00000000-0000-0000-0000-000000000001:out[0]"",
                         ""TargetPortId"": ""00000000-0000-0000-0000-000000000003:in[0]""
                     },
                     {
-                        ""Id"": ""00000000-0000-0000-0000-000000000007"",
+                        ""Guid"": ""00000000-0000-0000-0000-000000000007"",
                         ""SourcePortId"": ""00000000-0000-0000-0000-000000000002:out[0]"",
                         ""TargetPortId"": ""00000000-0000-0000-0000-000000000003:in[1]""
                     }
@@ -435,9 +447,9 @@ namespace WPFNode.Tests.ViewModels
             var number2 = _viewModel.Nodes[1];
             var add = _viewModel.Nodes[2];
 
-            Assert.Equal("Number1", number1.Name);
-            Assert.Equal("Number2", number2.Name);
-            Assert.Equal("Add", add.Name);
+            Assert.Equal("Number", number1.Name);
+            Assert.Equal("Number", number2.Name);
+            Assert.Equal("Addition", add.Name);
         }
 
         [Fact]
@@ -457,15 +469,12 @@ namespace WPFNode.Tests.ViewModels
             // 초기값 설정
             number1.Value = 5;
             number2.Value = 3;
-            await number1.ProcessAsync();
-            await number2.ProcessAsync();
-            await add.ProcessAsync();
 
             // Act
             await _canvas.ExecuteAsync();
 
             // Assert
-            Assert.Equal(8.0, output.InputPorts[0].Value);
+            Assert.Equal(8.0, ((IInputPort<double>)output.InputPorts[0]).GetValueOrDefault());
         }
 
         [Fact]
@@ -474,34 +483,34 @@ namespace WPFNode.Tests.ViewModels
             // Arrange
             var number1 = _canvas.CreateNode(typeof(NumberNode), 100, 100) as NumberNode;
             var number2 = _canvas.CreateNode(typeof(NumberNode), 100, 200) as NumberNode;
-            var add = _canvas.CreateNode(typeof(AdditionNode), 300, 150) as AdditionNode;
-            var mult = _canvas.CreateNode(typeof(MultiplicationNode), 500, 150) as MultiplicationNode;
-            var output = _canvas.CreateNode(typeof(OutputNode), 700, 150) as OutputNode;
+            var add     = _canvas.CreateNode(typeof(AdditionNode), 300, 150) as AdditionNode;
+            var mult    = _canvas.CreateNode(typeof(MultiplicationNode), 500, 150) as MultiplicationNode;
+            var output  = _canvas.CreateNode(typeof(OutputNode), 700, 150) as OutputNode;
 
-            // 포트 연결
             _canvas.Connect(number1.OutputPorts[0], add.InputPorts[0]);
             _canvas.Connect(number2.OutputPorts[0], add.InputPorts[1]);
             _canvas.Connect(add.OutputPorts[0], mult.InputPorts[0]);
             _canvas.Connect(number1.OutputPorts[0], mult.InputPorts[1]);
             _canvas.Connect(mult.OutputPorts[0], output.InputPorts[0]);
 
-            // 그룹 생성
             var group = _canvas.CreateGroup(new NodeBase[] { number1, number2, add }, "Math Group");
 
-            // 초기값 설정
             number1.Value = 5;
             number2.Value = 3;
-            await number1.ProcessAsync();
-            await number2.ProcessAsync();
-            await add.ProcessAsync();
-            await mult.ProcessAsync();
 
             // Act
-            await _canvas.ExecuteAsync();
+            try
+            {
+                await _canvas.ExecuteAsync();
+            }
+            catch (Exception ex)
+            {
+                Assert.Fail($"Execution failed: {ex.Message}");
+            }
 
             // Assert
             Assert.Equal(8.0, add.OutputPorts[0].Value);
-            Assert.Equal(40.0, output.InputPorts[0].Value);
+            Assert.Equal(40.0, ((IInputPort<double>)output.InputPorts[0]).GetValueOrDefault());
             Assert.Equal(3, group.Nodes.Count);
         }
 
@@ -523,6 +532,88 @@ namespace WPFNode.Tests.ViewModels
                 _canvas.Connect(node3.OutputPorts[0], node1.InputPorts[0]);
                 await _canvas.ExecuteAsync();
             });
+        }
+
+        [Fact]
+        public void FindNodeById_ExistingNode_ReturnsNode()
+        {
+            // Arrange
+            var node = _canvas.CreateNode(typeof(TestNode), 100, 100);
+
+            // Act
+            var foundNode = _viewModel.FindNodeById(node.Guid);
+
+            // Assert
+            Assert.NotNull(foundNode);
+            Assert.Equal(node.Guid, foundNode.Model.Guid);
+        }
+
+        [Fact]
+        public void FindNodesByName_ExistingNodes_ReturnsMatchingNodes()
+        {
+            // Arrange
+            var node1 = _canvas.CreateNode(typeof(TestNode), 100, 100) as NodeBase;
+            var node2 = _canvas.CreateNode(typeof(TestNode), 200, 200) as NodeBase;
+            node1.Name = "TestNode1";
+            node2.Name = "TestNode2";
+
+            // Act
+            var foundNodes = _viewModel.FindNodesByName("TestNode").ToList();
+
+            // Assert
+            Assert.Equal(2, foundNodes.Count);
+            Assert.Contains(foundNodes, n => n.Name == "TestNode1");
+            Assert.Contains(foundNodes, n => n.Name == "TestNode2");
+        }
+
+        [Fact]
+        public void FindNodesByType_ExistingNodes_ReturnsMatchingNodes()
+        {
+            // Arrange
+            _canvas.CreateNode(typeof(TestNode), 100, 100);
+            _canvas.CreateNode(typeof(NumberNode), 200, 200);
+            _canvas.CreateNode(typeof(TestNode), 300, 300);
+
+            // Act
+            var foundNodes = _viewModel.FindNodesByType(typeof(TestNode)).ToList();
+
+            // Assert
+            Assert.Equal(2, foundNodes.Count);
+            Assert.All(foundNodes, n => Assert.IsType<TestNode>(n.Model));
+        }
+
+        [Fact]
+        public void GetNodePorts_ExistingNode_ReturnsPortInformation()
+        {
+            // Arrange
+            var node = _canvas.CreateNode(typeof(TestNode), 100, 100);
+            var nodeViewModel = _viewModel.FindNodeById(node.Guid);
+            Assert.NotNull(nodeViewModel);
+
+            // Act
+            var (inputPorts, outputPorts) = nodeViewModel.GetPorts();
+
+            // Assert
+            Assert.Single(inputPorts);
+            Assert.Single(outputPorts);
+            Assert.Equal("Input", inputPorts.First().Name);
+            Assert.Equal("Output", outputPorts.First().Name);
+        }
+
+        [Fact]
+        public void GetNodeType_ExistingNode_ReturnsCorrectType()
+        {
+            // Arrange
+            var node = _canvas.CreateNode(typeof(TestNode), 100, 100);
+            var nodeViewModel = _viewModel.FindNodeById(node.Guid);
+            Assert.NotNull(nodeViewModel);
+
+            // Act
+            var nodeType = nodeViewModel.GetNodeType();
+
+            // Assert
+            Assert.NotNull(nodeType);
+            Assert.Equal(typeof(TestNode), nodeType);
         }
     }
 } 

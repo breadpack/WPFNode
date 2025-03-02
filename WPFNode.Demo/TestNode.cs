@@ -15,7 +15,7 @@ namespace WPFNode.Demo;
 public class TestNode : NodeBase {
     public OutputPort<string> Output { get; }
 
-    public TestNode(INodeCanvas canvas, Guid id) : base(canvas, id) {
+    public TestNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) {
         Output = CreateOutputPort<string>("출력");
 
         TextProperty = CreateProperty<string>(
@@ -50,7 +50,7 @@ public class TestNode : NodeBase {
 
     public NodeProperty<string> TextProperty { get; }
 
-    public override Task ProcessAsync() {
+    protected override Task ProcessAsync(CancellationToken cancellationToken = default) {
         Output.Value = $"Text: {TextProperty.Value}, Number: {NumberProperty.Value}, Bool: {BooleanProperty.Value}, Multiline: {MultilineTextProperty.Value}, Color: {ColorProperty.Value}";
         return Task.CompletedTask;
     }

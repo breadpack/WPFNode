@@ -1,6 +1,7 @@
 using System.Runtime.Serialization;
 using WPFNode.Constants;
 using WPFNode.Models;
+using WPFNode.Models.Execution;
 
 namespace WPFNode.Exceptions;
 

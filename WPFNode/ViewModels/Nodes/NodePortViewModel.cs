@@ -50,27 +50,6 @@ public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
         }
     }
 
-    public object? Value
-    {
-        get
-        {
-            return _port switch
-            {
-                IInputPort inputPort => inputPort.Value,
-                IOutputPort outputPort => outputPort.Value,
-                _ => throw new InvalidOperationException($"[{Name}] 알 수 없는 포트 타입입니다.")
-            };
-        }
-        set
-        {
-            if (_port is IOutputPort outputPort)
-            {
-                outputPort.Value = value;
-                OnPropertyChanged();
-            }
-        }
-    }
-
     public bool IsSelected
     {
         get => _isSelected;

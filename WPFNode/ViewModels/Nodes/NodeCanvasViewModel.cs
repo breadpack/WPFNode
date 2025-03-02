@@ -147,7 +147,7 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
         // 새 캔버스의 내용을 복사
         foreach (var node in sourceCanvas.Nodes)
         {
-            var newNode = _canvas.CreateNodeWithId(node.Id, node.GetType(), node.X, node.Y);
+            var newNode = _canvas.CreateNodeWithId(node.Guid, node.GetType(), node.X, node.Y);
             if (newNode is NodeBase newNodeBase && node is NodeBase sourceNodeBase)
             {
                 newNodeBase.Name = sourceNodeBase.Name;
@@ -165,15 +165,15 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
             
             if (sourcePort != null && targetPort != null)
             {
-                Console.WriteLine($"연결 복원 시도: {connection.Id}");
-                _canvas.ConnectWithId(connection.Id, sourcePort, targetPort);
-                Console.WriteLine($"연결 복원 성공: {connection.Id}");
+                Console.WriteLine($"연결 복원 시도: {connection.Guid}");
+                _canvas.ConnectWithId(connection.Guid, sourcePort, targetPort);
+                Console.WriteLine($"연결 복원 성공: {connection.Guid}");
             }
         }
         foreach (var group in sourceCanvas.Groups)
         {
             var nodes = group.Nodes
-                .Select(n => _canvas.Nodes.FirstOrDefault(cn => cn.Id == n.Id))
+                .Select(n => _canvas.Nodes.FirstOrDefault(cn => cn.Guid == n.Guid))
                 .Where(n => n != null)
                 .Cast<NodeBase>()
                 .ToList();
@@ -462,26 +462,28 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
         _commandManager.Execute(command);
     }
 
-    public NodePortViewModel FindPortViewModel(IPort port)
+    public NodeViewModel? FindNodeById(Guid nodeId)
     {
-        foreach (var node in Nodes)
-        {
-            var foundPort = node.InputPorts.FirstOrDefault(p => p.Model == port) ??
-                           node.OutputPorts.FirstOrDefault(p => p.Model == port);
-            if (foundPort != null)
-                return foundPort;
-        }
-        return null;
+        return Nodes.FirstOrDefault(n => n.Model.Guid == nodeId);
     }
 
-    public void OnPortsChanged()
+    public IEnumerable<NodeViewModel> FindNodesByName(string name)
     {
-        // SynchronizeWithModel();
+        if (string.IsNullOrWhiteSpace(name))
+            return Enumerable.Empty<NodeViewModel>();
+
+        return Nodes.Where(n => n.Name.Contains(name, StringComparison.OrdinalIgnoreCase));
     }
 
-    public NodeCanvas Model => _canvas;
+    public IEnumerable<NodeViewModel> FindNodesByType(Type nodeType)
+    {
+        if (nodeType == null)
+            return Enumerable.Empty<NodeViewModel>();
 
-    private async void ExecuteNodes()
+        return Nodes.Where(n => nodeType.IsAssignableFrom(n.Model.GetType()));
+    }
+
+    public async void ExecuteNodes()
     {
         try
         {
@@ -641,4 +643,23 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
             SynchronizeWithModel();
         }
     }
+
+    public NodePortViewModel FindPortViewModel(IPort port)
+    {
+        foreach (var node in Nodes)
+        {
+            var foundPort = node.InputPorts.FirstOrDefault(p => p.Model == port) ??
+                           node.OutputPorts.FirstOrDefault(p => p.Model == port);
+            if (foundPort != null)
+                return foundPort;
+        }
+        return null;
+    }
+
+    public void OnPortsChanged()
+    {
+        // SynchronizeWithModel();
+    }
+
+    public NodeCanvas Model => _canvas;
 }

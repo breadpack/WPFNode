@@ -11,7 +11,7 @@ public static class LoggerExtensions
         logger.LogInformation(
             "[{Category}] {NodeId}:{NodeName} - {Message}",
             LoggerCategories.Execution,
-            node.Id,
+            node.Guid,
             node.Name,
             message);
     }
@@ -22,7 +22,7 @@ public static class LoggerExtensions
             ex,
             "[{Category}] {NodeId}:{NodeName} - {Message}",
             LoggerCategories.Node,
-            node.Id,
+            node.Guid,
             node.Name,
             message);
     }

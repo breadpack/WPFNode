@@ -10,7 +10,7 @@ using ICommand = System.Windows.Input.ICommand;
 
 namespace WPFNode.ViewModels.Nodes;
 
-public class NodeViewModel : ViewModelBase
+public class NodeViewModel : ViewModelBase, INodeViewModel
 {
     private readonly NodeBase _model;
     private readonly INodeCommandService _commandService;
@@ -19,8 +19,10 @@ public class NodeViewModel : ViewModelBase
     private string _name;
     private bool _isSelected;
 
-    public ObservableCollection<NodePortViewModel> InputPorts { get; }
-    public ObservableCollection<NodePortViewModel> OutputPorts { get; }
+    private readonly ObservableCollection<NodePortViewModel> _inputPorts;
+    private readonly ObservableCollection<NodePortViewModel> _outputPorts;
+    public ReadOnlyObservableCollection<NodePortViewModel> InputPorts { get; }
+    public ReadOnlyObservableCollection<NodePortViewModel> OutputPorts { get; }
 
     public NodeViewModel(NodeBase model, INodeCommandService commandService, NodeCanvasViewModel canvas)
     {
@@ -30,10 +32,13 @@ public class NodeViewModel : ViewModelBase
         _name = model.Name;
         _position = new Point(model.X, model.Y);
         
-        InputPorts = new ObservableCollection<NodePortViewModel>(
+        _inputPorts = new ObservableCollection<NodePortViewModel>(
             model.InputPorts.Select(p => new NodePortViewModel(p, canvas)));
-        OutputPorts = new ObservableCollection<NodePortViewModel>(
+        _outputPorts = new ObservableCollection<NodePortViewModel>(
             model.OutputPorts.Select(p => new NodePortViewModel(p, canvas)));
+
+        InputPorts = new ReadOnlyObservableCollection<NodePortViewModel>(_inputPorts);
+        OutputPorts = new ReadOnlyObservableCollection<NodePortViewModel>(_outputPorts);
 
         // 포트의 Parent 설정
         foreach (var port in InputPorts.Concat(OutputPorts))
@@ -42,8 +47,8 @@ public class NodeViewModel : ViewModelBase
         }
 
         // 포트 컬렉션 변경 이벤트 구독
-        InputPorts.CollectionChanged += OnPortsCollectionChanged;
-        OutputPorts.CollectionChanged += OnPortsCollectionChanged;
+        _inputPorts.CollectionChanged += OnPortsCollectionChanged;
+        _outputPorts.CollectionChanged += OnPortsCollectionChanged;
 
         DeleteCommand = new RelayCommand(Delete);
         
@@ -51,7 +56,7 @@ public class NodeViewModel : ViewModelBase
         _model.PropertyChanged += Model_PropertyChanged;
     }
 
-    public Guid Id => _model.Id;
+    public Guid Id => _model.Guid;
     
     public string Name
     {
@@ -123,12 +128,12 @@ public class NodeViewModel : ViewModelBase
 
     public bool ExecuteCommand(string commandName, object? parameter = null)
     {
-        return _commandService.ExecuteCommand(_model.Id, commandName, parameter);
+        return _commandService.ExecuteCommand(_model.Guid, commandName, parameter);
     }
 
     public bool CanExecuteCommand(string commandName, object? parameter = null)
     {
-        return _commandService.CanExecuteCommand(_model.Id, commandName, parameter);
+        return _commandService.CanExecuteCommand(_model.Guid, commandName, parameter);
     }
 
     public ICommand? GetCommand(string commandName)
@@ -145,26 +150,26 @@ public class NodeViewModel : ViewModelBase
         switch (e.PropertyName)
         {
             case nameof(INode.InputPorts):
-                InputPorts.Clear();
+                _inputPorts.Clear();
                 foreach (var port in _model.InputPorts)
                 {
-                    InputPorts.Add(new NodePortViewModel(port, _canvas));
+                    _inputPorts.Add(new NodePortViewModel(port, _canvas));
                 }
                 break;
             case nameof(INode.OutputPorts):
-                OutputPorts.Clear();
+                _outputPorts.Clear();
                 foreach (var port in _model.OutputPorts)
                 {
-                    OutputPorts.Add(new NodePortViewModel(port, _canvas));
+                    _outputPorts.Add(new NodePortViewModel(port, _canvas));
                 }
                 break;
             case nameof(INode.Properties):
                 OnPropertyChanged(nameof(Properties));
                 // Properties가 변경되면 InputPorts도 함께 갱신
-                InputPorts.Clear();
+                _inputPorts.Clear();
                 foreach (var port in _model.InputPorts)
                 {
-                    InputPorts.Add(new NodePortViewModel(port, _canvas));
+                    _inputPorts.Add(new NodePortViewModel(port, _canvas));
                 }
                 break;
             case nameof(NodeBase.X):
@@ -184,5 +189,15 @@ public class NodeViewModel : ViewModelBase
                 OnPropertyChanged(nameof(Category));
                 break;
         }
+    }
+
+    public (ReadOnlyObservableCollection<NodePortViewModel> InputPorts, ReadOnlyObservableCollection<NodePortViewModel> OutputPorts) GetPorts()
+    {
+        return (InputPorts, OutputPorts);
+    }
+
+    public Type GetNodeType()
+    {
+        return Model.GetType();
     }
 } 

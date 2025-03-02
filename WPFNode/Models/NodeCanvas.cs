@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using WPFNode.Commands;
 using WPFNode.Exceptions;
 using WPFNode.Interfaces;
+using WPFNode.Models.Execution;
 using WPFNode.Models.Serialization;
 using WPFNode.Resources;
 using WPFNode.Services;
@@ -133,10 +134,26 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         var node = (NodeBase)Activator.CreateInstance(nodeType, this, Guid.NewGuid())!;
         node.X = x;
         node.Y = y;
-        node.Initialize();
         
         AddNodeInternal(node);
         return node;
+    }
+    
+    public T? Q<T>(string id) where T : INode
+    {
+        return _nodes.OfType<T>().FirstOrDefault(n => n.Id == id);
+    }
+
+    // 특정 타입의 노드를 찾아서 반환하는 유틸리티 메서드 추가
+    public IEnumerable<T> FindNodesByType<T>() where T : INode
+    {
+        return _nodes.OfType<T>();
+    }
+
+    // 특정 타입의 첫 번째 노드를 찾아서 반환하는 유틸리티 메서드 추가
+    public T? Q<T>() where T : INode
+    {
+        return _nodes.OfType<T>().FirstOrDefault();
     }
 
     private void AddNodeInternal(NodeBase node)
@@ -208,12 +225,12 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         }
 
         var sourcePortId = new PortId(
-            source.Node.Id,
+            source.Node.Guid,
             false,
             source.GetPortIndex());
             
         var targetPortId = new PortId(
-            target.Node.Id,
+            target.Node.Guid,
             true,
             target.GetPortIndex());
 
@@ -243,7 +260,7 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         if (!_connections.Contains(connection)) 
             throw new NodeConnectionException(
                 ExceptionMessages.GetMessage(ExceptionMessages.ConnectionNotFound), 
-                connection.Id.ToString());
+                connection.Guid.ToString());
         
         // Canvas의 Connections 컬렉션에서 제거
         _connections.Remove(connection);
@@ -306,7 +323,30 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
 
     public async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        var executionPlan = ExecutionPlan.Create(_nodes, _connections);
+        var executionPlan = new Execution.ExecutionPlan(_nodes, _connections, true);
+        await executionPlan.ExecuteAsync(cancellationToken);
+    }
+
+    public async Task ExecuteAsync(Execution.ExecutionPlanBuilder executionPlanBuilder, CancellationToken cancellationToken = default)
+    {
+        var executable = executionPlanBuilder.BuildExecutionPlan(_nodes, _connections, true);
+        await executable.ExecuteAsync(new Execution.ExecutionContext(), cancellationToken);
+    }
+
+    public async Task ExecuteAsync(IDictionary<Guid, object> parameters, CancellationToken cancellationToken = default)
+    {
+        // 파라미터를 각 노드에 설정
+        foreach (var (nodeId, value) in parameters)
+        {
+            var node = _nodes.FirstOrDefault(n => n.Guid == nodeId);
+            if (node != null)
+            {
+                await node.SetParameterAsync(value);
+            }
+        }
+
+        // 실행 계획 생성 및 실행
+        var executionPlan = new Execution.ExecutionPlan(_nodes, _connections, true);
         await executionPlan.ExecuteAsync(cancellationToken);
     }
 
@@ -333,23 +373,22 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         return new NodeCanvas();
     }
 
-    public T CreateNodeWithId<T>(Guid id, double x = 0, double y = 0) where T : INode
+    public T CreateNodeWithId<T>(Guid guid, double x = 0, double y = 0) where T : INode
     {
         var nodeType = typeof(T);
-        var node = (T)CreateNodeWithId(id, nodeType, x, y);
+        var node = (T)CreateNodeWithId(guid, nodeType, x, y);
         return node;
     }
 
-    public INode CreateNodeWithId(Guid id, Type nodeType, double x = 0, double y = 0)
+    public INode CreateNodeWithId(Guid guid, Type nodeType, double x = 0, double y = 0)
     {
         if (!typeof(NodeBase).IsAssignableFrom(nodeType))
             throw new NodeValidationException($"노드 타입은 NodeBase를 상속해야 합니다: {nodeType.Name}");
 
         // 생성자에 Canvas와 Id를 전달하여 노드 생성
-        var node = (NodeBase)Activator.CreateInstance(nodeType, this, id)!;
+        var node = (NodeBase)Activator.CreateInstance(nodeType, this, guid)!;
         node.X = x;
         node.Y = y;
-        node.Initialize();
         
         AddNodeInternal(node);
         return node;
@@ -367,12 +406,12 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
             throw new NodeConnectionException("포트는 노드에 연결되어 있어야 합니다.", source, target);
 
         var sourcePortId = new PortId(
-            source.Node.Id,
+            source.Node.Guid,
             false,
             source.Node.OutputPorts.ToList().IndexOf(outputPort));
             
         var targetPortId = new PortId(
-            target.Node.Id,
+            target.Node.Guid,
             true,
             target.Node.InputPorts.ToList().IndexOf(inputPort));
 

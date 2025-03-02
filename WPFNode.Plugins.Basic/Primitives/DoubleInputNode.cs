@@ -13,7 +13,7 @@ namespace WPFNode.Plugins.Basic.Primitives;
 [NodeStyle(StyleKeys.Input.Double)]
 public class DoubleInputNode : NumberInputNodeBase<double>
 {
-    public DoubleInputNode(INodeCanvas canvas, Guid id) : base(canvas, id)
+    public DoubleInputNode(INodeCanvas canvas, Guid guid) : base(canvas, guid)
     {
         // 기본값 설정
         Value = 0.0;

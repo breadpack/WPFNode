@@ -6,7 +6,7 @@ namespace WPFNode.Plugins.Basic.Primitives.Base;
 
 public abstract class NumberInputNodeBase<T> : InputNodeBase<T>, INumberInputNode where T : struct
 {
-    protected NumberInputNodeBase(INodeCanvas canvas, Guid id) : base(canvas, id)
+    protected NumberInputNodeBase(INodeCanvas canvas, Guid guid) : base(canvas, guid)
     {
     }
 

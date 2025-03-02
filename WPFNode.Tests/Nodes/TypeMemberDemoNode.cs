@@ -18,7 +18,7 @@ public class TypeMemberDemoNode : NodeBase
     private readonly INodeProperty _selectedType;
     private Type? _lastType;
     
-    public TypeMemberDemoNode(INodeCanvas canvas, Guid id) : base(canvas, id)
+    public TypeMemberDemoNode(INodeCanvas canvas, Guid guid) : base(canvas, guid)
     {
         _selectedType = CreateProperty<Type>("selectedType", "Selected Type");
         _selectedType.Value = typeof(string);
@@ -84,7 +84,7 @@ public class TypeMemberDemoNode : NodeBase
         _lastType = type;
     }
     
-    public override Task ProcessAsync()
+    protected override Task ProcessAsync(CancellationToken cancellationToken = default)
     {
         // 실제 처리는 하지 않음 (데모용)
         return Task.CompletedTask;
