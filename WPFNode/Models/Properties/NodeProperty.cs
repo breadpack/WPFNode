@@ -208,7 +208,7 @@ public class NodeProperty<T> : INodeProperty, IInputPort<T> {
         writer.WriteEndObject();
     }
 
-    public void ReadJson(JsonElement element) {
+    public void ReadJson(JsonElement element, JsonSerializerOptions options) {
         if (element.TryGetProperty("Value", out var valueElement)) {
             Value = JsonSerializer.Deserialize<T>(valueElement.GetRawText(), NodeCanvasJsonConverter.SerializerOptions);
         }

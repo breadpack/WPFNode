@@ -136,7 +136,7 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
         writer.WriteEndObject();
     }
 
-    public void ReadJson(JsonElement element) {
+    public void ReadJson(JsonElement element, JsonSerializerOptions options) {
         if (element.TryGetProperty("Name", out var nameElement))
             Name = nameElement.GetString()!;
         if (element.TryGetProperty("IsVisible", out var visibleElement))

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Text.Json.Serialization;
 using WPFNode.Models;
@@ -7,100 +8,82 @@ using WPFNode.Demo.Models;
 using WPFNode.Attributes;
 using WPFNode.Interfaces;
 
-namespace WPFNode.Demo.Nodes
-{
+namespace WPFNode.Demo.Nodes {
     [NodeName("Excel Input")]
     [NodeCategory("Data")]
     [NodeDescription("엑셀 테이블 데이터를 입력으로 사용하는 노드")]
-    public class ExcelInputNode : NodeBase
-    {
-        private ExcelTableData _tableData;
-        private int _currentRowIndex;
-        private List<string> _headers;
-        private string _identifier;
+    public class ExcelInputNode : DynamicNode, ILoopNode {
+        private TableData              _tableData;
+        private int                    _currentRowIndex;
+        private List<ColumnDefinition> _headers;
+        private string                 _identifier;
 
-        public string Identifier
-        {
-            get => _identifier;
-            set
-            {
-                if (string.IsNullOrEmpty(value))
-                    throw new ArgumentException("식별자는 비어있을 수 없습니다.", nameof(value));
-                _identifier = value;
-            }
-        }
+        public bool IsLoopCompleted { get; private set; }
 
         [JsonIgnore]
-        public IReadOnlyList<string> Headers => _headers;
+        public IReadOnlyList<ColumnDefinition> Headers => _headers;
 
-        public ExcelInputNode(INodeCanvas canvas, Guid guid, string identifier) : base(canvas, guid)
-        {
+        public ExcelInputNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) {
             _currentRowIndex = 0;
-            _headers = new List<string>();
-            _tableData = new ExcelTableData();
-            Identifier = identifier;
+            _headers         = [];
+            _tableData       = new();
         }
 
-        public void SetHeaders(IEnumerable<string> headers)
-        {
+        public void SetTableData(TableData tableData) {
+            _tableData = tableData ?? throw new ArgumentNullException(nameof(tableData));
+            RecreateOutputPorts(tableData.Columns);
+        }
+
+        private void RecreateOutputPorts(IEnumerable<ColumnDefinition> headers) {
             if (headers == null)
                 throw new ArgumentNullException(nameof(headers));
 
+            // 헤더 정보 업데이트
             _headers.Clear();
             _headers.AddRange(headers);
-            
-            // 헤더가 변경되면 출력 포트도 다시 생성
-            RecreateOutputPorts();
-            
-            // 테이블 구조 업데이트
-            UpdateTableStructure();
+
+            // 기존 포트 제거
+            ClearPorts();
+
+            // 헤더 기반으로 출력 포트 생성
+            foreach (var header in _headers) {
+                AddOutputPort(header.Name, Type.GetType(header.TypeName)!);
+            }
         }
 
-        private void UpdateTableStructure()
-        {
-            // 새로운 테이블 생성
-            _tableData = new ExcelTableData
-            {
-                TableName = "DataTable",
-                Headers = new List<string>(_headers)
-            };
-
-            // 데이터 테이블 컬럼 생성
-            foreach (var header in _headers)
-            {
-                _tableData.Data.Columns.Add(header);
-            }
-
+        public void Reset() {
+            IsLoopCompleted  = false;
             _currentRowIndex = 0;
         }
 
-        private void RecreateOutputPorts()
-        {
-            // 기존 포트 제거
-            ClearPorts();
-            
-            // 헤더 기반으로 출력 포트 생성
-            foreach (var header in _headers)
-            {
-                CreateOutputPort<string>(header);
+        public Task<bool> ShouldContinueAsync(CancellationToken cancellationToken = default) {
+            if (_currentRowIndex >= _tableData.Rows.Count) {
+                IsLoopCompleted = true;
+                return Task.FromResult(false);
             }
+
+            return Task.FromResult(true);
         }
 
-        protected override async Task ProcessAsync(CancellationToken cancellationToken = default)
-        {
-            if (_currentRowIndex >= _tableData.Data.Rows.Count)
-            {
+        protected override async Task ProcessAsync(CancellationToken cancellationToken = default) {
+            if (_currentRowIndex >= _tableData.Rows.Count) {
                 _currentRowIndex = 0;
                 return;
             }
 
             // 현재 행의 데이터를 출력 포트로 전달
-            var currentRow = _tableData.Data.Rows[_currentRowIndex];
-            for (int i = 0; i < OutputPorts.Count; i++)
-            {
-                if (OutputPorts[i] is OutputPort<string> outputPort)
-                {
-                    outputPort.Value = currentRow[i].ToString();
+            var currentRow = _tableData.Rows[_currentRowIndex];
+            for (int i = 0; i < OutputPorts.Count; i++) {
+                if (i < currentRow.Values.Count && i < _headers.Count) {
+                    var port = OutputPorts[i];
+                    var value = JsonSerializer.Deserialize(currentRow.Values[i], _headers[i].Type);
+                    
+                    // 리플렉션을 사용하여 포트의 Value 속성에 값 설정
+                    var portType = port.GetType();
+                    var valueProperty = portType.GetProperty("Value");
+                    if (valueProperty != null) {
+                        valueProperty.SetValue(port, value);
+                    }
                 }
             }
 
@@ -108,69 +91,8 @@ namespace WPFNode.Demo.Nodes
             await Task.CompletedTask;
         }
 
-        public void SetTableData(ExcelTableData tableData)
-        {
-            if (tableData == null)
-                throw new ArgumentNullException(nameof(tableData));
-
-            _tableData = tableData;
-            SetHeaders(tableData.Headers);
-        }
-
-        public void AddRow(IEnumerable<string> values)
-        {
-            if (values == null)
-                throw new ArgumentNullException(nameof(values));
-
-            var row = _tableData.Data.NewRow();
-            var valueArray = values.ToArray();
-
-            if (valueArray.Length != _headers.Count)
-                throw new ArgumentException($"값의 개수({valueArray.Length})가 헤더 개수({_headers.Count})와 일치하지 않습니다.");
-
-            for (int i = 0; i < valueArray.Length; i++)
-            {
-                row[i] = valueArray[i];
-            }
-
-            _tableData.Data.Rows.Add(row);
-        }
-
-        public class SaveData
-        {
-            public string Identifier { get; set; }
-            public List<string> Headers { get; set; }
-            public double X { get; set; }
-            public double Y { get; set; }
-        }
-
-        public SaveData GetSaveData()
-        {
-            return new SaveData
-            {
-                Identifier = Identifier,
-                Headers = new List<string>(_headers),
-                X = X,
-                Y = Y
-            };
-        }
-
-        public void LoadFromSaveData(SaveData saveData)
-        {
-            if (saveData == null)
-                throw new ArgumentNullException(nameof(saveData));
-
-            if (saveData.Identifier != Identifier)
-                throw new ArgumentException($"저장된 식별자({saveData.Identifier})가 현재 노드의 식별자({Identifier})와 일치하지 않습니다.");
-
-            X = saveData.X;
-            Y = saveData.Y;
-            SetHeaders(saveData.Headers);
-        }
-
-        public override string ToString()
-        {
-            return $"Excel Input Node ({Identifier})";
+        public override string ToString() {
+            return $"Excel Input Node ({Id})";
         }
     }
-} 
+}

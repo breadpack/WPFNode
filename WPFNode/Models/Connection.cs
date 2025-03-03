@@ -76,7 +76,7 @@ public class Connection : IConnection
         writer.WriteBoolean("IsEnabled", IsEnabled);
     }
 
-    public void ReadJson(JsonElement element)
+    public void ReadJson(JsonElement element, JsonSerializerOptions options)
     {
         // 가변 상태만 복원
         if (element.TryGetProperty("IsEnabled", out var isEnabledElement))

@@ -85,6 +85,7 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
     static NodeCanvas()
     {
         DefaultJsonOptions.Converters.Add(new NodeCanvasJsonConverter());
+        DefaultJsonOptions.Converters.Add(new TypeJsonConverter());
     }
 
     [JsonConstructor]
@@ -373,14 +374,14 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         return new NodeCanvas();
     }
 
-    public T CreateNodeWithId<T>(Guid guid, double x = 0, double y = 0) where T : INode
+    public T CreateNodeWithGuid<T>(Guid guid, double x = 0, double y = 0) where T : INode
     {
         var nodeType = typeof(T);
-        var node = (T)CreateNodeWithId(guid, nodeType, x, y);
+        var node = (T)CreateNodeWithGuid(guid, nodeType, x, y);
         return node;
     }
 
-    public INode CreateNodeWithId(Guid guid, Type nodeType, double x = 0, double y = 0)
+    public INode CreateNodeWithGuid(Guid guid, Type nodeType, double x = 0, double y = 0)
     {
         if (!typeof(NodeBase).IsAssignableFrom(nodeType))
             throw new NodeValidationException($"노드 타입은 NodeBase를 상속해야 합니다: {nodeType.Name}");
@@ -454,14 +455,14 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
             c.TargetPortId == targetPortId);
     }
 
-    public DynamicNode CreateDynamicNode(
+    public SubCanvasNode CreateDynamicNode(
         string name,
         string category,
         string description,
         double x = 0,
         double y = 0)
     {
-        var node = new DynamicNode(this, Guid.NewGuid(), name, category, description);
+        var node = new SubCanvasNode(this, Guid.NewGuid(), name, category, description);
         node.X = x;
         node.Y = y;
         SerializableNodes.Add(node);

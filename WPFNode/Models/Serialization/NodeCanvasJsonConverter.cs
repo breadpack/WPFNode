@@ -78,7 +78,7 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                 var nodeGuid = Guid.Parse(nodeElement.GetProperty("Guid").GetString()!);
                 var x = nodeElement.GetProperty("X").GetDouble();
                 var y = nodeElement.GetProperty("Y").GetDouble();
-                var node = canvas.CreateNodeWithId(nodeGuid, nodeType, x, y);
+                var node = canvas.CreateNodeWithGuid(nodeGuid, nodeType, x, y);
                 
                 if (node == null)
                 {
@@ -90,7 +90,7 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                 // 3. 노드 상태 복원
                 if (node is IJsonSerializable serializable)
                 {
-                    serializable.ReadJson(nodeElement);
+                    serializable.ReadJson(nodeElement, options);
                 }
             }
             catch (Exception ex)
@@ -291,7 +291,7 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                 // 4. 그룹 상태 복원
                 if (group is IJsonSerializable serializable)
                 {
-                    serializable.ReadJson(groupElement);
+                    serializable.ReadJson(groupElement, _serializerOptions);
                 }
                 else
                 {

@@ -122,7 +122,7 @@ public class OutputPort<T> : IOutputPort, INotifyPropertyChanged {
         writer.WriteEndObject();
     }
 
-    public void ReadJson(JsonElement element)
+    public void ReadJson(JsonElement element, JsonSerializerOptions options)
     {
         if (element.TryGetProperty("Name", out var nameElement))
             Name = nameElement.GetString()!;

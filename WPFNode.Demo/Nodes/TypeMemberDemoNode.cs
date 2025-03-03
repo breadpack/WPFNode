@@ -94,12 +94,12 @@ public class TypeMemberDemoNode : NodeBase
         return Task.CompletedTask;
     }
 
-    public override void ReadJson(JsonElement element)
+    public override void ReadJson(JsonElement element, JsonSerializerOptions options)
     {
         // selectedType의 값이 복원되기 전의 현재 타입 저장
         var previousType = _selectedType.Value as Type;
         
-        base.ReadJson(element);
+        base.ReadJson(element, options);
 
         // selectedType의 값이 복원된 후 멤버 프로퍼티들을 다시 생성
         if (_selectedType.Value != null)

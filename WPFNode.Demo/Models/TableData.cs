@@ -1,18 +1,18 @@
+using System.Text.Json.Serialization;
+
 namespace WPFNode.Demo.Models;
 
 public class TableData
 {
-    public string TableName { get; set; } = "";
-    public List<string> Headers { get; set; } = new();
-    public List<ColumnDefinition> Columns { get; set; } = new();
-    public List<RowData> Rows { get; set; } = new();
+    public string                        TableName { get; set; } = "";
+    public List<ColumnDefinition>        Columns   { get; set; } = new();
+    public List<RowData>                 Rows      { get; set; } = new();
 
     public TableData Clone()
     {
         return new TableData
         {
             TableName = this.TableName,
-            Headers = new List<string>(this.Headers),
             Columns = new List<ColumnDefinition>(this.Columns),
             Rows = new List<RowData>(this.Rows)
         };
@@ -23,7 +23,6 @@ public class TableData
         return new TableData
         {
             TableName = this.TableName,
-            Headers = new List<string>(this.Headers),
             Columns = new List<ColumnDefinition>(),
             Rows = new List<RowData>()
         };
@@ -33,8 +32,11 @@ public class TableData
 public class ColumnDefinition
 {
     public string Name { get; set; } = "";
-    public string Type { get; set; } = "";
+    public string TypeName { get; set; } = "";
     public bool IsNullable { get; set; }
+    
+    [JsonIgnore]
+    public Type Type => Type.GetType(TypeName)!;
 }
 
 public class RowData

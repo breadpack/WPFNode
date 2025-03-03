@@ -147,7 +147,7 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
         // 새 캔버스의 내용을 복사
         foreach (var node in sourceCanvas.Nodes)
         {
-            var newNode = _canvas.CreateNodeWithId(node.Guid, node.GetType(), node.X, node.Y);
+            var newNode = _canvas.CreateNodeWithGuid(node.Guid, node.GetType(), node.X, node.Y);
             if (newNode is NodeBase newNodeBase && node is NodeBase sourceNodeBase)
             {
                 newNodeBase.Name = sourceNodeBase.Name;
@@ -447,7 +447,7 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
             .Select(n => (NodeBase)n.Model)
             .ToList();
 
-        if (selectedNodes.Any())
+        if (selectedNodes.Count != 0)
         {
             var command = new AddGroupCommand(_canvas, group.Name, selectedNodes);
             _commandManager.Execute(command);
@@ -467,20 +467,13 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
         return Nodes.FirstOrDefault(n => n.Model.Guid == nodeId);
     }
 
-    public IEnumerable<NodeViewModel> FindNodesByName(string name)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-            return Enumerable.Empty<NodeViewModel>();
-
-        return Nodes.Where(n => n.Name.Contains(name, StringComparison.OrdinalIgnoreCase));
+    public IEnumerable<NodeViewModel> FindNodesByName(string name) {
+        return string.IsNullOrWhiteSpace(name) ? [] : Nodes.Where(n => n.Name.Contains(name, StringComparison.OrdinalIgnoreCase));
     }
 
     public IEnumerable<NodeViewModel> FindNodesByType(Type nodeType)
     {
-        if (nodeType == null)
-            return Enumerable.Empty<NodeViewModel>();
-
-        return Nodes.Where(n => nodeType.IsAssignableFrom(n.Model.GetType()));
+        return Nodes.Where(n => nodeType.IsInstanceOfType(n.Model));
     }
 
     public async void ExecuteNodes()

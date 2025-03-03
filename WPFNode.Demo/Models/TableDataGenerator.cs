@@ -10,14 +10,13 @@ public static class TableDataGenerator
         var tableData = new TableData
         {
             TableName = "Employees",
-            Headers = new List<string> { "Id", "Name", "Age", "Department", "Salary" },
             Columns = new List<ColumnDefinition>
             {
-                new() { Name = "Id", Type = "System.Int32", IsNullable = false },
-                new() { Name = "Name", Type = "System.String", IsNullable = false },
-                new() { Name = "Age", Type = "System.Int32", IsNullable = false },
-                new() { Name = "Department", Type = "System.String", IsNullable = false },
-                new() { Name = "Salary", Type = "System.Decimal", IsNullable = false }
+                new() { Name = "Id", TypeName = "System.Int32", IsNullable = false },
+                new() { Name = "Name", TypeName = "System.String", IsNullable = false },
+                new() { Name = "Age", TypeName = "System.Int32", IsNullable = false },
+                new() { Name = "Department", TypeName = "System.String", IsNullable = false },
+                new() { Name = "Salary", TypeName = "System.Decimal", IsNullable = false }
             },
             Rows = new List<RowData>
             {
@@ -37,14 +36,13 @@ public static class TableDataGenerator
         var tableData = new TableData
         {
             TableName = "Products",
-            Headers = new List<string> { "ProductId", "ProductName", "Category", "Price", "Stock" },
             Columns = new List<ColumnDefinition>
             {
-                new() { Name = "ProductId", Type = "System.Int32", IsNullable = false },
-                new() { Name = "ProductName", Type = "System.String", IsNullable = false },
-                new() { Name = "Category", Type = "System.String", IsNullable = false },
-                new() { Name = "Price", Type = "System.Decimal", IsNullable = false },
-                new() { Name = "Stock", Type = "System.Int32", IsNullable = false }
+                new() { Name = "ProductId", TypeName = "System.Int32", IsNullable = false },
+                new() { Name = "ProductName", TypeName = "System.String", IsNullable = false },
+                new() { Name = "Category", TypeName = "System.String", IsNullable = false },
+                new() { Name = "Price", TypeName = "System.Decimal", IsNullable = false },
+                new() { Name = "Stock", TypeName = "System.Int32", IsNullable = false }
             },
             Rows = new List<RowData>
             {

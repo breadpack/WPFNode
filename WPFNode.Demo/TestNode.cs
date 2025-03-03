@@ -9,8 +9,8 @@ using WPFNode.Models.Properties;
 
 namespace WPFNode.Demo;
 
-[NodeName("테스트 노드")]
-[NodeCategory("테스트")]
+[NodeName("Test Node")]
+[NodeCategory("Test")]
 [NodeDescription("속성 그리드 테스트를 위한 노드입니다.")]
 public class TestNode : NodeBase {
     public OutputPort<string> Output { get; }

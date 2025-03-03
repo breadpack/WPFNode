@@ -358,7 +358,7 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         writer.WriteEndArray();
     }
 
-    public virtual void ReadJson(JsonElement element)
+    public virtual void ReadJson(JsonElement element, JsonSerializerOptions options)
     {
         try
         {
@@ -383,7 +383,7 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
                         if (key != null && Properties.TryGetValue(key, out var property) && 
                             property is IJsonSerializable serializable)
                         {
-                            serializable.ReadJson(propertyElement);
+                            serializable.ReadJson(propertyElement, options);
                         }
                     }
                 }

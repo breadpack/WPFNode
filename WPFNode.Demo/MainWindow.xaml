@@ -8,9 +8,12 @@
         xmlns:controls="clr-namespace:WPFNode.Controls;assembly=WPFNode"
         xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
         mc:Ignorable="d"
-        Title="Node Editor" Height="450" Width="800"
+        Title="Migration Plan Designer" Height="800" Width="1200"
         WindowStartupLocation="CenterScreen"
         Closing="Window_Closing">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </Window.Resources>
     <i:Interaction.Triggers>
         <i:EventTrigger EventName="Loaded">
             <i:InvokeCommandAction Command="{Binding LoadedCommand}"/>
@@ -23,9 +26,16 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="250"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-        <ToolBar Grid.Row="0">
+        <!-- 상단 툴바 -->
+        <ToolBar Grid.Row="0" Grid.ColumnSpan="2">
             <Button Command="{Binding NodeCanvasViewModel.ExecuteCommand}">
                 <StackPanel Orientation="Horizontal">
                     <Path Data="M8,5 L19,12 L8,19 Z" Fill="#FF1E90FF" Stretch="Uniform" Width="16" Height="16" Margin="0,0,4,0"/>
@@ -33,22 +43,130 @@
                 </StackPanel>
             </Button>
             <Separator/>
-            <Button Content="자동 정렬" Command="{Binding NodeCanvasViewModel.AutoLayoutCommand}"/>
+            <Button Content="자동 정렬" Command="{Binding AutoLayoutCommand}"/>
             <Separator/>
             <Button Content="실행 취소" Command="{Binding NodeCanvasViewModel.UndoCommand}"/>
             <Button Content="다시 실행" Command="{Binding NodeCanvasViewModel.RedoCommand}"/>
             <Separator/>
             <Button Content="저장" Command="{Binding SaveCommand}"/>
             <Button Content="불러오기" Command="{Binding LoadCommand}"/>
+            <Separator/>
+            <Button Content="마이그레이션 플랜 저장" Command="{Binding SaveMigrationPlanCommand}"/>
+            <Button Content="마이그레이션 실행" Command="{Binding ExecuteMigrationCommand}"/>
         </ToolBar>
 
+        <!-- 왼쪽 패널 - 테이블 선택 및 정보 -->
+        <Grid Grid.Row="1" Grid.Column="0" Margin="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Text="테이블 선택" FontWeight="Bold" Margin="0,0,0,5"/>
+            
+            <ComboBox Grid.Row="1" 
+                      ItemsSource="{Binding AvailableTables}" 
+                      SelectedItem="{Binding SelectedTable}"
+                      DisplayMemberPath="TableName"
+                      Margin="0,0,0,10"/>
+            
+            <GroupBox Grid.Row="2" Header="테이블 정보">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    
+                    <TextBlock Grid.Row="0" Text="{Binding SelectedTable.TableName, StringFormat=테이블 이름: {0}}" Margin="0,0,0,5"/>
+                    
+                    <DataGrid Grid.Row="1" 
+                              ItemsSource="{Binding SelectedTable.Columns}" 
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              HeadersVisibility="Column"
+                              GridLinesVisibility="All"
+                              BorderThickness="1"
+                              BorderBrush="#FFABADB3">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="컬럼명" Binding="{Binding Name}" Width="*"/>
+                            <DataGridTextColumn Header="타입" Binding="{Binding TypeName}" Width="*"/>
+                            <DataGridCheckBoxColumn Header="Nullable" Binding="{Binding IsNullable}" Width="60"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </GroupBox>
+            
+            <Button Grid.Row="3" 
+                    Content="선택한 테이블로 마이그레이션 플랜 로드" 
+                    Command="{Binding LoadMigrationPlanCommand}"
+                    CommandParameter="{Binding SelectedTable.TableName}"
+                    Margin="0,10,0,0"/>
+        </Grid>
+
+        <!-- 노드 캔버스 -->
         <controls:NodeCanvasControl
             x:Name="NodeCanvasControl"
             Grid.Row="1"
+            Grid.Column="1"
             HorizontalAlignment="Stretch"
             VerticalAlignment="Stretch"
             HorizontalContentAlignment="Stretch"
             VerticalContentAlignment="Stretch"
             DataContext="{Binding NodeCanvasViewModel}"/>
+
+        <!-- 상태 표시줄 -->
+        <StatusBar Grid.Row="2" Grid.ColumnSpan="2">
+            <StatusBarItem>
+                <TextBlock Text="{Binding StatusMessage}"/>
+            </StatusBarItem>
+        </StatusBar>
+
+        <!-- 마이그레이션 결과 -->
+        <Expander Grid.Row="3" Grid.ColumnSpan="2" Header="마이그레이션 결과" IsExpanded="{Binding IsMigrationCompleted}">
+            <Grid Margin="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                
+                <TextBlock Grid.Row="0" 
+                           Text="{Binding MigratedTable.TableName, StringFormat=마이그레이션된 테이블: {0}}" 
+                           FontWeight="Bold" 
+                           Margin="0,0,0,5"
+                           Visibility="{Binding IsMigrationCompleted, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                
+                <DataGrid Grid.Row="1" 
+                          x:Name="ResultDataGrid"
+                          ItemsSource="{Binding MigratedTable.Rows}" 
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          MaxHeight="200"
+                          Visibility="{Binding IsMigrationCompleted, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <DataGrid.Columns>
+                        <!-- 동적 컬럼 생성을 위한 코드는 코드 비하인드에서 처리 -->
+                    </DataGrid.Columns>
+                </DataGrid>
+                
+                <TextBlock Grid.Row="2" 
+                           Text="JSON 결과:" 
+                           FontWeight="Bold" 
+                           Margin="0,10,0,5"
+                           Visibility="{Binding IsMigrationCompleted, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                
+                <TextBox Grid.Row="3" 
+                         Text="{Binding MigrationJsonResult, Mode=OneWay}" 
+                         IsReadOnly="True"
+                         TextWrapping="Wrap"
+                         VerticalScrollBarVisibility="Auto"
+                         HorizontalScrollBarVisibility="Auto"
+                         FontFamily="Consolas"
+                         MaxHeight="200"
+                         Visibility="{Binding IsMigrationCompleted, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+            </Grid>
+        </Expander>
     </Grid>
 </Window> 
