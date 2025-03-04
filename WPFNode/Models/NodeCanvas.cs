@@ -271,6 +271,7 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         connection.Target.RemoveConnection(connection);
         
         OnPropertyChanged(nameof(Connections));
+        OnConnectionRemoved(connection);
     }
 
     public NodeGroup CreateGroup(IEnumerable<NodeBase> nodes, string name = "New Group")
@@ -283,7 +284,7 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         {
             if (_nodes.Contains(node))
             {
-                group.Nodes.Add(node);
+                group.Add(node);
             }
         }
         _groups.Add(group);
@@ -440,7 +441,7 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         {
             if (_nodes.Contains(node))
             {
-                group.Nodes.Add(node);
+                group.Add(node);
             }
         }
         _groups.Add(group);

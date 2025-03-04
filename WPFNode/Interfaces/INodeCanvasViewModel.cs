@@ -7,14 +7,15 @@ namespace WPFNode.Interfaces;
 
 public interface INodeCanvasViewModel
 {
-    ObservableCollection<NodeViewModel> Nodes { get; }
-    ObservableCollection<ConnectionViewModel> Connections { get; }
-    ObservableCollection<NodeGroupViewModel> Groups { get; }
+    ObservableCollection<NodeViewModel>       Nodes           { get; }
+    ObservableCollection<ConnectionViewModel> Connections     { get; }
+    ObservableCollection<NodeGroupViewModel>  Groups          { get; }
+    ObservableCollection<ISelectable>         SelectableItems { get; }
+    ObservableCollection<ISelectable>         SelectedItems   { get; }
     
     double Scale { get; set; }
     double OffsetX { get; set; }
     double OffsetY { get; set; }
-    NodeViewModel? SelectedNode { get; set; }
 
     IWpfCommand AddNodeCommand { get; }
     IWpfCommand RemoveNodeCommand { get; }
@@ -33,6 +34,38 @@ public interface INodeCanvasViewModel
     NodePortViewModel FindPortViewModel(IPort port);
     void OnPortsChanged();
     NodeCanvas Model { get; }
+
+    /// <summary>
+    /// 모든 선택 가능한 항목의 선택을 해제합니다.
+    /// </summary>
+    void ClearSelection();
+    
+    /// <summary>
+    /// 선택된 모든 항목을 반환합니다.
+    /// </summary>
+    IEnumerable<ISelectable> GetSelectedItems();
+    
+    /// <summary>
+    /// 지정된 유형의 선택된 항목을 반환합니다.
+    /// </summary>
+    IEnumerable<T> GetSelectedItemsOfType<T>() where T : ISelectable;
+    
+    /// <summary>
+    /// 항목을 선택합니다.
+    /// </summary>
+    /// <param name="selectable">선택할 항목</param>
+    /// <param name="clearOthers">다른 항목의 선택을 해제할지 여부</param>
+    void SelectItem(ISelectable selectable, bool clearOthers = true);
+    
+    /// <summary>
+    /// 모든 선택 가능한 항목을 선택합니다.
+    /// </summary>
+    void SelectAll();
+    
+    /// <summary>
+    /// ID로 항목을 찾아 반환합니다.
+    /// </summary>
+    ISelectable? FindSelectableById(Guid id);
 
     /// <summary>
     /// 지정된 파일 경로에 캔버스를 저장합니다.

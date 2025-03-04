@@ -20,9 +20,8 @@ public class AddGroupCommand : ICommand
 
     public void Execute()
     {
-        foreach (var node in _nodes)
-        {
-            _group.Nodes.Add(node);
+        foreach (var node in _nodes) {
+            _group.Add(node);
         }
         _canvas.AddGroup(_group);
     }
@@ -57,7 +56,7 @@ public class RemoveGroupCommand : ICommand
     {
         foreach (var node in _nodes)
         {
-            _group.Nodes.Add(node);
+            _group.Add(node);
         }
         _canvas.AddGroup(_group);
     }

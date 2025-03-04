@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using WPFNode.Utilities;
@@ -13,6 +14,11 @@ public class ConnectionControl : Control
     private Path? _arrow;
     private PathFigure? _pathFigure;
     private BezierSegment? _bezierSegment;
+    
+    private static readonly Brush DefaultBrush = Brushes.Gray;
+    private static readonly Brush SelectedBrush = Brushes.Orange;
+    private const double DefaultThickness = 2.0;
+    private const double SelectedThickness = 3.0;
 
     static ConnectionControl()
     {
@@ -27,9 +33,70 @@ public class ConnectionControl : Control
 
     public ConnectionControl()
     {
-        Foreground = Brushes.Gray;
+        Foreground = DefaultBrush;
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
+        MouseLeftButtonDown += OnMouseLeftButtonDown;
+        DataContextChanged += OnDataContextChanged;
+    }
+    
+    private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (e.OldValue is ConnectionViewModel oldViewModel)
+        {
+            oldViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        }
+        
+        if (e.NewValue is ConnectionViewModel newViewModel)
+        {
+            newViewModel.PropertyChanged += OnViewModelPropertyChanged;
+            UpdateVisualState();
+        }
+    }
+    
+    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ConnectionViewModel.IsSelected))
+        {
+            UpdateVisualState();
+        }
+    }
+    
+    private void UpdateVisualState()
+    {
+        if (ViewModel == null || _path == null) return;
+        
+        if (ViewModel.IsSelected)
+        {
+            _path.Stroke = SelectedBrush;
+            _path.StrokeThickness = SelectedThickness;
+            if (_arrow != null)
+            {
+                _arrow.Fill = SelectedBrush;
+            }
+        }
+        else
+        {
+            _path.Stroke = DefaultBrush;
+            _path.StrokeThickness = DefaultThickness;
+            if (_arrow != null)
+            {
+                _arrow.Fill = DefaultBrush;
+            }
+        }
+    }
+    
+    private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (ViewModel == null) return;
+        
+        // 현재 연결선 선택 상태 토글
+        if (ViewModel.IsSelected)
+            ViewModel.Deselect();
+        else
+            ViewModel.Select();
+        
+        e.Handled = true;
     }
 
     public override void OnApplyTemplate()
@@ -42,6 +109,7 @@ public class ConnectionControl : Control
         _bezierSegment = GetTemplateChild("PART_BezierSegment") as BezierSegment;
 
         UpdateConnection();
+        UpdateVisualState();
     }
 
     protected override void OnRender(DrawingContext drawingContext)

@@ -31,16 +31,6 @@ public class RemoveNodeCommand : ICommand
 
     public void Execute()
     {
-        // 모든 연결 제거
-        var connections = _node.InputPorts.SelectMany(p => p.Connections)
-                             .Concat(_node.OutputPorts.SelectMany(p => p.Connections))
-                             .Distinct()
-                             .ToList();
-                             
-        foreach (var connection in connections)
-        {
-            _canvas.Disconnect(connection);
-        }
         _canvas.RemoveNode(_node);
     }
 

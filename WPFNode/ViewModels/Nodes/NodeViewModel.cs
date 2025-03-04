@@ -7,17 +7,17 @@ using WPFNode.Interfaces;
 using WPFNode.Models;
 using WPFNode.ViewModels.Base;
 using ICommand = System.Windows.Input.ICommand;
+using System.Linq;
 
 namespace WPFNode.ViewModels.Nodes;
 
-public class NodeViewModel : ViewModelBase, INodeViewModel
+public class NodeViewModel : ViewModelBase, INodeViewModel, ISelectable, IDisposable
 {
     private readonly NodeBase _model;
     private readonly INodeCommandService _commandService;
     private readonly NodeCanvasViewModel _canvas;
     private Point _position;
     private string _name;
-    private bool _isSelected;
 
     private readonly ObservableCollection<NodePortViewModel> _inputPorts;
     private readonly ObservableCollection<NodePortViewModel> _outputPorts;
@@ -26,19 +26,18 @@ public class NodeViewModel : ViewModelBase, INodeViewModel
 
     public NodeViewModel(NodeBase model, INodeCommandService commandService, NodeCanvasViewModel canvas)
     {
-        _model = model;
+        _model          = model;
         _commandService = commandService;
-        _canvas = canvas;
-        _name = model.Name;
-        _position = new Point(model.X, model.Y);
-        
-        _inputPorts = new ObservableCollection<NodePortViewModel>(
-            model.InputPorts.Select(p => new NodePortViewModel(p, canvas)));
-        _outputPorts = new ObservableCollection<NodePortViewModel>(
-            model.OutputPorts.Select(p => new NodePortViewModel(p, canvas)));
+        _canvas         = canvas;
+        _position       = new(model.X, model.Y);
+        _name           = model.Name;
 
-        InputPorts = new ReadOnlyObservableCollection<NodePortViewModel>(_inputPorts);
-        OutputPorts = new ReadOnlyObservableCollection<NodePortViewModel>(_outputPorts);
+        // 포트 컬렉션 초기화
+        _inputPorts = new(model.InputPorts.Select(p => new NodePortViewModel(p, canvas)));
+        _outputPorts = new(model.OutputPorts.Select(p => new NodePortViewModel(p, canvas)));
+
+        InputPorts  = new(_inputPorts);
+        OutputPorts = new(_outputPorts);
 
         // 포트의 Parent 설정
         foreach (var port in InputPorts.Concat(OutputPorts))
@@ -50,10 +49,34 @@ public class NodeViewModel : ViewModelBase, INodeViewModel
         _inputPorts.CollectionChanged += OnPortsCollectionChanged;
         _outputPorts.CollectionChanged += OnPortsCollectionChanged;
 
-        DeleteCommand = new RelayCommand(Delete);
-        
-        // Model 속성 변경 감지
+        // 모델 속성 변경 이벤트 구독
         _model.PropertyChanged += Model_PropertyChanged;
+
+        // 선택 상태 변경 이벤트 구독
+        _canvas.SelectedItems.CollectionChanged += SelectedItemsOnCollectionChanged;
+
+        // 명령 초기화
+        DeleteCommand = new RelayCommand(Delete);
+    }
+
+    private void SelectedItemsOnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) {
+        if (e is { Action: NotifyCollectionChangedAction.Add, NewItems: not null }) {
+            if (e.NewItems.OfType<INodeViewModel>().Any(item => item == this)) {
+                OnPropertyChanged(nameof(IsSelected));
+            }
+        } else if (e is { Action: NotifyCollectionChangedAction.Remove, OldItems: not null }) {
+            if (e.OldItems.OfType<INodeViewModel>().Any(item => item == this)) {
+                OnPropertyChanged(nameof(IsSelected));
+            }
+        }
+        else if (e is { Action: NotifyCollectionChangedAction.Reset }) {
+            OnPropertyChanged(nameof(IsSelected));
+        }
+    }
+
+    public void Dispose() {
+        _model.PropertyChanged -= Model_PropertyChanged;
+        _canvas.SelectedItems.CollectionChanged -= SelectedItemsOnCollectionChanged;
     }
 
     public Guid Id => _model.Guid;
@@ -99,10 +122,26 @@ public class NodeViewModel : ViewModelBase, INodeViewModel
         }
     }
 
-    public bool IsSelected
+    /// <summary>
+    /// 노드가 선택되었는지 확인합니다.
+    /// </summary>
+    public bool IsSelected => _canvas.IsItemSelected(this);
+
+    /// <summary>
+    /// 노드를 선택합니다.
+    /// </summary>
+    /// <param name="clearOthers">다른 항목의 선택을 해제할지 여부</param>
+    public void Select(bool clearOthers = true)
     {
-        get => _isSelected;
-        set => SetProperty(ref _isSelected, value);
+        _canvas.SelectItem(this, clearOthers);
+    }
+
+    /// <summary>
+    /// 노드의 선택을 해제합니다.
+    /// </summary>
+    public void Deselect()
+    {
+        _canvas.DeselectItem(this);
     }
 
     public ICommand DeleteCommand { get; }
@@ -153,14 +192,14 @@ public class NodeViewModel : ViewModelBase, INodeViewModel
                 _inputPorts.Clear();
                 foreach (var port in _model.InputPorts)
                 {
-                    _inputPorts.Add(new NodePortViewModel(port, _canvas));
+                    _inputPorts.Add(new(port, _canvas));
                 }
                 break;
             case nameof(INode.OutputPorts):
                 _outputPorts.Clear();
                 foreach (var port in _model.OutputPorts)
                 {
-                    _outputPorts.Add(new NodePortViewModel(port, _canvas));
+                    _outputPorts.Add(new(port, _canvas));
                 }
                 break;
             case nameof(INode.Properties):
@@ -169,12 +208,12 @@ public class NodeViewModel : ViewModelBase, INodeViewModel
                 _inputPorts.Clear();
                 foreach (var port in _model.InputPorts)
                 {
-                    _inputPorts.Add(new NodePortViewModel(port, _canvas));
+                    _inputPorts.Add(new(port, _canvas));
                 }
                 break;
             case nameof(NodeBase.X):
             case nameof(NodeBase.Y):
-                Position = new Point(_model.X, _model.Y);
+                Position = new(_model.X, _model.Y);
                 break;
             case nameof(NodeBase.Name):
                 Name = _model.Name;
@@ -200,4 +239,7 @@ public class NodeViewModel : ViewModelBase, INodeViewModel
     {
         return Model.GetType();
     }
+
+    // ISelectable 인터페이스 구현
+    public string SelectionType => "Node";
 } 

@@ -32,13 +32,13 @@ public class ViewportChangedEventArgs : EventArgs
 
 public class NodeCanvasControl : Control
 {
-    private NodeViewModel? _dragNode;
-    private Point? _lastMousePosition;
+    private NodeViewModel?     _dragNode;
+    private Point?             _lastMousePosition;
     private NodePortViewModel? _dragStartPort;
-    private Line? _dragLine;
-    private Canvas? _dragCanvas;
-    private ScrollViewer? _scrollViewer;
-    private SearchPanel? _searchPanel;
+    private Line?              _dragLine;
+    private Canvas?            _dragCanvas;
+    private ScrollViewer?      _scrollViewer;
+    private SearchPanel?       _searchPanel;
     
     private readonly NodeCanvasStateManager _stateManager;
     private bool _isUpdatingLayout;
@@ -155,6 +155,8 @@ public class NodeCanvasControl : Control
     public event EventHandler<NodeViewModel>? NodeMoved;
     public event EventHandler<NodeViewModel>? NodeSelected;
     public event EventHandler<NodeViewModel>? NodeDeselected;
+    public event EventHandler<ConnectionViewModel>? ConnectionSelected;
+    public event EventHandler<ConnectionViewModel>? ConnectionDeselected;
     public event EventHandler<ViewportChangedEventArgs>? ViewportChanged;
 
     protected virtual void OnNodeAdded(NodeViewModel node)
@@ -190,6 +192,16 @@ public class NodeCanvasControl : Control
     protected virtual void OnNodeDeselected(NodeViewModel node)
     {
         NodeDeselected?.Invoke(this, node);
+    }
+
+    protected virtual void OnConnectionSelected(ConnectionViewModel connection)
+    {
+        ConnectionSelected?.Invoke(this, connection);
+    }
+
+    protected virtual void OnConnectionDeselected(ConnectionViewModel connection)
+    {
+        ConnectionDeselected?.Invoke(this, connection);
     }
 
     protected virtual void OnViewportChanged(double scale, double offsetX, double offsetY)
@@ -271,6 +283,15 @@ public class NodeCanvasControl : Control
         viewModel.PropertyChanged += OnViewModelPropertyChanged;
         ((INotifyCollectionChanged)viewModel.Nodes).CollectionChanged += OnNodesCollectionChanged;
         ((INotifyCollectionChanged)viewModel.Connections).CollectionChanged += OnConnectionsCollectionChanged;
+        
+        foreach (NodeViewModel node in viewModel.Nodes)
+        {
+            node.PropertyChanged += OnNodePropertyChanged;
+        }
+        foreach (ConnectionViewModel connection in viewModel.Connections)
+        {
+            connection.PropertyChanged += OnConnectionPropertyChanged;
+        }
     }
 
     private void UnsubscribeFromViewModelEvents(NodeCanvasViewModel viewModel)
@@ -278,6 +299,15 @@ public class NodeCanvasControl : Control
         viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         ((INotifyCollectionChanged)viewModel.Nodes).CollectionChanged -= OnNodesCollectionChanged;
         ((INotifyCollectionChanged)viewModel.Connections).CollectionChanged -= OnConnectionsCollectionChanged;
+        
+        foreach (NodeViewModel node in viewModel.Nodes)
+        {
+            node.PropertyChanged -= OnNodePropertyChanged;
+        }
+        foreach (ConnectionViewModel connection in viewModel.Connections)
+        {
+            connection.PropertyChanged -= OnConnectionPropertyChanged;
+        }
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -290,10 +320,6 @@ public class NodeCanvasControl : Control
                 case nameof(NodeCanvasViewModel.OffsetX):
                 case nameof(NodeCanvasViewModel.OffsetY):
                     OnViewportChanged(viewModel.Scale, viewModel.OffsetX, viewModel.OffsetY);
-                    break;
-                case nameof(NodeCanvasViewModel.SelectedNode):
-                    if (viewModel.SelectedNode != null)
-                        OnNodeSelected(viewModel.SelectedNode);
                     break;
             }
         }
@@ -328,12 +354,14 @@ public class NodeCanvasControl : Control
                 foreach (ConnectionViewModel connection in e.NewItems!)
                 {
                     OnConnectionAdded(connection);
+                    connection.PropertyChanged += OnConnectionPropertyChanged;
                 }
                 break;
             case NotifyCollectionChangedAction.Remove:
                 foreach (ConnectionViewModel connection in e.OldItems!)
                 {
                     OnConnectionRemoved(connection);
+                    connection.PropertyChanged -= OnConnectionPropertyChanged;
                 }
                 break;
         }
@@ -348,11 +376,30 @@ public class NodeCanvasControl : Control
                 case nameof(NodeViewModel.Position):
                     OnNodeMoved(node);
                     break;
-                case nameof(NodeViewModel.IsSelected):
-                    if (node.IsSelected)
+                case nameof(NodeViewModel.IsSelected): {
+                    if (node.IsSelected) {
                         OnNodeSelected(node);
+                    }
                     else
                         OnNodeDeselected(node);
+                    break;
+                }
+            }
+        }
+    }
+
+    private void OnConnectionPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (sender is ConnectionViewModel connection)
+        {
+            switch (e.PropertyName)
+            {
+                case nameof(ConnectionViewModel.IsSelected):
+                    if (connection.IsSelected) {
+                        OnConnectionSelected(connection);
+                    }
+                    else
+                        OnConnectionDeselected(connection);
                     break;
             }
         }
@@ -655,31 +702,36 @@ public class NodeCanvasControl : Control
                     break;
 
                 case Key.A:
-                    SelectAllNodes();
+                    SelectAllItems();
                     e.Handled = true;
                     break;
             }
         }
         else if (e.Key == Key.Delete)
         {
-            DeleteSelectedNodes();
+            DeleteSelectedItems();
             e.Handled = true;
         }
     }
 
-    private void SelectAllNodes()
+    private void SelectAllItems()
     {
         if (ViewModel == null) return;
-        foreach (var node in ViewModel.Nodes)
-        {
-            node.IsSelected = true;
-        }
+        
+        // 모든 선택 가능한 항목 선택
+        ViewModel.SelectAll();
     }
 
     private void CopySelectedNodes()
     {
         if (ViewModel == null) return;
-        ViewModel.CopyCommand.Execute(null);
+        
+        // 선택된 노드만 복사 (현재 ISelectable을 구현해도 노드만 복사 가능하므로)
+        var selectedNodes = ViewModel.GetSelectedItemsOfType<NodeViewModel>().ToList();
+        if (selectedNodes.Any())
+        {
+            ViewModel.CopyCommand.Execute(null);
+        }
     }
 
     private void PasteNodes()
@@ -688,13 +740,27 @@ public class NodeCanvasControl : Control
         ViewModel.PasteCommand.Execute(null);
     }
 
-    private void DeleteSelectedNodes()
+    private void DeleteSelectedItems()
     {
         if (ViewModel == null) return;
-        var selectedNodes = ViewModel.Nodes.Where(n => n.IsSelected).ToList();
-        foreach (var node in selectedNodes)
+        
+        // ISelectable 인터페이스를 사용하여 모든 선택된 항목 처리
+        var selectedItems = ViewModel.GetSelectedItems().ToList();
+        
+        foreach (var item in selectedItems)
         {
-            ViewModel.RemoveNodeCommand.Execute(node);
+            switch (item)
+            {
+                case NodeViewModel nodeVM:
+                    ViewModel.RemoveNodeCommand.Execute(nodeVM);
+                    break;
+                    
+                case ConnectionViewModel connectionVM:
+                    ViewModel.DisconnectCommand.Execute((connectionVM.Source, connectionVM.Target));
+                    break;
+                    
+                // 향후 다른 유형의 선택 가능한 항목이 추가되면 여기에 케이스 추가
+            }
         }
     }
 

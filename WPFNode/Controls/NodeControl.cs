@@ -160,7 +160,7 @@ public class NodeControl : ContentControl, INodeControl
         var canvas = this.GetParentOfType<NodeCanvasControl>();
         if (canvas?.ViewModel == null) return;
 
-        var selectedNodes = canvas.ViewModel.Nodes.Where(n => n.IsSelected).ToList();
+        var selectedNodes = canvas.ViewModel.GetSelectedItemsOfType<NodeViewModel>().ToList();
         if (selectedNodes.Any())
         {
             var nodeDataList = selectedNodes.Select(n => ((NodeBase)n.Model).CreateCopy()).ToList();
@@ -187,7 +187,7 @@ public class NodeControl : ContentControl, INodeControl
         var canvas = this.GetParentOfType<NodeCanvasControl>();
         if (canvas?.ViewModel == null) return;
 
-        var selectedNodes = canvas.ViewModel.Nodes.Where(n => n.IsSelected).ToList();
+        var selectedNodes = canvas.ViewModel.GetSelectedItemsOfType<NodeViewModel>().ToList();
         foreach (var node in selectedNodes)
         {
             canvas.ViewModel.RemoveNodeCommand.Execute(node);
@@ -208,12 +208,12 @@ public class NodeControl : ContentControl, INodeControl
                 foreach (var node in canvas.ViewModel.Nodes)
                 {
                     if (node != ViewModel)
-                        node.IsSelected = false;
+                        node.Deselect();
                 }
             }
         }
 
-        ViewModel.IsSelected = true;
+        ViewModel.Select();
         _dragStart = e.GetPosition(this.Parent as IInputElement);
         _nodeStartPosition = ViewModel.Position;
         CaptureMouse();
@@ -251,7 +251,7 @@ public class NodeControl : ContentControl, INodeControl
 
     private void OnNodeDrag(object sender, MouseEventArgs e)
     {
-        if (_dragStart.HasValue && ViewModel != null && IsMouseCaptured)
+        if (_dragStart.HasValue && ViewModel != null && e.LeftButton == MouseButtonState.Pressed)
         {
             var currentPos = e.GetPosition(this.Parent as IInputElement);
             var delta = currentPos - _dragStart.Value;
@@ -259,18 +259,15 @@ public class NodeControl : ContentControl, INodeControl
             var canvas = this.GetParentOfType<NodeCanvasControl>();
             if (canvas?.ViewModel != null)
             {
-                foreach (var node in canvas.ViewModel.Nodes)
+                var selectedNodes = canvas.ViewModel.GetSelectedItemsOfType<NodeViewModel>();
+                foreach (var node in selectedNodes)
                 {
-                    if (node.IsSelected)
-                    {
-                        node.Position = new Point(
-                            _nodeStartPosition.X + delta.X,
-                            _nodeStartPosition.Y + delta.Y);
-                    }
+                    node.Position = new Point(
+                        _nodeStartPosition.X + delta.X,
+                        _nodeStartPosition.Y + delta.Y);
                 }
-                UpdateCenteredPosition();
             }
-
+            UpdateCenteredPosition();
             e.Handled = true;
         }
     }

@@ -28,6 +28,13 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
     public ObservableCollection<NodeViewModel> Nodes { get; init; }
     public ObservableCollection<ConnectionViewModel> Connections { get; init; }
     public ObservableCollection<NodeGroupViewModel> Groups { get; init; }
+    
+    // 선택 가능한 모든 항목을 저장하는 컬렉션
+    public ObservableCollection<ISelectable> SelectableItems { get; init; }
+    
+    // 선택된 항목들을 저장하는 컬렉션
+    [ObservableProperty]
+    private ObservableCollection<ISelectable> _selectedItems;
 
     [ObservableProperty]
     private double _scale = 1.0;
@@ -37,9 +44,6 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
 
     [ObservableProperty]
     private double _offsetY;
-
-    [ObservableProperty]
-    private NodeViewModel? _selectedNode;
 
     public IWpfCommand AddNodeCommand { get; init; }
     public IWpfCommand RemoveNodeCommand { get; init; }
@@ -72,6 +76,8 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
         Nodes = new ObservableCollection<NodeViewModel>();
         Connections = new ObservableCollection<ConnectionViewModel>();
         Groups = new ObservableCollection<NodeGroupViewModel>();
+        SelectableItems = new ObservableCollection<ISelectable>();
+        _selectedItems = new ObservableCollection<ISelectable>();
 
         // 커맨드 초기화
         AddNodeCommand = new RelayCommand<Type>(ExecuteAddNode);
@@ -189,6 +195,7 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
         var nodeViewModel = CreateNodeViewModel(node);
         RegisterNodeEvents(nodeViewModel);
         Nodes.Add(nodeViewModel);
+        SelectableItems.Add(nodeViewModel);
     }
 
     private void OnNodeRemoved(object? sender, INode node)
@@ -198,6 +205,8 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
         {
             UnregisterNodeEvents(viewModel);
             Nodes.Remove(viewModel);
+            SelectableItems.Remove(viewModel);
+            viewModel.Dispose();
         }
     }
 
@@ -206,6 +215,7 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
         var connectionViewModel = new ConnectionViewModel(connection, this);
         RegisterConnectionEvents(connectionViewModel);
         Connections.Add(connectionViewModel);
+        SelectableItems.Add(connectionViewModel);
     }
 
     private void OnConnectionRemoved(object? sender, IConnection connection)
@@ -215,6 +225,8 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
         {
             UnregisterConnectionEvents(viewModel);
             Connections.Remove(viewModel);
+            SelectableItems.Remove(viewModel);
+            viewModel.Dispose();
         }
     }
 
@@ -232,6 +244,7 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
         {
             UnregisterGroupEvents(viewModel);
             Groups.Remove(viewModel);
+            viewModel.Dispose();
         }
     }
 
@@ -244,35 +257,51 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
         BindingOperations.DisableCollectionSynchronization(Nodes);
         BindingOperations.DisableCollectionSynchronization(Connections);
         BindingOperations.DisableCollectionSynchronization(Groups);
+        BindingOperations.DisableCollectionSynchronization(SelectableItems);
 
+        foreach (var node in Nodes) {
+            node.Dispose();
+        }
         Nodes.Clear();
+        
         foreach (var node in _canvas.Nodes)
         {
             var nodeViewModel = CreateNodeViewModel(node);
             RegisterNodeEvents(nodeViewModel);
             Nodes.Add(nodeViewModel);
+            SelectableItems.Add(nodeViewModel);
         }
 
+        foreach (var connection in Connections) {
+            connection.Dispose();
+        }
         Connections.Clear();
         foreach (var connection in _canvas.Connections)
         {
             var connectionViewModel = new ConnectionViewModel(connection, this);
             RegisterConnectionEvents(connectionViewModel);
             Connections.Add(connectionViewModel);
+            SelectableItems.Add(connectionViewModel);
         }
-
+        
+        foreach (var group in Groups) {
+            group.Dispose();
+        }
         Groups.Clear();
         foreach (var group in _canvas.Groups)
         {
             var groupViewModel = new NodeGroupViewModel(group, this);
             RegisterGroupEvents(groupViewModel);
             Groups.Add(groupViewModel);
+            // 추후 그룹도 ISelectable 구현하면 추가
+            // SelectableItems.Add(groupViewModel);
         }
 
         // 컬렉션 동기화 재개
         BindingOperations.EnableCollectionSynchronization(Nodes, new object());
         BindingOperations.EnableCollectionSynchronization(Connections, new object());
         BindingOperations.EnableCollectionSynchronization(Groups, new object());
+        BindingOperations.EnableCollectionSynchronization(SelectableItems, new object());
     }
 
     private void RegisterNodeEvents(NodeViewModel node)
@@ -309,20 +338,14 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
     {
         if (sender is NodeViewModel viewModel && e.PropertyName == nameof(NodeViewModel.IsSelected))
         {
-            if (viewModel.IsSelected)
-            {
-                SelectedNode = viewModel;
-            }
-            else if (SelectedNode == viewModel)
-            {
-                SelectedNode = null;
-            }
         }
     }
 
     private void OnConnectionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        // 필요한 경우 Connection 속성 변경 처리
+        if (sender is ConnectionViewModel viewModel && e.PropertyName == nameof(ConnectionViewModel.IsSelected))
+        {
+        }
     }
 
     private void OnGroupPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -598,6 +621,7 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
                     BindingOperations.DisableCollectionSynchronization(Nodes);
                     BindingOperations.DisableCollectionSynchronization(Connections);
                     BindingOperations.DisableCollectionSynchronization(Groups);
+                    BindingOperations.DisableCollectionSynchronization(SelectableItems);
 
                     UnregisterCanvasEvents();
                     ClearCanvas();
@@ -617,6 +641,7 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
                     BindingOperations.EnableCollectionSynchronization(Nodes, new object());
                     BindingOperations.EnableCollectionSynchronization(Connections, new object());
                     BindingOperations.EnableCollectionSynchronization(Groups, new object());
+                    BindingOperations.EnableCollectionSynchronization(SelectableItems, new object());
 
                     tcs.SetResult();
                 }
@@ -655,4 +680,92 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
     }
 
     public NodeCanvas Model => _canvas;
+
+    /// <summary>
+    /// 항목이 선택되었는지 확인합니다.
+    /// </summary>
+    /// <param name="item">확인할 항목</param>
+    /// <returns>항목이 선택되었으면 true, 아니면 false</returns>
+    public bool IsItemSelected(ISelectable item)
+    {
+        return SelectedItems.Contains(item);
+    }
+
+    /// <summary>
+    /// 항목을 선택합니다.
+    /// </summary>
+    /// <param name="selectable">선택할 항목</param>
+    /// <param name="clearOthers">다른 항목의 선택을 해제할지 여부</param>
+    public void SelectItem(ISelectable selectable, bool clearOthers = true)
+    {
+        if (clearOthers)
+        {
+            ClearSelection();
+        }
+        
+        if (!SelectedItems.Contains(selectable))
+        {
+            SelectedItems.Add(selectable);
+            
+            // 선택 변경 이벤트 발생
+            OnPropertyChanged(nameof(SelectedItems));
+        }
+    }
+
+    public void SelectAll() {
+        ClearSelection();
+        foreach (var item in SelectableItems) {
+            SelectedItems.Add(item);
+        }
+        OnPropertyChanged(nameof(SelectedItems));
+    }
+
+    /// <summary>
+    /// 항목의 선택을 해제합니다.
+    /// </summary>
+    /// <param name="selectable">선택 해제할 항목</param>
+    public void DeselectItem(ISelectable selectable)
+    {
+        if (SelectedItems.Contains(selectable))
+        {
+            SelectedItems.Remove(selectable);
+            // 선택 변경 이벤트 발생
+            OnPropertyChanged(nameof(SelectedItems));
+        }
+    }
+
+    /// <summary>
+    /// 모든 선택 가능한 항목의 선택을 해제합니다.
+    /// </summary>
+    public void ClearSelection()
+    {
+        SelectedItems.Clear();
+        
+        // 선택 변경 이벤트 발생
+        OnPropertyChanged(nameof(SelectedItems));
+    }
+    
+    /// <summary>
+    /// 선택된 모든 항목을 반환합니다.
+    /// </summary>
+    public IEnumerable<ISelectable> GetSelectedItems()
+    {
+        return SelectedItems;
+    }
+    
+    /// <summary>
+    /// 지정된 유형의 선택된 항목을 반환합니다.
+    /// </summary>
+    public IEnumerable<T> GetSelectedItemsOfType<T>() where T : ISelectable
+    {
+        return SelectedItems.OfType<T>();
+    }
+
+    /// <summary>
+    /// ID로 항목을 찾아 반환합니다.
+    /// </summary>
+    public ISelectable? FindSelectableById(Guid id)
+    {
+        return SelectableItems.FirstOrDefault(item => item.Id == id);
+    }
 }

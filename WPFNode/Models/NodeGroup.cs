@@ -20,15 +20,12 @@ public class NodeGroup : INotifyPropertyChanged
     [JsonConstructor]
     public NodeGroup(Guid id, string name)
     {
-        Id = id;
-        _name = name;
-        _width = 200;
+        Id      = id;
+        _name   = name;
+        _width  = 200;
         _height = 150;
-        _color = Colors.LightBlue;
-        Nodes = new ObservableCollection<NodeBase>();
-        
-        // 노드 추가/제거 시 그룹 크기 업데이트
-        Nodes.CollectionChanged += (s, e) => UpdateBounds();
+        _color  = Colors.LightBlue;
+        _nodes  = new();
     }
 
     public Guid Id { get; }
@@ -51,7 +48,7 @@ public class NodeGroup : INotifyPropertyChanged
         get => _x;
         set
         {
-            if (_x != value)
+            if (Math.Abs(_x - value) > double.Epsilon)
             {
                 _x = value;
                 OnPropertyChanged();
@@ -64,7 +61,7 @@ public class NodeGroup : INotifyPropertyChanged
         get => _y;
         set
         {
-            if (_y != value)
+            if (Math.Abs(_y - value) > double.Epsilon)
             {
                 _y = value;
                 OnPropertyChanged();
@@ -77,7 +74,7 @@ public class NodeGroup : INotifyPropertyChanged
         get => _width;
         set
         {
-            if (_width != value)
+            if (Math.Abs(_width - value) > double.Epsilon)
             {
                 _width = value;
                 OnPropertyChanged();
@@ -90,7 +87,7 @@ public class NodeGroup : INotifyPropertyChanged
         get => _height;
         set
         {
-            if (_height != value)
+            if (Math.Abs(_height - value) > double.Epsilon)
             {
                 _height = value;
                 OnPropertyChanged();
@@ -147,8 +144,7 @@ public class NodeGroup : INotifyPropertyChanged
         }
     }
 
-    [JsonPropertyName("nodes")]
-    public ObservableCollection<NodeBase> Nodes { get; }
+    public IReadOnlyList<NodeBase> Nodes => _nodes;
 
     private void UpdateBounds()
     {
@@ -205,5 +201,12 @@ public class NodeGroup : INotifyPropertyChanged
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    public void Add(NodeBase node) {
+        if (node == null) throw new ArgumentNullException(nameof(node));
+        _nodes.Add(node);
+        UpdateBounds();
+        OnPropertyChanged(nameof(Nodes));
     }
 } 
