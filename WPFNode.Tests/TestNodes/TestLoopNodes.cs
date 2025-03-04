@@ -166,20 +166,20 @@ public class MultiplyNode : NodeBase {
 /// </summary>
 [WPFNode.Attributes.OutputNode]
 public class ResultCollectorNode : NodeBase, IResettable {
-    private readonly List<int> _values = new();
+    private readonly List<double> _values = new();
 
     [JsonConstructor]
     public ResultCollectorNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) {
         Name           = "Result Collector";
-        ValuePort      = CreateInputPort<int>("Value");
+        ValuePort      = CreateInputPort<double>("Value");
         IsCompletePort = CreateInputPort<bool>("IsComplete");
     }
 
     public InputPort<bool> IsCompletePort { get; set; }
 
-    public InputPort<int> ValuePort { get; set; }
+    public InputPort<double> ValuePort { get; set; }
 
-    public IReadOnlyList<int> CollectedValues => _values;
+    public IReadOnlyList<double> CollectedValues => _values;
 
     public void Reset() {
         _values.Clear();
