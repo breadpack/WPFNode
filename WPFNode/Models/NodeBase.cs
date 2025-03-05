@@ -97,7 +97,7 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
 
     internal INodeCanvas Canvas => _canvas;
 
-    protected virtual InputPort<T> CreateInputPort<T>(string name)
+    protected InputPort<T> CreateInputPort<T>(string name)
     {
         var portIndex = _inputPorts.Count;
         var port = new InputPort<T>(name, this, portIndex);
@@ -105,7 +105,7 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         return port;
     }
 
-    protected virtual IInputPort CreateInputPort(string name, Type type)
+    protected IInputPort CreateInputPort(string name, Type type)
     {
         var portIndex = _inputPorts.Count;
         var port = (IInputPort)Activator.CreateInstance(
@@ -115,7 +115,7 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         return port;
     }
 
-    protected virtual OutputPort<T> CreateOutputPort<T>(string name)
+    protected OutputPort<T> CreateOutputPort<T>(string name)
     {
         var portIndex = _outputPorts.Count;
         var port = new OutputPort<T>(name, this, portIndex);
@@ -123,7 +123,7 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         return port;
     }
 
-    protected virtual IOutputPort CreateOutputPort(string name, Type type)
+    protected IOutputPort CreateOutputPort(string name, Type type)
     {
         var portIndex = _outputPorts.Count;
         var port = (IOutputPort)Activator.CreateInstance(
@@ -133,13 +133,14 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         return port;
     }
 
-    protected virtual NodeProperty<T> CreateProperty<T>(
+    protected NodeProperty<T> CreateProperty<T>(
         string name,
         string displayName,
         string? format = null,
         bool canConnectToPort = false)
     {
         var property = new NodeProperty<T>(
+            name,
             displayName,
             this,
             _inputPorts.Count,
@@ -170,7 +171,7 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         return property;
     }
 
-    protected virtual INodeProperty CreateProperty(
+    protected INodeProperty CreateProperty(
         string name,
         string displayName,
         Type type,
@@ -179,7 +180,7 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
     {
         var property = (INodeProperty)Activator.CreateInstance(
             typeof(NodeProperty<>).MakeGenericType(type),
-            displayName, this, _inputPorts.Count, format, canConnectToPort)!;
+            name, displayName, this, _inputPorts.Count, format, canConnectToPort)!;
         _properties[name] = property;
 
         // 프로퍼티 변경 이벤트 구독
@@ -212,27 +213,48 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
             OnPropertyChanged(nameof(InputPorts));
         }
     }
-
-    protected void RemoveProperty(string name)
+    
+    protected void RemoveInputPort(IInputPort port) 
     {
-        if (_properties.TryGetValue(name, out var property))
+        if (_inputPorts.Contains(port)) {
+            port.Disconnect();
+            _inputPorts.Remove(port);
+            OnPropertyChanged(nameof(InputPorts));
+        }
+    }
+    
+    protected void RemoveOutputPort(IOutputPort port) 
+    {
+        if (_outputPorts.Contains(port))
         {
-            if (property is IInputPort inputPort && _inputPorts.Contains(inputPort))
-            {
-                if (property.IsConnectedToPort)
-                {
-                    property.DisconnectFromPort();
-                }
-                _inputPorts.Remove(inputPort);
-                OnPropertyChanged(nameof(InputPorts));
-            }
-            _properties.Remove(name);
-            OnPropertyChanged(nameof(Properties));
+            _outputPorts.Remove(port);
+            OnPropertyChanged(nameof(OutputPorts));
         }
     }
 
+    protected void RemoveProperty(string name) {
+        if (!_properties.TryGetValue(name, out var property))
+            return;
+        
+        if (property is IInputPort inputPort && _inputPorts.Contains(inputPort))
+        {
+            if (inputPort.IsConnected)
+            {
+                inputPort.Disconnect();
+            }
+            _inputPorts.Remove(inputPort);
+            OnPropertyChanged(nameof(InputPorts));
+        }
+        
+        _properties.Remove(name);
+        OnPropertyChanged(nameof(Properties));
+    }
+    
     protected void RemoveProperty(INodeProperty property)
     {
+        if (property == null)
+            throw new ArgumentNullException(nameof(property));
+        
         var entry = _properties.FirstOrDefault(x => x.Value == property);
         if (!string.IsNullOrEmpty(entry.Key))
         {
@@ -240,7 +262,7 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         }
     }
 
-    protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }

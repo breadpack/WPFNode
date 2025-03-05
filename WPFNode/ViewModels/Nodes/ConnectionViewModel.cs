@@ -64,20 +64,20 @@ public class ConnectionViewModel : ViewModelBase, ISelectable, IDisposable
     public IConnection Model => _model;
 
     private void SelectedItemsOnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) {
-        if (e.Action == NotifyCollectionChangedAction.Add && e.NewItems != null) {
+        if (e is { Action: NotifyCollectionChangedAction.Add, NewItems: not null }) {
             foreach (ISelectable item in e.NewItems) {
                 if (item == this) {
                     OnPropertyChanged(nameof(IsSelected));
                 }
             }
-        } else if (e.Action == NotifyCollectionChangedAction.Remove && e.OldItems != null) {
+        } else if (e is { Action: NotifyCollectionChangedAction.Remove, OldItems: not null }) {
             foreach (ISelectable item in e.OldItems) {
                 if (item == this) {
                     OnPropertyChanged(nameof(IsSelected));
                 }
             }
         }
-        else if (e.Action == NotifyCollectionChangedAction.Reset) {
+        else if (e.Action is NotifyCollectionChangedAction.Reset) {
             OnPropertyChanged(nameof(IsSelected));
         }
     }

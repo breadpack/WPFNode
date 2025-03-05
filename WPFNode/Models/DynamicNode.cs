@@ -154,65 +154,12 @@ public class DynamicNode : NodeBase
         
         // 입력 포트 제거 (속성이 아닌 입력 포트만)
         var inputPortsToRemove = InputPorts
-            .Where(p => !Properties.Values.Any(prop => prop == p))
+            .Where(p => Properties.Values.All(prop => prop != p))
             .ToList();
             
         foreach (var port in inputPortsToRemove)
         {
             RemoveInputPort(port);
-        }
-    }
-    
-    /// <summary>
-    /// 입력 포트를 제거합니다.
-    /// </summary>
-    protected void RemoveInputPort(IInputPort port)
-    {
-        var nodeBaseType = typeof(NodeBase);
-        var method = nodeBaseType.GetMethod("RemoveInputPort", 
-            BindingFlags.NonPublic | BindingFlags.Instance);
-        
-        if (method != null)
-        {
-            method.Invoke(this, new object[] { port });
-        }
-    }
-    
-    /// <summary>
-    /// 출력 포트를 제거합니다.
-    /// </summary>
-    protected void RemoveOutputPort(IOutputPort port)
-    {
-        var nodeBaseType = typeof(NodeBase);
-        var method = nodeBaseType.GetMethod("RemoveOutputPort", 
-            BindingFlags.NonPublic | BindingFlags.Instance);
-        
-        if (method != null)
-        {
-            method.Invoke(this, new object[] { port });
-        }
-    }
-    
-    /// <summary>
-    /// 속성을 제거합니다.
-    /// </summary>
-    protected void RemoveProperty(INodeProperty property)
-    {
-        var nodeBaseType = typeof(NodeBase);
-        var method = nodeBaseType.GetMethod("RemoveProperty", 
-            BindingFlags.NonPublic | BindingFlags.Instance, null, 
-            new[] { typeof(INodeProperty) }, null);
-        
-        if (method != null)
-        {
-            method.Invoke(this, new object[] { property });
-            
-            // 초기화된 속성 목록에서도 제거
-            var entry = Properties.FirstOrDefault(x => x.Value == property);
-            if (!string.IsNullOrEmpty(entry.Key))
-            {
-                _initializedProperties.Remove(entry.Key);
-            }
         }
     }
 

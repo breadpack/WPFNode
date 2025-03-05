@@ -45,12 +45,12 @@ public class NodePropertyViewModel : INotifyPropertyChanged
         get => _property.CanConnectToPort;
         set
         {
-            if (_property.CanConnectToPort != value)
+            if (_property.CanConnectToPort != value && _property is IInputPort inputPort)
             {
                 // 연결 해제
-                if (!value && _property.IsConnectedToPort)
+                if (!value && inputPort.IsConnected)
                 {
-                    _property.DisconnectFromPort();
+                    inputPort.Disconnect();
                 }
                 
                 // 포트 연결 가능 여부 설정
@@ -60,7 +60,7 @@ public class NodePropertyViewModel : INotifyPropertyChanged
         }
     }
     
-    public bool IsConnected => _property.IsConnectedToPort;
+    public bool IsConnected => _property is IInputPort { IsConnected: true };
 
     public bool IsVisible
     {

@@ -18,14 +18,15 @@ public class NodeProperty<T> : INodeProperty, IInputPort<T> {
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public NodeProperty(
+        string  name,
         string  displayName,
         INode   node,
         int     portIndex,
         string? format           = null,
         bool    canConnectToPort = false
     ) {
+        Name         = name;
         DisplayName  = displayName;
-        Name         = displayName;
         Format       = format;
         PropertyType = typeof(T);
         ElementType  = GetElementType(PropertyType);
@@ -39,6 +40,7 @@ public class NodeProperty<T> : INodeProperty, IInputPort<T> {
     }
 
     // INodeProperty 구현
+    public string  Name        { get; }
     public string  DisplayName { get; }
     public string? Format      { get; }
 
@@ -48,7 +50,7 @@ public class NodeProperty<T> : INodeProperty, IInputPort<T> {
             if (_canConnectToPort != value) {
                 // 포트 연결이 비활성화될 때 기존 연결 해제
                 if (!value && IsConnected) {
-                    DisconnectFromPort();
+                    Disconnect();
                 }
 
                 _canConnectToPort = value;
@@ -67,7 +69,7 @@ public class NodeProperty<T> : INodeProperty, IInputPort<T> {
         set {
             if (_isVisible != value) {
                 if (!value && IsConnected) {
-                    DisconnectFromPort();
+                    Disconnect();
                 }
 
                 _isVisible = value;
@@ -103,7 +105,7 @@ public class NodeProperty<T> : INodeProperty, IInputPort<T> {
     public T? GetValueOrDefault(T? defaultValue = default) {
         if (!CanConnectToPort)
             return _value ?? defaultValue;
-        
+
         if (IsConnected) {
             var connection = Connections.FirstOrDefault();
             if (connection?.Source is { } outputPort) {
@@ -113,12 +115,13 @@ public class NodeProperty<T> : INodeProperty, IInputPort<T> {
                 if (TryConvertValue(sourceValue, out T? convertedValue)) {
                     return convertedValue;
                 }
-                    
+
                 if (sourceValue.TryConvertTo(out T? convertedValue2)) {
                     return convertedValue2;
                 }
             }
         }
+
         return defaultValue;
     }
 
@@ -138,7 +141,6 @@ public class NodeProperty<T> : INodeProperty, IInputPort<T> {
 
     public int GetPortIndex() => _portIndex;
 
-    public string                     Name        { get; set; }
     public Type                       DataType    => PropertyType;
     public bool                       IsInput     => true;
     public bool                       IsConnected => Connections.Count > 0;
@@ -170,7 +172,7 @@ public class NodeProperty<T> : INodeProperty, IInputPort<T> {
         OnPropertyChanged(nameof(IsConnected));
         OnPropertyChanged(nameof(Value)); // 연결 해제 시 값 업데이트 알림
     }
-    
+
     public bool CanAcceptType(Type type) {
         // 포트로 사용되지 않는 경우 연결 불가
         if (!CanConnectToPort)
@@ -226,7 +228,7 @@ public class NodeProperty<T> : INodeProperty, IInputPort<T> {
         // 이미 자신이 InputPort이므로 구현 불필요
     }
 
-    public void DisconnectFromPort() {
+    public void Disconnect() {
         // 연결된 모든 연결 해제
         foreach (var connection in Connections.ToArray()) {
             connection.Disconnect();

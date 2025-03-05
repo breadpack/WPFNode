@@ -123,6 +123,10 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
         return canvas.Connect(source, this);
     }
 
+    public void Disconnect() {
+        _connection?.Disconnect();
+    }
+
     protected virtual void OnPropertyChanged(string propertyName) {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }

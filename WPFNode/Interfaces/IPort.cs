@@ -5,7 +5,7 @@ namespace WPFNode.Interfaces;
 
 public interface IPort : INotifyPropertyChanged, IJsonSerializable {
     PortId                     Id          { get; }
-    string                     Name        { get; set; }
+    string                     Name        { get; }
     Type                       DataType    { get; }
     bool                       IsInput     { get; }
     bool                       IsConnected { get; }
@@ -18,8 +18,9 @@ public interface IPort : INotifyPropertyChanged, IJsonSerializable {
 }
 
 public interface IInputPort : IPort {
-    bool        CanAcceptType(Type      type);
-    IConnection Connect(IOutputPort     source);
+    bool        CanAcceptType(Type  type);
+    IConnection Connect(IOutputPort source);
+    void        Disconnect();
 }
 
 public interface IInputPort<T> : IInputPort {
@@ -31,4 +32,5 @@ public interface IOutputPort : IPort {
     object?     Value { get; set; }
     IConnection Connect(IInputPort target);
     void        Disconnect();
+    void        Disconnect(IInputPort target);
 }

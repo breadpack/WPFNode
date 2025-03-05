@@ -7,7 +7,6 @@ namespace WPFNode.ViewModels.Nodes;
 public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
 {
     private readonly IPort _port;
-    private string _name;
     private bool _isSelected;
     private readonly NodeCanvasViewModel _canvas;
 
@@ -15,16 +14,12 @@ public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
     {
         _port = port;
         _canvas = canvas;
-        _name = port.Name;
 
         // Model 속성 변경 감지
         _port.PropertyChanged += (s, e) =>
         {
             switch (e.PropertyName)
             {
-                case nameof(IPort.Name):
-                    Name = _port.Name;
-                    break;
                 case nameof(IPort.Connections):
                     OnPropertyChanged(nameof(Connections));
                     OnPropertyChanged(nameof(IsConnected));
@@ -40,14 +35,7 @@ public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
     
     public string Name
     {
-        get => _name;
-        set
-        {
-            if (SetProperty(ref _name, value))
-            {
-                _port.Name = value;
-            }
-        }
+        get => _port.Name;
     }
 
     public bool IsSelected

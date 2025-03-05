@@ -75,8 +75,13 @@ public class OutputPort<T> : IOutputPort, INotifyPropertyChanged {
     public void Disconnect() {
         var connections = Connections.ToList();
         foreach (var connection in connections) {
-            Canvas.Disconnect(connection);
+            connection.Disconnect();
         }
+    }
+
+    public void Disconnect(IInputPort target) {
+        Connections.FirstOrDefault(c => c.Target == target)
+                   ?.Disconnect();
     }
 
     public void AddConnection(IConnection connection)
