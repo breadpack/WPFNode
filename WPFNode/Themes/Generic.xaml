@@ -90,9 +90,10 @@
         </Setter>
     </Style>
 
+    <converters:TypeToColorConverter x:Key="TypeToColorConverter" />
     <Style TargetType="{x:Type local:PortControl}">
         <Setter Property="MinWidth" Value="50"/>
-        <Setter Property="Height" Value="24"/>
+        <Setter Property="Height" Value="32"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Visibility" Value="{Binding IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
         <Setter Property="Template">
@@ -108,33 +109,42 @@
                         <!-- 연결점 -->
                         <Ellipse x:Name="PART_ConnectionPoint"
                                 Width="12" Height="12"
-                                Fill="#FF404040"
+                                Fill="{Binding DataType, Converter={StaticResource TypeToColorConverter}, FallbackValue=#FF404040}"
                                 Stroke="#FF606060"
                                 StrokeThickness="1"
                                 Margin="0,6,0,6"/>
                                 
-                        <!-- 포트 이름 -->
-                        <TextBlock x:Name="PART_PortName"
-                                 Grid.Column="1"
-                                 Text="{Binding Name}"
-                                 VerticalAlignment="Center"
-                                 Margin="4,0,0,0"
-                                 Foreground="Black"/>
+                        <!-- 포트 이름과 타입 -->
+                        <StackPanel x:Name="PART_PortInfo"
+                                  Grid.Column="1"
+                                  Margin="4,0,0,0">
+                            <TextBlock x:Name="PART_PortName"
+                                     Text="{Binding Name}"
+                                     VerticalAlignment="Center"
+                                     Foreground="Black"/>
+                            <TextBlock x:Name="PART_PortType"
+                                     Text="{Binding DataType.Name, FallbackValue=Unknown}"
+                                     VerticalAlignment="Center"
+                                     Foreground="{Binding DataType, Converter={StaticResource TypeToColorConverter}, FallbackValue=Black}"
+                                     FontSize="9"/>
+                        </StackPanel>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsInput" Value="True">
                             <Setter TargetName="PART_ConnectionPoint" Property="Grid.Column" Value="0"/>
                             <Setter TargetName="PART_ConnectionPoint" Property="HorizontalAlignment" Value="Left"/>
-                            <Setter TargetName="PART_PortName" Property="Grid.Column" Value="1"/>
+                            <Setter TargetName="PART_PortInfo" Property="Grid.Column" Value="1"/>
                             <Setter TargetName="PART_PortName" Property="TextAlignment" Value="Left"/>
-                            <Setter TargetName="PART_PortName" Property="Margin" Value="4,0,0,0"/>
+                            <Setter TargetName="PART_PortType" Property="TextAlignment" Value="Left"/>
+                            <Setter TargetName="PART_PortInfo" Property="Margin" Value="4,0,0,0"/>
                         </Trigger>
                         <Trigger Property="IsInput" Value="False">
                             <Setter TargetName="PART_ConnectionPoint" Property="Grid.Column" Value="1"/>
                             <Setter TargetName="PART_ConnectionPoint" Property="HorizontalAlignment" Value="Right"/>
-                            <Setter TargetName="PART_PortName" Property="Grid.Column" Value="0"/>
+                            <Setter TargetName="PART_PortInfo" Property="Grid.Column" Value="0"/>
                             <Setter TargetName="PART_PortName" Property="TextAlignment" Value="Right"/>
-                            <Setter TargetName="PART_PortName" Property="Margin" Value="0,0,4,0"/>
+                            <Setter TargetName="PART_PortType" Property="TextAlignment" Value="Right"/>
+                            <Setter TargetName="PART_PortInfo" Property="Margin" Value="0,0,4,0"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -155,7 +165,7 @@
                           Visibility="{Binding IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <Ellipse x:Name="PART_ConnectionPoint"
                                 Width="12" Height="12"
-                                Fill="#FF404040"
+                                Fill="{Binding DataType, Converter={StaticResource TypeToColorConverter}, FallbackValue=#FF404040}"
                                 Stroke="#FF606060"
                                 StrokeThickness="1">
                             <Ellipse.Style>
@@ -229,6 +239,7 @@
         </Setter>
     </Style>
 
+    <converters:ColorToBrushConverter x:Key="ColorToBrushConverter" />
     <Style TargetType="{x:Type local:NodeGroupControl}">
         <Setter Property="Template">
             <Setter.Value>
@@ -401,9 +412,6 @@
             </Setter.Value>
         </Setter>
     </Style>
-
-    <!-- 색상 변환기 -->
-    <converters:ColorToBrushConverter x:Key="ColorToBrushConverter"/>
 
     <!-- Value Converters -->
     <converters:CenterOffsetConverter x:Key="CenterOffsetConverter"/>

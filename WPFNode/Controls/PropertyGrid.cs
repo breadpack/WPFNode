@@ -219,9 +219,15 @@ public class PropertyGrid : Control, INotifyPropertyChanged
                     {
                         if (e.PropertyName == nameof(INodeProperty.Value))
                         {
+                            var valueStr = property.Value?.ToString() ?? "null";
+                            if (valueStr.Length > 50)
+                            {
+                                valueStr = valueStr.Substring(0, 47) + "...";
+                            }
+                            
                             portControl.ToolTip = $"입력 포트: {property.DisplayName}\n" +
                                                $"타입: {property.PropertyType.Name}\n" +
-                                               $"값: {property.Value}";
+                                               $"값: {valueStr}";
                         }
                     };
                 }
