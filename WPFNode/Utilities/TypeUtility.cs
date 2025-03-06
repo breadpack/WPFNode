@@ -1,9 +1,40 @@
+using System.ComponentModel;
+using System.Globalization;
 using System.Reflection;
 
 namespace WPFNode.Utilities;
 
 public static class TypeExtensions
 {
+    /// <summary>
+    /// 소스 타입이 대상 타입으로 변환 가능한지 확인합니다.
+    /// InputPort와 NodeProperty에서 공통으로 사용되는 CanAcceptType의 기반 메서드입니다.
+    /// </summary>
+    public static bool CanConvertTo(this Type sourceType, Type targetType)
+    {
+        if (sourceType == null) return false;
+        
+        // 1. 대상 타입이 string이면 모든 타입 허용 (ToString 메서드를 통해 변환 가능)
+        if (targetType == typeof(string))
+            return true;
+            
+        // 2. 문자열에서 Parse/TryParse 메서드를 통한 변환이 가능한지 확인
+        if (sourceType == typeof(string) && targetType.HasParseMethod())
+            return true;
+            
+        // 3. TypeConverter를 통한 변환이 가능한지 확인
+        var targetConverter = System.ComponentModel.TypeDescriptor.GetConverter(targetType);
+        if (targetConverter.CanConvertFrom(sourceType))
+            return true;
+            
+        var sourceConverter = System.ComponentModel.TypeDescriptor.GetConverter(sourceType);
+        if (sourceConverter.CanConvertTo(targetType))
+            return true;
+
+        // 4. 타입 호환성 검사 (암시적 변환)
+        return sourceType.CanImplicitlyConvertTo(targetType);
+    }
+    
     /// <summary>
     /// 주어진 타입이 숫자 타입인지 확인합니다.
     /// </summary>
@@ -76,6 +107,127 @@ public static class TypeExtensions
 public static class ValueConversionExtensions
 {
     /// <summary>
+    /// 주어진 타입이 Parse/TryParse 메서드를 가지고 있는지 확인합니다.
+    /// </summary>
+    public static bool HasParseMethod(this Type type)
+    {
+        return type.GetMethod("Parse", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(string) }, null) != null ||
+               type.GetMethod("TryParse", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(string), type.MakeByRefType() }, null) != null;
+    }
+    
+    /// <summary>
+    /// 주어진 타입에 대해 Parse 또는 TryParse 메서드를 사용해 문자열 변환을 시도합니다.
+    /// </summary>
+    private static bool TryParseString(string sourceString, Type targetType, out object? result)
+    {
+        result = null;
+        
+        try 
+        {
+            // TryParse 메서드 시도
+            var tryParseMethod = targetType.GetMethod("TryParse", 
+                BindingFlags.Public | BindingFlags.Static, 
+                null, 
+                new[] { typeof(string), targetType.MakeByRefType() }, 
+                null);
+                
+            if (tryParseMethod != null)
+            {
+                var parameters = new object?[] { sourceString, null };
+                var success = (bool)tryParseMethod.Invoke(null, parameters)!;
+                if (success)
+                {
+                    result = parameters[1];
+                    return true;
+                }
+                return false;
+            }
+            
+            // Parse 메서드 시도
+            var parseMethod = targetType.GetMethod("Parse", 
+                BindingFlags.Public | BindingFlags.Static, 
+                null, 
+                new[] { typeof(string) }, 
+                null);
+                
+            if (parseMethod != null)
+            {
+                result = parseMethod.Invoke(null, new object[] { sourceString });
+                return true;
+            }
+            
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+    
+    /// <summary>
+    /// 주어진 타입에 대해 명시적 변환 연산자를 시도합니다.
+    /// </summary>
+    private static bool TryExplicitConversion(object sourceValue, Type sourceType, Type targetType, out object? result)
+    {
+        result = null;
+        
+        try
+        {
+            // 명시적 변환 연산자 확인
+            var explicitOperator = targetType.GetMethod("op_Explicit",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[] { sourceType },
+                null);
+
+            if (explicitOperator != null)
+            {
+                result = explicitOperator.Invoke(null, new[] { sourceValue });
+                return true;
+            }
+            
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+    
+    /// <summary>
+    /// TypeConverter를 사용하여 변환을 시도합니다.
+    /// </summary>
+    private static bool TryTypeConverter(object sourceValue, Type targetType, out object? result)
+    {
+        result = null;
+        
+        try
+        {
+            // TypeConverter 사용
+            var converter = TypeDescriptor.GetConverter(targetType);
+            if (converter.CanConvertFrom(sourceValue.GetType()))
+            {
+                result = converter.ConvertFrom(sourceValue);
+                return true;
+            }
+            
+            // 소스 타입에서 대상 타입으로의 변환 시도
+            converter = TypeDescriptor.GetConverter(sourceValue.GetType());
+            if (converter.CanConvertTo(targetType))
+            {
+                result = converter.ConvertTo(sourceValue, targetType);
+                return true;
+            }
+            
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// 값을 대상 타입으로 변환을 시도합니다.
     /// </summary>
     public static bool TryConvertTo<T>(this object? sourceValue, out T? result)
@@ -114,8 +266,29 @@ public static class ValueConversionExtensions
                 result = (T)implicitOperator.Invoke(null, new[] { sourceValue })!;
                 return true;
             }
+            
+            // 4. 명시적 변환 연산자 확인
+            if (TryExplicitConversion(sourceValue, sourceType, targetType, out var explicitResult))
+            {
+                result = (T)explicitResult!;
+                return true;
+            }
 
-            // 4. 문자열로 변환
+            // 5. 문자열 변환 시도 (Parse/TryParse)
+            if (sourceValue is string sourceString && TryParseString(sourceString, targetType, out var parsedResult))
+            {
+                result = (T)parsedResult!;
+                return true;
+            }
+            
+            // 6. TypeConverter 사용
+            if (TryTypeConverter(sourceValue, targetType, out var convertedResult))
+            {
+                result = (T)convertedResult!;
+                return true;
+            }
+
+            // 7. 문자열로 변환
             if (targetType == typeof(string))
             {
                 result = (T)(object)sourceValue.ToString()!;
@@ -164,18 +337,44 @@ public static class ValueConversionExtensions
             {
                 return implicitOperator.Invoke(null, new[] { sourceValue });
             }
+            
+            // 4. 명시적 변환 연산자 확인
+            if (TryExplicitConversion(sourceValue, sourceType, targetType, out var explicitResult))
+            {
+                return explicitResult;
+            }
 
-            // 4. 문자열로 변환
+            // 5. 문자열 변환 시도 (Parse/TryParse)
+            if (sourceValue is string sourceString && TryParseString(sourceString, targetType, out var parsedResult))
+            {
+                return parsedResult;
+            }
+            
+            // 6. TypeConverter 사용
+            if (TryTypeConverter(sourceValue, targetType, out var convertedResult))
+            {
+                return convertedResult;
+            }
+
+            // 7. 문자열로 변환
             if (targetType == typeof(string))
             {
                 return sourceValue.ToString();
             }
-
-            return null;
+            
+            // 8. 마지막 수단으로 Convert.ChangeType 시도
+            try
+            {
+                return Convert.ChangeType(sourceValue, targetType, CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                return null;
+            }
         }
         catch
         {
             return null;
         }
     }
-} 
+}

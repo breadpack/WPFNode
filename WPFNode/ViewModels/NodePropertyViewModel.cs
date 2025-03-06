@@ -9,6 +9,7 @@ public class NodePropertyViewModel : INotifyPropertyChanged
 {
     private readonly INodeProperty _property;
     private FrameworkElement? _control;
+    private PropertyChangedEventHandler? _propertyChangedHandler;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -19,7 +20,7 @@ public class NodePropertyViewModel : INotifyPropertyChanged
 
         if (_property is INotifyPropertyChanged notifyPropertyChanged)
         {
-            notifyPropertyChanged.PropertyChanged += (s, e) =>
+            _propertyChangedHandler = (s, e) =>
             {
                 if (e.PropertyName == nameof(Value))
                 {
@@ -34,6 +35,8 @@ public class NodePropertyViewModel : INotifyPropertyChanged
                     OnPropertyChanged(nameof(IsVisible));
                 }
             };
+            
+            notifyPropertyChanged.PropertyChanged += _propertyChangedHandler;
         }
     }
 
@@ -89,6 +92,21 @@ public class NodePropertyViewModel : INotifyPropertyChanged
     }
 
     public FrameworkElement? Control => _control;
+
+    /// <summary>
+    /// 이벤트 구독을 해제하고 리소스를 정리합니다.
+    /// </summary>
+    public void Cleanup()
+    {
+        if (_property is INotifyPropertyChanged notifyPropertyChanged && _propertyChangedHandler != null)
+        {
+            notifyPropertyChanged.PropertyChanged -= _propertyChangedHandler;
+            _propertyChangedHandler = null;
+        }
+        
+        // 컨트롤 참조 해제
+        _control = null;
+    }
 
     protected virtual void OnPropertyChanged(string propertyName)
     {

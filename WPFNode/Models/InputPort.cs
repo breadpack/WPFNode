@@ -56,12 +56,8 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
         if (_converters.ContainsKey(sourceType))
             return true;
 
-        // 2. 대상 타입이 string이면 모든 타입 허용 (ToString 메서드를 통해 변환 가능)
-        if (typeof(T) == typeof(string))
-            return true;
-
-        // 3. 타입 호환성 검사
-        return sourceType.CanImplicitlyConvertTo(typeof(T));
+        // 2. 공통 타입 변환 검사 메서드 호출
+        return sourceType.CanConvertTo(typeof(T));
     }
 
     public T? GetValueOrDefault(T? defaultValue = default) {
@@ -69,12 +65,27 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
             var sourceValue = outputPort.Value;
             if (sourceValue == null) return defaultValue;
 
-            if (_converters.TryGetValue(sourceValue.GetType(), out var converter)) {
-                return converter(sourceValue);
+            try {
+                // 1. 등록된 커스텀 컨버터 시도
+                if (_converters.TryGetValue(sourceValue.GetType(), out var converter)) {
+                    return converter(sourceValue);
+                }
+                
+                // 2. 일반적인 타입 변환 시도
+                if (sourceValue.TryConvertTo(out T? convertedValue)) {
+                    return convertedValue;
+                }
+                
+                // 3. 마지막으로 문자열 변환 시도 (대상 타입이 string이 아닌 경우에만)
+                if (typeof(T) != typeof(string) && sourceValue.ToString() is string stringValue) {
+                    if (stringValue.TryConvertTo(out convertedValue)) {
+                        return convertedValue;
+                    }
+                }
             }
-            
-            if (sourceValue.TryConvertTo(out T? convertedValue)) {
-                return convertedValue;
+            catch (Exception ex) {
+                // 변환 중 오류가 발생하더라도 기본값을 반환
+                System.Diagnostics.Debug.WriteLine($"InputPort 값 변환 중 오류 발생: {ex.Message}");
             }
         }
         return defaultValue;

@@ -112,21 +112,59 @@ public class NodeProperty<T> : INodeProperty, IInputPort<T> {
                 var sourceValue = outputPort.Value;
                 if (sourceValue == null) return defaultValue;
 
-                if (TryConvertValue(sourceValue, out T? convertedValue)) {
-                    return convertedValue;
+                try {
+                    // 1. 직접 변환 시도
+                    if (TryConvertValue(sourceValue, out T? convertedValue)) {
+                        return convertedValue;
+                    }
+                    
+                    // 2. 일반적인 타입 변환 시도
+                    if (sourceValue.TryConvertTo(out T? convertedValue2)) {
+                        return convertedValue2;
+                    }
+                    
+                    // 3. 마지막으로 문자열 변환 시도 (대상 타입이 string이 아닌 경우에만)
+                    if (PropertyType != typeof(string) && sourceValue.ToString() is string stringValue) {
+                        if (stringValue.TryConvertTo(out T? stringConvertedValue)) {
+                            return stringConvertedValue;
+                        }
+                    }
                 }
-
-                if (sourceValue.TryConvertTo(out T? convertedValue2)) {
-                    return convertedValue2;
+                catch (Exception ex) {
+                    // 변환 중 오류가 발생하더라도 기본값을 반환
+                    System.Diagnostics.Debug.WriteLine($"NodeProperty 값 변환 중 오류 발생: {ex.Message}");
                 }
             }
         }
 
-        return defaultValue;
+        return _value ?? defaultValue;
     }
 
     private bool TryConvertValue(object? sourceValue, out T? result) {
-        return sourceValue.TryConvertTo(out result);
+        result = default;
+        if (sourceValue == null) return false;
+        
+        try {
+            // TypeConverter를 통해 변환 시도
+            var converter = TypeDescriptor.GetConverter(PropertyType);
+            if (converter.CanConvertFrom(sourceValue.GetType())) {
+                result = (T?)converter.ConvertFrom(sourceValue);
+                return true;
+            }
+            
+            // 소스 타입의 TypeConverter로 변환 시도
+            var sourceConverter = TypeDescriptor.GetConverter(sourceValue.GetType());
+            if (sourceConverter.CanConvertTo(PropertyType)) {
+                result = (T?)sourceConverter.ConvertTo(sourceValue, PropertyType);
+                return true;
+            }
+            
+            // 기본 TryConvertTo 메서드 호출
+            return sourceValue.TryConvertTo(out result);
+        }
+        catch {
+            return false;
+        }
     }
 
     // IInputPort 구현
@@ -181,7 +219,8 @@ public class NodeProperty<T> : INodeProperty, IInputPort<T> {
         if (type == null)
             throw new NodeConnectionException("타입이 null입니다.");
 
-        return type.CanImplicitlyConvertTo(PropertyType);
+        // 공통 타입 변환 검사 메서드 호출
+        return type.CanConvertTo(PropertyType);
     }
 
     private static Type? GetElementType(Type type) {

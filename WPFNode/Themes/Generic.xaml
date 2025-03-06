@@ -524,6 +524,121 @@
         </ComboBox>
     </DataTemplate>
 
+    <!-- EnumFlagsTemplate -->
+    <DataTemplate x:Key="EnumFlagsTemplate">
+        <Border BorderBrush="#333" BorderThickness="1" CornerRadius="3" Padding="5" Margin="0,2">
+            <ItemsControl ItemsSource="{Binding EnumValues}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <CheckBox Content="{Binding DisplayName}" 
+                                  IsChecked="{Binding IsSelected, Mode=TwoWay}" 
+                                  Margin="0,2"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </Border>
+    </DataTemplate>
+
+    <!-- GuidTemplate -->
+    <DataTemplate x:Key="GuidTemplate">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBox Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                     IsReadOnly="{Binding IsConnected}"
+                     Grid.Column="0"
+                     Margin="0,0,5,0"/>
+            <Button Content="생성" 
+                    Command="{Binding GenerateGuidCommand}" 
+                    Grid.Column="1"
+                    Padding="5,0"
+                    IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}"/>
+        </Grid>
+    </DataTemplate>
+
+    <!-- ListTemplate -->
+    <DataTemplate x:Key="ListTemplate">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            
+            <!-- 헤더 -->
+            <Border Grid.Row="0" 
+                    Background="#FFF0F0F0" 
+                    BorderBrush="#FFD0D0D0" 
+                    BorderThickness="1,1,1,0"
+                    Padding="4,2">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding ItemCount, StringFormat=항목 수: {0}}"
+                             VerticalAlignment="Center"/>
+                    <Button Grid.Column="1"
+                            Content="추가"
+                            Padding="4,0"
+                            Command="{Binding AddItemCommand}"/>
+                </Grid>
+            </Border>
+            
+            <!-- 항목 목록 -->
+            <Border Grid.Row="1" 
+                    BorderBrush="#FFD0D0D0" 
+                    BorderThickness="1,0,1,0"
+                    MinHeight="60"
+                    MaxHeight="200">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Items}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ContentPresenter Content="{Binding Editor}"/>
+                                    <Button Grid.Column="1"
+                                            Content="↑"
+                                            Width="24"
+                                            Margin="2,0,0,0"
+                                            Command="{Binding MoveUpCommand}"
+                                            ToolTip="위로 이동"/>
+                                    <Button Grid.Column="2"
+                                            Content="×"
+                                            Width="24"
+                                            Margin="2,0,0,0"
+                                            Command="{Binding RemoveCommand}"
+                                            ToolTip="항목 삭제"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Border>
+            
+            <!-- 푸터 -->
+            <Border Grid.Row="2" 
+                    Background="#FFF0F0F0" 
+                    BorderBrush="#FFD0D0D0" 
+                    BorderThickness="1,0,1,1"
+                    Padding="4,2">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="모두 삭제"
+                            Padding="4,0"
+                            Command="{Binding ClearItemsCommand}"
+                            Margin="0,0,2,0"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </DataTemplate>
+
     <!-- PropertyGrid 스타일 -->
     <Style TargetType="{x:Type local:PropertyGrid}">
         <Setter Property="Template">

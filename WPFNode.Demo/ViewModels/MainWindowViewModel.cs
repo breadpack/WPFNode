@@ -181,9 +181,9 @@ public partial class MainWindowViewModel : ObservableObject
                 StatusMessage = $"{tableData.TableName} 테이블에 대한 새 마이그레이션 플랜을 생성했습니다.";
             }
         }
-        catch (Exception ex)
-        {
+        catch (Exception ex) {
             MessageBox.Show($"테이블 로드 중 오류 발생: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            CreateCanvasForTable(tableData);
         }
     }
 

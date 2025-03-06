@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
@@ -9,15 +10,18 @@ using WPFNode.ViewModels;
 using WPFNode.ViewModels.Nodes;
 using NodeCanvasViewModel = WPFNode.ViewModels.Nodes.NodeCanvasViewModel;
 using System.Collections.Specialized;
+using System.Reflection;
 
 namespace WPFNode.Controls;
 
-public class PropertyGrid : Control, INotifyPropertyChanged
+public class PropertyGrid : Control, INotifyPropertyChanged, IDisposable
 {
     private string _searchText = string.Empty;
     private NodeViewModel? _selectedNode;
     private ListCollectionView? _filteredProperties;
     private NodeCanvasViewModel? _canvasViewModel;
+    private List<NodePropertyViewModel> _currentPropertyViewModels = new List<NodePropertyViewModel>();
+    private bool _isDisposed;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -30,6 +34,11 @@ public class PropertyGrid : Control, INotifyPropertyChanged
     public PropertyGrid()
     {
         UpdateProperties();
+    }
+
+    ~PropertyGrid()
+    {
+        Dispose(false);
     }
 
     public static readonly DependencyProperty CanvasViewModelProperty =
@@ -59,6 +68,20 @@ public class PropertyGrid : Control, INotifyPropertyChanged
                     propertyGrid.OnSelectedItemsCollectionChanged;
             }
 
+            // 이전 속성 뷰모델 정리
+            foreach (var viewModel in propertyGrid._currentPropertyViewModels)
+            {
+                viewModel.Cleanup();
+            }
+            propertyGrid._currentPropertyViewModels.Clear();
+
+            // 이전 선택 노드의 이벤트 구독 해제
+            if (propertyGrid._selectedNode != null)
+            {
+                propertyGrid._selectedNode.PropertyChanged -= propertyGrid.OnSelectedNodePropertyChanged;
+                propertyGrid._selectedNode = null;
+            }
+
             propertyGrid._canvasViewModel = e.NewValue as NodeCanvasViewModel;
             
             // 새 CanvasViewModel의 SelectedItems 컬렉션 변경 이벤트 구독
@@ -69,7 +92,6 @@ public class PropertyGrid : Control, INotifyPropertyChanged
             }
             
             propertyGrid.UpdateSelectedNode();
-            propertyGrid.UpdateProperties();
         }
     }
 
@@ -90,9 +112,17 @@ public class PropertyGrid : Control, INotifyPropertyChanged
             
             if (_selectedNode != selectedNode)
             {
+                // 이전 노드의 이벤트 구독 해제
                 if (_selectedNode != null)
                 {
                     _selectedNode.PropertyChanged -= OnSelectedNodePropertyChanged;
+                    
+                    // 이전 속성 뷰모델 정리
+                    foreach (var viewModel in _currentPropertyViewModels)
+                    {
+                        viewModel.Cleanup();
+                    }
+                    _currentPropertyViewModels.Clear();
                 }
                 
                 _selectedNode = selectedNode;
@@ -103,6 +133,9 @@ public class PropertyGrid : Control, INotifyPropertyChanged
                 }
                 
                 OnPropertyChanged(nameof(SelectedNode));
+                
+                // 노드가 변경되었으므로 속성 목록 갱신
+                UpdateProperties();
             }
         }
     }
@@ -111,6 +144,13 @@ public class PropertyGrid : Control, INotifyPropertyChanged
 
     private void OnSelectedNodePropertyChanged(object? sender, PropertyChangedEventArgs e) {
         if (e.PropertyName == nameof(NodeViewModel.Properties)) {
+            // 속성 목록이 변경되었으므로 이전 속성 뷰모델 정리 후 업데이트
+            foreach (var viewModel in _currentPropertyViewModels)
+            {
+                viewModel.Cleanup();
+            }
+            _currentPropertyViewModels.Clear();
+            
             UpdateProperties();
         }        
     }
@@ -132,9 +172,19 @@ public class PropertyGrid : Control, INotifyPropertyChanged
 
     private void UpdateProperties()
     {
+        // 이전 NodePropertyViewModel 인스턴스의 이벤트 구독 해제
+        foreach (var viewModel in _currentPropertyViewModels)
+        {
+            viewModel.Cleanup();
+        }
+        
+        // 새로운 NodePropertyViewModel 인스턴스 생성
         var properties = _selectedNode?.Model?.Properties.Values
             .Select(p => new NodePropertyViewModel(p))
             .ToList() ?? new List<NodePropertyViewModel>();
+        
+        // 현재 인스턴스 목록 업데이트
+        _currentPropertyViewModels = properties;
 
         _filteredProperties = new ListCollectionView(properties)
         {
@@ -249,6 +299,13 @@ public class PropertyGrid : Control, INotifyPropertyChanged
 
     private FrameworkElement? CreateMainControl(INodeProperty property)
     {
+        // 0. 특수 타입 처리
+        var specialControl = CreateSpecialTypeControl(property);
+        if (specialControl != null)
+        {
+            return specialControl;
+        }
+        
         // 1. 컬렉션 타입 처리
         if (property.ElementType != null)
         {
@@ -263,6 +320,73 @@ public class PropertyGrid : Control, INotifyPropertyChanged
 
         // 3. PropertyControlProviderRegistry를 통해 컨트롤 생성
         return NodeServices.PropertyControlProviderRegistry.CreateControl(property);
+    }
+
+    private FrameworkElement? CreateSpecialTypeControl(INodeProperty property)
+    {
+        // Guid 타입 처리
+        if (property.PropertyType == typeof(Guid))
+        {
+            return CreateGuidControl(property);
+        }
+        
+        // EnumFlags 타입 처리
+        if (property.PropertyType.IsEnum && 
+            property.PropertyType.GetCustomAttributes(typeof(FlagsAttribute), false).Length > 0)
+        {
+            return CreateEnumFlagsControl(property);
+        }
+        
+        // List 타입 처리
+        if (property.PropertyType.IsGenericType && 
+            (property.PropertyType.GetGenericTypeDefinition() == typeof(List<>) ||
+             property.PropertyType.GetGenericTypeDefinition() == typeof(IList<>) ||
+             property.PropertyType.GetGenericTypeDefinition() == typeof(ICollection<>) ||
+             property.PropertyType.GetGenericTypeDefinition() == typeof(IEnumerable<>)))
+        {
+            return CreateListControl(property);
+        }
+        
+        return null;
+    }
+
+    private FrameworkElement CreateGuidControl(INodeProperty property)
+    {
+        var viewModel = new ViewModels.PropertyEditors.GuidPropertyViewModel(property);
+        
+        var contentControl = new ContentControl
+        {
+            ContentTemplate = TryFindResource("GuidTemplate") as DataTemplate,
+            Content = viewModel
+        };
+        
+        return contentControl;
+    }
+
+    private FrameworkElement CreateEnumFlagsControl(INodeProperty property)
+    {
+        var viewModel = new ViewModels.PropertyEditors.EnumFlagsPropertyViewModel(property);
+        
+        var contentControl = new ContentControl
+        {
+            ContentTemplate = TryFindResource("EnumFlagsTemplate") as DataTemplate,
+            Content = viewModel
+        };
+        
+        return contentControl;
+    }
+
+    private FrameworkElement CreateListControl(INodeProperty property)
+    {
+        var viewModel = new ViewModels.PropertyEditors.ListPropertyViewModel(property);
+        
+        var contentControl = new ContentControl
+        {
+            ContentTemplate = TryFindResource("ListTemplate") as DataTemplate,
+            Content = viewModel
+        };
+        
+        return contentControl;
     }
 
     private bool IsComplexType(Type type)
@@ -355,7 +479,14 @@ public class PropertyGrid : Control, INotifyPropertyChanged
             Type t when t == typeof(DateTime) => "DateTimeTemplate",
             Type t when t == typeof(TimeSpan) => "TimeSpanTemplate",
             Type t when t == typeof(System.Windows.Media.Color) => "ColorTemplate",
+            Type t when t == typeof(Guid) => "GuidTemplate",
             Type t when t.IsEnum => "EnumTemplate",
+            Type t when t.IsGenericType && 
+                      (t.GetGenericTypeDefinition() == typeof(List<>) ||
+                       t.GetGenericTypeDefinition() == typeof(IList<>) ||
+                       t.GetGenericTypeDefinition() == typeof(ICollection<>) ||
+                       t.GetGenericTypeDefinition() == typeof(IEnumerable<>)) => "ListTemplate",
+            Type t when t.IsEnum && t.GetCustomAttributes(typeof(FlagsAttribute), false).Length > 0 => "EnumFlagsTemplate",
             _ => null
         };
 
@@ -389,5 +520,43 @@ public class PropertyGrid : Control, INotifyPropertyChanged
         };
         
         return textBox;
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_isDisposed)
+            return;
+
+        if (disposing)
+        {
+            // 관리되는 리소스 해제
+            if (_selectedNode != null)
+            {
+                _selectedNode.PropertyChanged -= OnSelectedNodePropertyChanged;
+                _selectedNode = null;
+            }
+
+            if (_canvasViewModel != null)
+            {
+                ((INotifyCollectionChanged)_canvasViewModel.SelectedItems).CollectionChanged -= 
+                    OnSelectedItemsCollectionChanged;
+                _canvasViewModel = null;
+            }
+
+            // 속성 뷰모델 정리
+            foreach (var viewModel in _currentPropertyViewModels)
+            {
+                viewModel.Cleanup();
+            }
+            _currentPropertyViewModels.Clear();
+        }
+
+        _isDisposed = true;
     }
 }
