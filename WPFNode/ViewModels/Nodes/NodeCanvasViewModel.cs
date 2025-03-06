@@ -468,8 +468,8 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
         SynchronizeWithModel();
     }
 
-    public async Task<string> ToJsonAsync() {
-        return await Task.Run(() => _canvas.ToJson());
+    public Task<string> ToJsonAsync() {
+        return Task.FromResult(_canvas.ToJson());
     }
 
     public async Task LoadFromJsonAsync(string json) {
