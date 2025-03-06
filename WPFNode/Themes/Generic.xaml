@@ -265,7 +265,8 @@
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="250"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="250" MinWidth="150"/>
                             </Grid.ColumnDefinitions>
 
                             <!-- 캔버스 영역 -->
@@ -336,13 +337,41 @@
                                     </ItemsControl>
                                 </Canvas>
                             </ScrollViewer>
+                            
+                            <!-- GridSplitter -->
+                            <GridSplitter Grid.Column="1"
+                                          Width="5"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Stretch"
+                                          Background="#FFD0D0D0"
+                                          BorderBrush="#FFA0A0A0"
+                                          BorderThickness="1,0"
+                                          ShowsPreview="True"
+                                          Cursor="SizeWE">
+                                <GridSplitter.Template>
+                                    <ControlTemplate TargetType="GridSplitter">
+                                        <Border Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}">
+                                            <Rectangle Width="1" 
+                                                       HorizontalAlignment="Center"
+                                                       Fill="#FF808080"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </GridSplitter.Template>
+                            </GridSplitter>
 
                             <!-- 속성 그리드 -->
-                            <local:PropertyGrid Grid.Column="1"
-                                              CanvasViewModel="{Binding Path=.}"
-                                              Background="White"
-                                              BorderBrush="Gray"
-                                              BorderThickness="0,0,0,1"/>
+                            <Border Grid.Column="2"
+                                   Background="#FFF5F5F5"
+                                   BorderBrush="#FFD0D0D0"
+                                   BorderThickness="0,0,0,0">
+                                <local:PropertyGrid CanvasViewModel="{Binding Path=.}"
+                                                  Background="White"
+                                                  BorderBrush="Gray"
+                                                  BorderThickness="0,0,0,1"
+                                                  Margin="0"/>
+                            </Border>
                         </Grid>
                     </Border>
                 </ControlTemplate>
@@ -503,11 +532,21 @@
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
                         
+                        <!-- 헤더 -->
+                        <Border Grid.Row="0"
+                                Background="#FF2D2D30"
+                                Padding="8,4">
+                            <TextBlock Text="속성"
+                                     Foreground="White"
+                                     FontWeight="Bold"/>
+                        </Border>
+                        
                         <!-- 검색 박스 -->
-                        <TextBox Grid.Row="0" 
+                        <TextBox Grid.Row="1" 
                                  Text="{Binding SearchText, RelativeSource={RelativeSource TemplatedParent}, UpdateSourceTrigger=PropertyChanged}"
                                  Margin="5"
                                  Padding="5"
@@ -518,7 +557,7 @@
                                  VerticalContentAlignment="Center"/>
                         
                         <!-- 프로퍼티 목록 -->
-                        <ScrollViewer Grid.Row="1" 
+                        <ScrollViewer Grid.Row="2" 
                                     VerticalScrollBarVisibility="Auto"
                                     HorizontalScrollBarVisibility="Disabled">
                             <ItemsControl ItemsSource="{Binding FilteredProperties, RelativeSource={RelativeSource TemplatedParent}}">
@@ -577,6 +616,12 @@
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
+                                <ItemsControl.ItemContainerStyle>
+                                    <Style TargetType="ContentPresenter">
+                                        <Setter Property="Margin" Value="0,2"/>
+                                        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                                    </Style>
+                                </ItemsControl.ItemContainerStyle>
                             </ItemsControl>
                         </ScrollViewer>
                     </Grid>
