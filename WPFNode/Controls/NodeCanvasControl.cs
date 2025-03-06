@@ -283,15 +283,7 @@ public class NodeCanvasControl : Control
         viewModel.PropertyChanged += OnViewModelPropertyChanged;
         ((INotifyCollectionChanged)viewModel.Nodes).CollectionChanged += OnNodesCollectionChanged;
         ((INotifyCollectionChanged)viewModel.Connections).CollectionChanged += OnConnectionsCollectionChanged;
-        
-        foreach (NodeViewModel node in viewModel.Nodes)
-        {
-            node.PropertyChanged += OnNodePropertyChanged;
-        }
-        foreach (ConnectionViewModel connection in viewModel.Connections)
-        {
-            connection.PropertyChanged += OnConnectionPropertyChanged;
-        }
+        ((INotifyCollectionChanged)viewModel.SelectedItems).CollectionChanged += OnSelectedItemsCollectionChanged;
     }
 
     private void UnsubscribeFromViewModelEvents(NodeCanvasViewModel viewModel)
@@ -299,14 +291,41 @@ public class NodeCanvasControl : Control
         viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         ((INotifyCollectionChanged)viewModel.Nodes).CollectionChanged -= OnNodesCollectionChanged;
         ((INotifyCollectionChanged)viewModel.Connections).CollectionChanged -= OnConnectionsCollectionChanged;
-        
-        foreach (NodeViewModel node in viewModel.Nodes)
+        ((INotifyCollectionChanged)viewModel.SelectedItems).CollectionChanged -= OnSelectedItemsCollectionChanged;
+    }
+
+    private void OnSelectedItemsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        // 선택된 항목이 추가된 경우
+        if (e.NewItems != null)
         {
-            node.PropertyChanged -= OnNodePropertyChanged;
+            foreach (ISelectable item in e.NewItems)
+            {
+                if (item is NodeViewModel node)
+                {
+                    OnNodeSelected(node);
+                }
+                else if (item is ConnectionViewModel connection)
+                {
+                    OnConnectionSelected(connection);
+                }
+            }
         }
-        foreach (ConnectionViewModel connection in viewModel.Connections)
+        
+        // 선택된 항목이 제거된 경우
+        if (e.OldItems != null)
         {
-            connection.PropertyChanged -= OnConnectionPropertyChanged;
+            foreach (ISelectable item in e.OldItems)
+            {
+                if (item is NodeViewModel node)
+                {
+                    OnNodeDeselected(node);
+                }
+                else if (item is ConnectionViewModel connection)
+                {
+                    OnConnectionDeselected(connection);
+                }
+            }
         }
     }
 
@@ -323,6 +342,10 @@ public class NodeCanvasControl : Control
                     break;
             }
         }
+        else if (sender is NodeViewModel node && e.PropertyName == nameof(NodeViewModel.Position))
+        {
+            OnNodeMoved(node);
+        }
     }
 
     private void OnNodesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -333,14 +356,12 @@ public class NodeCanvasControl : Control
                 foreach (NodeViewModel node in e.NewItems!)
                 {
                     OnNodeAdded(node);
-                    node.PropertyChanged += OnNodePropertyChanged;
                 }
                 break;
             case NotifyCollectionChangedAction.Remove:
                 foreach (NodeViewModel node in e.OldItems!)
                 {
                     OnNodeRemoved(node);
-                    node.PropertyChanged -= OnNodePropertyChanged;
                 }
                 break;
         }
@@ -354,54 +375,14 @@ public class NodeCanvasControl : Control
                 foreach (ConnectionViewModel connection in e.NewItems!)
                 {
                     OnConnectionAdded(connection);
-                    connection.PropertyChanged += OnConnectionPropertyChanged;
                 }
                 break;
             case NotifyCollectionChangedAction.Remove:
                 foreach (ConnectionViewModel connection in e.OldItems!)
                 {
                     OnConnectionRemoved(connection);
-                    connection.PropertyChanged -= OnConnectionPropertyChanged;
                 }
                 break;
-        }
-    }
-
-    private void OnNodePropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (sender is NodeViewModel node)
-        {
-            switch (e.PropertyName)
-            {
-                case nameof(NodeViewModel.Position):
-                    OnNodeMoved(node);
-                    break;
-                case nameof(NodeViewModel.IsSelected): {
-                    if (node.IsSelected) {
-                        OnNodeSelected(node);
-                    }
-                    else
-                        OnNodeDeselected(node);
-                    break;
-                }
-            }
-        }
-    }
-
-    private void OnConnectionPropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (sender is ConnectionViewModel connection)
-        {
-            switch (e.PropertyName)
-            {
-                case nameof(ConnectionViewModel.IsSelected):
-                    if (connection.IsSelected) {
-                        OnConnectionSelected(connection);
-                    }
-                    else
-                        OnConnectionDeselected(connection);
-                    break;
-            }
         }
     }
 
@@ -718,8 +699,10 @@ public class NodeCanvasControl : Control
     {
         if (ViewModel == null) return;
         
-        // 모든 선택 가능한 항목 선택
-        ViewModel.SelectAll();
+        foreach (var item in ViewModel.SelectableItems)
+        {
+            ViewModel.SelectItem(item, false);
+        }
     }
 
     private void CopySelectedNodes()
@@ -744,7 +727,7 @@ public class NodeCanvasControl : Control
     {
         if (ViewModel == null) return;
         
-        // ISelectable 인터페이스를 사용하여 모든 선택된 항목 처리
+        // 선택된 항목 가져오기
         var selectedItems = ViewModel.GetSelectedItems().ToList();
         
         foreach (var item in selectedItems)

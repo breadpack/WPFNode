@@ -37,20 +37,19 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
 
     [ObservableProperty]
     private double _offsetY;
-
-    public IWpfCommand AddNodeCommand     { get; init; }
-    public IWpfCommand RemoveNodeCommand  { get; init; }
-    public IWpfCommand ConnectCommand     { get; init; }
-    public IWpfCommand DisconnectCommand  { get; init; }
-    public IWpfCommand AddGroupCommand    { get; init; }
-    public IWpfCommand RemoveGroupCommand { get; init; }
-    public IWpfCommand UndoCommand        { get; init; }
-    public IWpfCommand RedoCommand        { get; init; }
-    public IWpfCommand ExecuteCommand     { get; init; }
-    public IWpfCommand CopyCommand        { get; init; }
-    public IWpfCommand PasteCommand       { get; init; }
-    public IWpfCommand SaveCommand        { get; init; }
-    public IWpfCommand LoadCommand        { get; init; }
+    public IWpfCommand          AddNodeCommand     { get; init; }
+    public IWpfCommand          RemoveNodeCommand  { get; init; }
+    public IWpfCommand          ConnectCommand     { get; init; }
+    public IWpfCommand          DisconnectCommand  { get; init; }
+    public IWpfCommand          AddGroupCommand    { get; init; }
+    public IWpfCommand          RemoveGroupCommand { get; init; }
+    public IWpfCommand          UndoCommand        { get; init; }
+    public IWpfCommand          RedoCommand        { get; init; }
+    public IWpfCommand          ExecuteCommand     { get; init; }
+    public IWpfCommand          CopyCommand        { get; init; }
+    public IWpfCommand          PasteCommand       { get; init; }
+    public IWpfCommand          SaveCommand        { get; init; }
+    public IWpfCommand          LoadCommand        { get; init; }
 
     public NodeCanvasViewModel() : this(new()) { }
 

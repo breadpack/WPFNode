@@ -8,6 +8,7 @@ using WPFNode.Services;
 using WPFNode.ViewModels;
 using WPFNode.ViewModels.Nodes;
 using NodeCanvasViewModel = WPFNode.ViewModels.Nodes.NodeCanvasViewModel;
+using System.Collections.Specialized;
 
 namespace WPFNode.Controls;
 
@@ -51,46 +52,62 @@ public class PropertyGrid : Control, INotifyPropertyChanged
     {
         if (d is PropertyGrid propertyGrid)
         {
+            // 이전 CanvasViewModel의 SelectedItems 컬렉션 변경 이벤트 구독 해제
+            if (e.OldValue is NodeCanvasViewModel oldViewModel)
+            {
+                ((INotifyCollectionChanged)oldViewModel.SelectedItems).CollectionChanged -= 
+                    propertyGrid.OnSelectedItemsCollectionChanged;
+            }
+
             propertyGrid._canvasViewModel = e.NewValue as NodeCanvasViewModel;
+            
+            // 새 CanvasViewModel의 SelectedItems 컬렉션 변경 이벤트 구독
+            if (propertyGrid._canvasViewModel != null)
+            {
+                ((INotifyCollectionChanged)propertyGrid._canvasViewModel.SelectedItems).CollectionChanged += 
+                    propertyGrid.OnSelectedItemsCollectionChanged;
+            }
+            
+            propertyGrid.UpdateSelectedNode();
             propertyGrid.UpdateProperties();
         }
     }
 
-    public static readonly DependencyProperty SelectedNodeProperty =
-        DependencyProperty.Register(
-            nameof(SelectedNode),
-            typeof(NodeViewModel),
-            typeof(PropertyGrid),
-            new FrameworkPropertyMetadata(
-                null,
-                FrameworkPropertyMetadataOptions.BindsTwoWayByDefault,
-                OnSelectedNodeChanged));
-
-    public NodeViewModel? SelectedNode
+    private void OnSelectedItemsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        get => (NodeViewModel?)GetValue(SelectedNodeProperty);
-        set
+        UpdateSelectedNode();
+        UpdateProperties();
+    }
+
+    private void UpdateSelectedNode()
+    {
+        // SelectedItems에서 첫 번째 NodeViewModel을 찾아 SelectedNode로 설정
+        if (_canvasViewModel != null)
         {
-            SetValue(SelectedNodeProperty, value);
-            OnPropertyChanged(nameof(SelectedNode));
-            UpdateProperties();
+            var selectedNode = _canvasViewModel.SelectedItems
+                .OfType<NodeViewModel>()
+                .FirstOrDefault();
+            
+            if (_selectedNode != selectedNode)
+            {
+                if (_selectedNode != null)
+                {
+                    _selectedNode.PropertyChanged -= OnSelectedNodePropertyChanged;
+                }
+                
+                _selectedNode = selectedNode;
+                
+                if (_selectedNode != null)
+                {
+                    _selectedNode.PropertyChanged += OnSelectedNodePropertyChanged;
+                }
+                
+                OnPropertyChanged(nameof(SelectedNode));
+            }
         }
     }
 
-    private static void OnSelectedNodeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-    {
-        if (d is PropertyGrid propertyGrid)
-        {
-            if (e.OldValue is NodeViewModel oldNode) {
-                oldNode.PropertyChanged -= propertyGrid.OnSelectedNodePropertyChanged;
-            }
-            propertyGrid._selectedNode = e.NewValue as NodeViewModel;
-            if (propertyGrid._selectedNode != null) {
-                propertyGrid._selectedNode.PropertyChanged += propertyGrid.OnSelectedNodePropertyChanged;
-            }
-            propertyGrid.UpdateProperties();
-        }
-    }
+    public NodeViewModel? SelectedNode => _selectedNode;
 
     private void OnSelectedNodePropertyChanged(object? sender, PropertyChangedEventArgs e) {
         if (e.PropertyName == nameof(NodeViewModel.Properties)) {
@@ -115,7 +132,7 @@ public class PropertyGrid : Control, INotifyPropertyChanged
 
     private void UpdateProperties()
     {
-        var properties = SelectedNode?.Model?.Properties.Values
+        var properties = _selectedNode?.Model?.Properties.Values
             .Select(p => new NodePropertyViewModel(p))
             .ToList() ?? new List<NodePropertyViewModel>();
 

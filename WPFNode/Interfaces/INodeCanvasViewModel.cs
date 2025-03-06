@@ -7,11 +7,11 @@ namespace WPFNode.Interfaces;
 
 public interface INodeCanvasViewModel
 {
-    ObservableCollection<NodeViewModel>       Nodes           { get; }
-    ObservableCollection<ConnectionViewModel> Connections     { get; }
-    ObservableCollection<NodeGroupViewModel>  Groups          { get; }
-    ObservableCollection<ISelectable>         SelectableItems { get; }
-    ObservableCollection<ISelectable>         SelectedItems   { get; }
+    ObservableCollection<NodeViewModel> Nodes { get; }
+    ObservableCollection<ConnectionViewModel> Connections { get; }
+    ObservableCollection<NodeGroupViewModel> Groups { get; }
+    ObservableCollection<ISelectable> SelectableItems { get; }
+    ObservableCollection<ISelectable> SelectedItems { get; }
     
     double Scale { get; set; }
     double OffsetX { get; set; }
@@ -36,6 +36,13 @@ public interface INodeCanvasViewModel
     NodeCanvas Model { get; }
 
     /// <summary>
+    /// 항목이 선택되었는지 확인합니다.
+    /// </summary>
+    /// <param name="item">확인할 항목</param>
+    /// <returns>항목이 선택되었으면 true, 아니면 false</returns>
+    bool IsItemSelected(ISelectable item);
+
+    /// <summary>
     /// 모든 선택 가능한 항목의 선택을 해제합니다.
     /// </summary>
     void ClearSelection();
@@ -58,9 +65,10 @@ public interface INodeCanvasViewModel
     void SelectItem(ISelectable selectable, bool clearOthers = true);
     
     /// <summary>
-    /// 모든 선택 가능한 항목을 선택합니다.
+    /// 항목의 선택을 해제합니다.
     /// </summary>
-    void SelectAll();
+    /// <param name="selectable">선택 해제할 항목</param>
+    void DeselectItem(ISelectable selectable);
     
     /// <summary>
     /// ID로 항목을 찾아 반환합니다.

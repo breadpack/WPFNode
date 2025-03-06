@@ -18,7 +18,6 @@ namespace WPFNode.Models;
 public class DynamicNode : NodeBase
 {
     private string _category;
-    private readonly Dictionary<string, INodeProperty> _properties;
     private readonly HashSet<string> _initializedProperties = new HashSet<string>();
 
     private record PortDefinition(string Name, Type Type, int Index, bool IsVisible)
@@ -40,7 +39,6 @@ public class DynamicNode : NodeBase
         : base(canvas, guid)
     {
         _category = "Dynamic";
-        _properties = new Dictionary<string, INodeProperty>();
     }
 
     public DynamicNode(
@@ -54,7 +52,6 @@ public class DynamicNode : NodeBase
         Name = name;
         _category = category;
         Description = description;
-        _properties = new Dictionary<string, INodeProperty>();
     }
 
     public override string Category => _category;
@@ -91,7 +88,6 @@ public class DynamicNode : NodeBase
         }
 
         var property = CreateProperty<T>(name, displayName, format, canConnectToPort);
-        _properties[name] = property;
         _initializedProperties.Add(name);
         return property;
     }
@@ -109,7 +105,6 @@ public class DynamicNode : NodeBase
         }
 
         var property = CreateProperty(name, displayName, type, format, canConnectToPort);
-        _properties[name] = property;
         _initializedProperties.Add(name);
         return property;
     }
@@ -347,7 +342,6 @@ public class DynamicNode : NodeBase
                             options);
                     }
                     
-                    _properties[prop.Name] = property;
                     _initializedProperties.Add(prop.Name);
                 }
                 else
