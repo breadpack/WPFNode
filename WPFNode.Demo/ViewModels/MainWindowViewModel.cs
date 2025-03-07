@@ -126,6 +126,7 @@ public partial class MainWindowViewModel : ObservableObject
         // 샘플 테이블 데이터 생성
         AvailableTables.Add(TableDataGenerator.CreateSampleEmployeeData());
         AvailableTables.Add(TableDataGenerator.CreateSampleProductData());
+        AvailableTables.Add(TableDataGenerator.CreateMultipleEmployeeData());
 
         // 기본 테이블 선택
         SelectedTable = AvailableTables.FirstOrDefault();
@@ -238,7 +239,17 @@ public partial class MainWindowViewModel : ObservableObject
         try {
             // 마이그레이션 플랜 로드 또는 생성
             var canvas = _migrationService.LoadMigrationPlan(tableName);
-            NodeCanvasViewModel = new NodeCanvasViewModel(canvas);
+            var inputNode = canvas.Q<ExcelInputNode>(tableData.TableName);
+            if (inputNode != null)
+            {
+                inputNode.SetTableData(tableData);
+                NodeCanvasViewModel = new NodeCanvasViewModel(canvas);
+            }
+            else
+            {
+                // 노드가 없으면 새로 생성
+                CreateCanvasForTable(tableData);
+            }
         }
         catch (Exception ex) {
             MessageBox.Show($"마이그레이션 플랜 로드 중 오류 발생. 새 마이그레이션 플랜을 생성합니다.\n: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);

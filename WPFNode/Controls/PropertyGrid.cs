@@ -299,94 +299,27 @@ public class PropertyGrid : Control, INotifyPropertyChanged, IDisposable
 
     private FrameworkElement? CreateMainControl(INodeProperty property)
     {
-        // 0. 특수 타입 처리
-        var specialControl = CreateSpecialTypeControl(property);
-        if (specialControl != null)
+        // 1. 먼저 PropertyControlProviderRegistry를 통해 컨트롤 생성 시도
+        var control = NodeServices.PropertyControlProviderRegistry.CreateControl(property);
+        if (control != null)
         {
-            return specialControl;
+            return control;
         }
         
-        // 1. 컬렉션 타입 처리
+        // 2. 컬렉션 타입 처리 (레거시 처리)
         if (property.ElementType != null)
         {
             return CreateCollectionControl(property);
         }
 
-        // 2. 복합 타입 처리 (사용자 정의 타입)
+        // 3. 복합 타입 처리 (사용자 정의 타입)
         if (IsComplexType(property.PropertyType))
         {
             return CreateComplexTypeControl(property);
         }
 
-        // 3. PropertyControlProviderRegistry를 통해 컨트롤 생성
-        return NodeServices.PropertyControlProviderRegistry.CreateControl(property);
-    }
-
-    private FrameworkElement? CreateSpecialTypeControl(INodeProperty property)
-    {
-        // Guid 타입 처리
-        if (property.PropertyType == typeof(Guid))
-        {
-            return CreateGuidControl(property);
-        }
-        
-        // EnumFlags 타입 처리
-        if (property.PropertyType.IsEnum && 
-            property.PropertyType.GetCustomAttributes(typeof(FlagsAttribute), false).Length > 0)
-        {
-            return CreateEnumFlagsControl(property);
-        }
-        
-        // List 타입 처리
-        if (property.PropertyType.IsGenericType && 
-            (property.PropertyType.GetGenericTypeDefinition() == typeof(List<>) ||
-             property.PropertyType.GetGenericTypeDefinition() == typeof(IList<>) ||
-             property.PropertyType.GetGenericTypeDefinition() == typeof(ICollection<>) ||
-             property.PropertyType.GetGenericTypeDefinition() == typeof(IEnumerable<>)))
-        {
-            return CreateListControl(property);
-        }
-        
-        return null;
-    }
-
-    private FrameworkElement CreateGuidControl(INodeProperty property)
-    {
-        var viewModel = new ViewModels.PropertyEditors.GuidPropertyViewModel(property);
-        
-        var contentControl = new ContentControl
-        {
-            ContentTemplate = TryFindResource("GuidTemplate") as DataTemplate,
-            Content = viewModel
-        };
-        
-        return contentControl;
-    }
-
-    private FrameworkElement CreateEnumFlagsControl(INodeProperty property)
-    {
-        var viewModel = new ViewModels.PropertyEditors.EnumFlagsPropertyViewModel(property);
-        
-        var contentControl = new ContentControl
-        {
-            ContentTemplate = TryFindResource("EnumFlagsTemplate") as DataTemplate,
-            Content = viewModel
-        };
-        
-        return contentControl;
-    }
-
-    private FrameworkElement CreateListControl(INodeProperty property)
-    {
-        var viewModel = new ViewModels.PropertyEditors.ListPropertyViewModel(property);
-        
-        var contentControl = new ContentControl
-        {
-            ContentTemplate = TryFindResource("ListTemplate") as DataTemplate,
-            Content = viewModel
-        };
-        
-        return contentControl;
+        // 4. 기본 텍스트 박스 반환
+        return CreateDefaultControl(property);
     }
 
     private bool IsComplexType(Type type)

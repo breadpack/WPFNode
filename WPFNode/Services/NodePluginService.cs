@@ -8,6 +8,7 @@ using WPFNode.Constants;
 using WPFNode.Exceptions;
 using WPFNode.Interfaces;
 using WPFNode.Models;
+using WPFNode.Services;
 
 namespace WPFNode.Services;
 
@@ -162,6 +163,7 @@ public class NodePluginService : INodePluginService, IDisposable
                 if (IsValidAssembly(assembly))
                 {
                     LoadNodesFromAssembly(assembly);
+                    LoadPropertyControlProvidersFromAssembly(assembly);
                 }
             }
             catch (Exception ex)
@@ -172,6 +174,39 @@ public class NodePluginService : INodePluginService, IDisposable
                     pluginPath, 
                     ex);
             }
+        }
+    }
+    
+    private void LoadPropertyControlProvidersFromAssembly(Assembly assembly)
+    {
+        try
+        {
+            var pluginTypes = assembly.GetTypes()
+                .Where(t => typeof(INodePlugin).IsAssignableFrom(t) && !t.IsAbstract && !t.IsInterface)
+                .ToList();
+                
+            foreach (var pluginType in pluginTypes)
+            {
+                try
+                {
+                    var plugin = Activator.CreateInstance(pluginType) as INodePlugin;
+                    if (plugin != null)
+                    {
+                        foreach (var provider in plugin.GetPropertyControlProviders())
+                        {
+                            NodeServices.PropertyControlProviderRegistry.RegisterProvider(provider);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "플러그인 인스턴스 생성 실패: {Type}", pluginType.FullName);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "어셈블리에서 PropertyControlProvider 로드 중 오류 발생: {Assembly}", assembly.FullName);
         }
     }
 
@@ -325,4 +360,4 @@ public class NodePluginService : INodePluginService, IDisposable
         _isDisposed = true;
         GC.SuppressFinalize(this);
     }
-} 
+}

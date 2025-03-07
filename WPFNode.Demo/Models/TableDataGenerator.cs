@@ -56,4 +56,29 @@ public static class TableDataGenerator
 
         return tableData;
     }
-} 
+    
+    public static TableData CreateMultipleEmployeeData()
+    {
+        var tableData = new TableData
+        {
+            TableName = "MultipleEmployees",
+            Columns = new List<ColumnDefinition>
+            {
+                new() { Name = "Name1", TypeName = "System.String", IsNullable = true },
+                new() { Name = "Age1", TypeName = "System.Int32", IsNullable = false },
+                new() { Name = "Name2", TypeName = "System.String", IsNullable = true },
+                new() { Name = "Age2", TypeName = "System.Int32", IsNullable = false },
+                new() { Name = "Name3", TypeName = "System.String", IsNullable = true },
+                new() { Name = "Age3", TypeName = "System.Int32", IsNullable = false }
+            },
+            Rows = new List<RowData>
+            {
+                new() { Values = new List<string> { "김철수", "30", "이영희", "28", "박민수", "35" } },
+                new() { Values = new List<string> { "정지원", "32", "", "0", "한미영", "29" } },
+                new() { Values = new List<string> { "최준호", "27", "강지현", "31", "", "0" } }
+            }
+        };
+
+        return tableData;
+    }
+}

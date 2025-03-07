@@ -127,6 +127,9 @@ namespace WPFNode.Demo.Services
             {
                 return TableDataGenerator.CreateSampleProductData();
             }
+            else if (tableName.Equals("MultipleEmployees", StringComparison.OrdinalIgnoreCase)) {
+                return TableDataGenerator.CreateMultipleEmployeeData();
+            }
             else
             {
                 // 기본값으로 직원 데이터 반환
