@@ -466,11 +466,29 @@ public class NodeCanvasControl : Control
 
     private void UpdateCanvasSize(Window window)
     {
-        if (_dragCanvas == null) return;
+        if (_dragCanvas == null || _scrollViewer == null) return;
+        
+        // 캔버스 크기 변경 전 현재 스크롤 위치의 상대 비율 저장
+        double horizontalRatio = 0;
+        double verticalRatio = 0;
+        
+        // 스크롤 가능한 영역이 있는 경우에만 비율 계산
+        if (_dragCanvas.Width > _scrollViewer.ViewportWidth)
+            horizontalRatio = _scrollViewer.HorizontalOffset / (_dragCanvas.Width - _scrollViewer.ViewportWidth);
+        if (_dragCanvas.Height > _scrollViewer.ViewportHeight)
+            verticalRatio = _scrollViewer.VerticalOffset / (_dragCanvas.Height - _scrollViewer.ViewportHeight);
+        
+        // 캔버스 크기 업데이트
         _dragCanvas.Width = window.ActualWidth * 4;
         _dragCanvas.Height = window.ActualHeight * 4;
         
         System.Diagnostics.Debug.WriteLine($"Canvas size updated: {_dragCanvas.Width}x{_dragCanvas.Height} (Window: {window.ActualWidth}x{window.ActualHeight})");
+        
+        // 스크롤 위치 재조정 - 같은 상대 비율 유지
+        if (_dragCanvas.Width > _scrollViewer.ViewportWidth)
+            _scrollViewer.ScrollToHorizontalOffset(horizontalRatio * (_dragCanvas.Width - _scrollViewer.ViewportWidth));
+        if (_dragCanvas.Height > _scrollViewer.ViewportHeight)
+            _scrollViewer.ScrollToVerticalOffset(verticalRatio * (_dragCanvas.Height - _scrollViewer.ViewportHeight));
     }
 
     private void OnWindowSizeChanged(object sender, SizeChangedEventArgs e)
@@ -893,4 +911,4 @@ public class NodeCanvasControl : Control
     }
 
     #endregion
-} 
+}
