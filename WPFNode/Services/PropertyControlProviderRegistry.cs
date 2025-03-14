@@ -51,17 +51,17 @@ public class PropertyControlProviderRegistry
         }
     }
     
-    public IPropertyControlProvider? GetProvider(Type propertyType)
+    public IPropertyControlProvider? GetProvider(INodeProperty property)
     {
         return _providers.Values
-            .Where(p => p.CanHandle(propertyType))
+            .Where(p => p.CanHandle(property))
             .OrderByDescending(p => p.Priority)
             .FirstOrDefault();
     }
     
     public FrameworkElement CreateControl(INodeProperty property)
     {
-        var provider = GetProvider(property.PropertyType);
+        var provider = GetProvider(property);
         return provider?.CreateControl(property) ?? new TextBox();
     }
 } 

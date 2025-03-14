@@ -136,6 +136,12 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         node.X = x;
         node.Y = y;
         
+        // DynamicNode 타입인 경우 초기화 호출
+        if (node is DynamicNode dynamicNode)
+        {
+            dynamicNode.InitializeNode();
+        }
+        
         AddNodeInternal(node);
         return node;
     }
@@ -392,6 +398,12 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         node.X = x;
         node.Y = y;
         
+        // DynamicNode 타입인 경우 초기화 호출
+        if (node is DynamicNode dynamicNode)
+        {
+            dynamicNode.InitializeNode();
+        }
+        
         AddNodeInternal(node);
         return node;
     }
@@ -506,4 +518,4 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
     }
 }
 
-// NodeExecutionException을 ExecutionPlan.cs로 이동 
+// NodeExecutionException을 ExecutionPlan.cs로 이동

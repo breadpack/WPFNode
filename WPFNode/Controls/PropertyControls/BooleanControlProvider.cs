@@ -7,7 +7,7 @@ namespace WPFNode.Controls.PropertyControls;
 
 public class BooleanControlProvider : IPropertyControlProvider
 {
-    public bool CanHandle(Type propertyType) => propertyType == typeof(bool);
+    public bool CanHandle(INodeProperty property) => property.PropertyType == typeof(bool);
     
     public FrameworkElement CreateControl(INodeProperty property)
     {

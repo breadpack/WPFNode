@@ -10,9 +10,9 @@ namespace WPFNode.Controls.PropertyControls
 {
     public class EnumFlagsControlProvider : IPropertyControlProvider
     {
-        public bool CanHandle(Type propertyType)
+        public bool CanHandle(INodeProperty property)
         {
-            return propertyType.IsEnum && propertyType.GetCustomAttributes(typeof(FlagsAttribute), false).Length > 0;
+            return property.PropertyType.IsEnum && property.PropertyType.GetCustomAttributes(typeof(FlagsAttribute), false).Length > 0;
         }
 
         public FrameworkElement CreateControl(INodeProperty property)

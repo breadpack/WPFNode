@@ -560,16 +560,18 @@ public class NodeCanvasControl : Control
             e.Handled = true;
             return;
         }
+        
         // 노드 클릭 확인
-        else if (e.Source is NodeControl nodeControl && nodeControl.DataContext is NodeViewModel nodeViewModel)
+        if (e.Source is NodeControl nodeControl && nodeControl.DataContext is NodeViewModel nodeViewModel)
         {
             _dragNode = nodeViewModel;
             CaptureMouse();
             e.Handled = true;
             return;
         }
+        
         // 캔버스 배경 클릭
-        else if (e.Source == this)
+        if (e.Source == this)
         {
             CaptureMouse();
             e.Handled = true;

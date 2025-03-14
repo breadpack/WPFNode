@@ -226,17 +226,49 @@ public class PropertyGrid : Control, INotifyPropertyChanged, IDisposable
 
     private void UpdatePropertyControls()
     {
-        if (Template?.FindName("PART_PropertyPanel", this) is StackPanel propertyPanel)
+        // DataContext가 INodeProperty인 경우, 이 속성에 대한 컨트롤을 생성하고 
+        // 현재 속성 목록에 추가하거나 기존 필터링된 속성 목록을 업데이트
+        if (DataContext is INodeProperty property)
         {
-            propertyPanel.Children.Clear();
-
-            if (DataContext is INodeProperty property)
+            // 1. 새로운 NodePropertyViewModel 생성
+            var propertyViewModel = new NodePropertyViewModel(property);
+            
+            // 2. 기존 _currentPropertyViewModels 목록 정리
+            foreach (var vm in _currentPropertyViewModels)
             {
-                var control = CreatePropertyControl(property);
-                if (control != null)
+                vm.Cleanup();
+            }
+            _currentPropertyViewModels.Clear();
+            
+            // 3. 새 목록에 추가
+            _currentPropertyViewModels.Add(propertyViewModel);
+            
+            // 4. FilteredProperties 업데이트
+            _filteredProperties = new ListCollectionView(_currentPropertyViewModels)
+            {
+                Filter = OnFilterProperties
+            };
+            
+            // 5. 변경 알림
+            OnPropertyChanged(nameof(FilteredProperties));
+        }
+        else
+        {
+            // DataContext가 INodeProperty가 아닌 경우, 빈 목록으로 설정
+            if (_currentPropertyViewModels.Count > 0)
+            {
+                foreach (var vm in _currentPropertyViewModels)
                 {
-                    propertyPanel.Children.Add(control);
+                    vm.Cleanup();
                 }
+                _currentPropertyViewModels.Clear();
+                
+                _filteredProperties = new ListCollectionView(_currentPropertyViewModels)
+                {
+                    Filter = OnFilterProperties
+                };
+                
+                OnPropertyChanged(nameof(FilteredProperties));
             }
         }
     }

@@ -11,8 +11,8 @@ namespace WPFNode.Controls.PropertyControls
 {
     public class ListControlProvider : IPropertyControlProvider
     {
-        public bool CanHandle(Type propertyType)
-        {
+        public bool CanHandle(INodeProperty property) {
+            var propertyType = property.PropertyType;
             return (propertyType.IsGenericType && 
                     (propertyType.GetGenericTypeDefinition() == typeof(List<>) ||
                      propertyType.GetGenericTypeDefinition() == typeof(IList<>) ||

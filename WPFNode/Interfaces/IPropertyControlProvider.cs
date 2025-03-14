@@ -5,7 +5,7 @@ namespace WPFNode.Interfaces;
 public interface IPropertyControlProvider
 {
     // 이 제공자가 처리할 수 있는 타입인지 확인
-    bool CanHandle(Type propertyType);
+    bool CanHandle(INodeProperty property);
     
     // 컨트롤 생성
     FrameworkElement CreateControl(INodeProperty property);

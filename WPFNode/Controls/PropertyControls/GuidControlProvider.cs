@@ -9,9 +9,9 @@ namespace WPFNode.Controls.PropertyControls
 {
     public class GuidControlProvider : IPropertyControlProvider
     {
-        public bool CanHandle(Type propertyType)
+        public bool CanHandle(INodeProperty property)
         {
-            return propertyType == typeof(Guid);
+            return property == typeof(Guid);
         }
 
         public FrameworkElement CreateControl(INodeProperty property)

@@ -9,7 +9,7 @@ namespace WPFNode.Controls.PropertyControls;
 
 public class ColorControlProvider : IPropertyControlProvider
 {
-    public bool CanHandle(Type propertyType) => propertyType == typeof(Color);
+    public bool CanHandle(INodeProperty property) => property.PropertyType == typeof(Color);
     
     public FrameworkElement CreateControl(INodeProperty property)
     {

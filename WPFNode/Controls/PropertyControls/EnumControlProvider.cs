@@ -7,7 +7,7 @@ namespace WPFNode.Controls.PropertyControls;
 
 public class EnumControlProvider : IPropertyControlProvider
 {
-    public bool CanHandle(Type propertyType) => propertyType.IsEnum;
+    public bool CanHandle(INodeProperty property) => property.PropertyType.IsEnum;
     
     public FrameworkElement CreateControl(INodeProperty property)
     {

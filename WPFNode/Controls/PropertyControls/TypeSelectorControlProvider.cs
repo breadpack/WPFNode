@@ -8,7 +8,7 @@ namespace WPFNode.Controls.PropertyControls;
 
 public class TypeSelectorControlProvider : IPropertyControlProvider
 {
-    public bool CanHandle(Type propertyType) => propertyType == typeof(Type);
+    public bool CanHandle(INodeProperty property) => property.PropertyType == typeof(Type);
     
     public FrameworkElement CreateControl(INodeProperty property)
     {

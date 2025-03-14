@@ -666,6 +666,15 @@
                     IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}"/>
         </Grid>
     </DataTemplate>
+    
+    <!-- DropDownTemplate -->
+    <DataTemplate x:Key="DropDownTemplate">
+        <ComboBox ItemsSource="{Binding Options}"
+                  SelectedItem="{Binding SelectedItem, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                  DisplayMemberPath="DisplayName"
+                  MinWidth="60"
+                  Margin="2"/>
+    </DataTemplate>
 
     <!-- ListTemplate -->
     <DataTemplate x:Key="ListTemplate">

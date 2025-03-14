@@ -7,7 +7,7 @@ namespace WPFNode.Controls.PropertyControls;
 
 public class DefaultTextControlProvider : IPropertyControlProvider
 {
-    public bool CanHandle(Type propertyType) => true;  // 모든 타입 처리 가능
+    public bool CanHandle(INodeProperty property) => true;  // 모든 타입 처리 가능
     
     public FrameworkElement CreateControl(INodeProperty property)
     {

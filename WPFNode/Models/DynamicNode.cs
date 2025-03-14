@@ -18,6 +18,7 @@ namespace WPFNode.Models;
 public class DynamicNode : NodeBase
 {
     private string _category;
+    private bool _isInitialized = false;
     private readonly HashSet<string> _initializedProperties = new HashSet<string>();
 
     private record PortDefinition(string Name, Type Type, int Index, bool IsVisible)
@@ -32,13 +33,59 @@ public class DynamicNode : NodeBase
         string? Format, 
         bool CanConnectToPort, 
         int Index,
-        JsonElement? Value = null);
+        JsonElement? Value = null,
+        List<JsonElement>? Options = null);
 
     [JsonConstructor]
     public DynamicNode(INodeCanvas canvas, Guid guid) 
         : base(canvas, guid)
     {
         _category = "Dynamic";
+    }
+
+    /// <summary>
+    /// 노드를 초기화합니다. 이 메서드는 생성 및 역직렬화 시 자동으로 호출됩니다.
+    /// </summary>
+    public void InitializeNode()
+    {
+        // 이미 초기화되었으면 건너뜀
+        if (_isInitialized)
+            return;
+
+        try
+        {
+            // 1. 필수 속성 초기화
+            InitializeRequiredProperties();
+            
+            // 2. 노드 구성 (이벤트 핸들러, 포트 설정 등)
+            ConfigureNode();
+            
+            // 초기화 완료 표시
+            _isInitialized = true;
+            
+            Logger?.LogDebug($"{GetType().Name} 노드 초기화 완료");
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, $"{GetType().Name} 노드 초기화 중 오류 발생");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 필수 속성을 초기화합니다. 파생 클래스에서 오버라이드하여 필수 속성을 추가할 수 있습니다.
+    /// </summary>
+    protected virtual void InitializeRequiredProperties()
+    {
+        // 기본 구현은 비어있음 - 파생 클래스에서 오버라이드
+    }
+
+    /// <summary>
+    /// 노드를 구성합니다. 파생 클래스에서 오버라이드하여 포트 설정, 이벤트 연결 등을 수행할 수 있습니다.
+    /// </summary>
+    protected virtual void ConfigureNode()
+    {
+        // 기본 구현은 비어있음 - 파생 클래스에서 오버라이드
     }
 
     public DynamicNode(
@@ -58,21 +105,53 @@ public class DynamicNode : NodeBase
 
     public InputPort<T> AddInputPort<T>(string name)
     {
+        // 이미 해당 이름과 타입의 입력 포트가 있는지 확인
+        var existingPort = InputPorts.OfType<InputPort<T>>().FirstOrDefault(p => p.Name == name);
+        if (existingPort != null)
+        {
+            return existingPort;
+        }
+
+        // 없으면 새로 생성
         return CreateInputPort<T>(name);
     }
 
     public IInputPort AddInputPort(string name, Type type)
     {
+        // 이미 해당 이름과 타입의 입력 포트가 있는지 확인
+        var existingPort = InputPorts.FirstOrDefault(p => p.Name == name && p.DataType == type);
+        if (existingPort != null)
+        {
+            return existingPort;
+        }
+
+        // 없으면 새로 생성
         return CreateInputPort(name, type);
     }
 
     public OutputPort<T> AddOutputPort<T>(string name)
     {
+        // 이미 해당 이름과 타입의 출력 포트가 있는지 확인
+        var existingPort = OutputPorts.OfType<OutputPort<T>>().FirstOrDefault(p => p.Name == name);
+        if (existingPort != null)
+        {
+            return existingPort;
+        }
+
+        // 없으면 새로 생성
         return CreateOutputPort<T>(name);
     }
 
     public IOutputPort AddOutputPort(string name, Type type)
     {
+        // 이미 해당 이름과 타입의 출력 포트가 있는지 확인
+        var existingPort = OutputPorts.FirstOrDefault(p => p.Name == name && p.DataType == type);
+        if (existingPort != null)
+        {
+            return existingPort;
+        }
+
+        // 없으면 새로 생성
         return CreateOutputPort(name, type);
     }
 
@@ -215,6 +294,27 @@ public class DynamicNode : NodeBase
                 writer.WritePropertyName("Value");
                 JsonSerializer.Serialize(writer, prop.Value.Value, prop.Value.PropertyType, NodeCanvasJsonConverter.SerializerOptions);
             }
+            
+            // INodePropertyOption 정보 직렬화
+            if (prop.Value.Options.Any())
+            {
+                writer.WriteStartArray("Options");
+                foreach (var option in prop.Value.Options)
+                {
+                    writer.WriteStartObject();
+                    writer.WriteString("OptionType", option.OptionType);
+                    
+                    // option을 JsonSerializable로 직렬화
+                    if (option is IJsonSerializable jsonSerializable)
+                    {
+                        jsonSerializable.WriteJson(writer);
+                    }
+                    
+                    writer.WriteEndObject();
+                }
+                writer.WriteEndArray();
+            }
+            
             writer.WriteEndObject();
         }
         writer.WriteEndArray();
@@ -260,12 +360,23 @@ public class DynamicNode : NodeBase
             {
                 value = valueElement;
             }
+            
+            // Options 수집
+            List<JsonElement>? options = null;
+            if (propDef.TryGetProperty("Options", out var optionsElement))
+            {
+                options = new List<JsonElement>();
+                foreach (var optionElement in optionsElement.EnumerateArray())
+                {
+                    options.Add(optionElement);
+                }
+            }
 
             if (type != null)
             {
                 yield return new PropertyDefinition(
                     name, displayName, type, format, 
-                    canConnectToPort, index, value);
+                    canConnectToPort, index, value, options);
             }
         }
     }
@@ -296,10 +407,13 @@ public class DynamicNode : NodeBase
 
     public override void ReadJson(JsonElement element, JsonSerializerOptions options)
     {
-        base.ReadJson(element, options);
-
+        // 초기화 상태 리셋
+        _isInitialized = false;
+        
         try
         {
+            base.ReadJson(element, options);
+
             ResetNode();
             _initializedProperties.Clear();
 
@@ -342,6 +456,14 @@ public class DynamicNode : NodeBase
                             options);
                     }
                     
+                    // Options 정보가 있지만 현재 역직렬화 지원이 구현되지 않았으므로
+                    // 로그만 남기고 향후 구현 예정
+                    if (prop.Options != null && prop.Options.Count > 0)
+                    {
+                        // 여기서는 옵션 정보가 존재한다는 것만 로그로 남김
+                        Logger?.LogInformation($"Property {prop.Name}에 {prop.Options.Count}개의 옵션이 있지만, 역직렬화 지원이 아직 구현되지 않았습니다.");
+                    }
+                    
                     _initializedProperties.Add(prop.Name);
                 }
                 else
@@ -370,6 +492,11 @@ public class DynamicNode : NodeBase
                     }
                 }
             }
+
+            // 역직렬화 후 노드 초기화 - 필수 속성 추가 및 구성
+            InitializeNode();
+            
+            Logger?.LogDebug($"{GetType().Name} 노드 역직렬화 및 초기화 완료");
         }
         catch (Exception ex)
         {
@@ -377,4 +504,4 @@ public class DynamicNode : NodeBase
             throw;
         }
     }
-} 
+}

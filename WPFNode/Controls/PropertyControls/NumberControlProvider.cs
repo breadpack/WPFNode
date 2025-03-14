@@ -15,7 +15,7 @@ public class NumberControlProvider : IPropertyControlProvider
         typeof(decimal)
     };
     
-    public bool CanHandle(Type propertyType) => SupportedTypes.Contains(propertyType);
+    public bool CanHandle(INodeProperty property) => SupportedTypes.Contains(property.PropertyType);
     
     public FrameworkElement CreateControl(INodeProperty property)
     {

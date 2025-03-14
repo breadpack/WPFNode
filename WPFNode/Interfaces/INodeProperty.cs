@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿﻿﻿﻿using System.ComponentModel;
+using System.Collections.Generic;
 using WPFNode.Constants;
 
 namespace WPFNode.Interfaces;
@@ -15,4 +16,7 @@ public interface INodeProperty : INotifyPropertyChanged, IJsonSerializable
     
     // 값 관련
     object? Value { get; set; }
+    
+    // 추가 옵션
+    IEnumerable<INodePropertyOption> Options { get; }
 }

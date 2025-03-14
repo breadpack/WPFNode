@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Text.Json;
+using System.Collections.Generic;
 using WPFNode.Exceptions;
 using WPFNode.Interfaces;
 using WPFNode.Utilities;
@@ -8,12 +9,13 @@ using WPFNode.Models.Serialization;
 namespace WPFNode.Models.Properties;
 
 public class NodeProperty<T> : INodeProperty, IInputPort<T> {
-    private          T?                _value;
-    private readonly INode?            _node;
-    private readonly List<IConnection> _connections = new();
-    private          bool              _canConnectToPort;
-    private          bool              _isVisible;
-    private          int               _portIndex;
+    private          T?                         _value;
+    private readonly INode?                     _node;
+    private readonly List<IConnection>          _connections = new();
+    private readonly List<INodePropertyOption>  _options = new();
+    private          bool                       _canConnectToPort;
+    private          bool                       _isVisible;
+    private          int                        _portIndex;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -78,10 +80,11 @@ public class NodeProperty<T> : INodeProperty, IInputPort<T> {
         }
     }
 
-    public Type        PropertyType      { get; }
-    public Type?       ElementType       { get; }
-    public IInputPort? ConnectedPort     => IsConnected ? this : null;
-    public bool        IsConnectedToPort => IsConnected;
+    public Type                       PropertyType      { get; }
+    public Type?                      ElementType       { get; }
+    public IInputPort?                ConnectedPort     => IsConnected ? this : null;
+    public bool                       IsConnectedToPort => IsConnected;
+    public IEnumerable<INodePropertyOption> Options     => _options;
 
     object? INodeProperty.Value {
         get => Value;
