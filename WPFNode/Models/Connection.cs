@@ -7,15 +7,16 @@ namespace WPFNode.Models;
 
 public class Connection : IConnection
 {
-    private bool _isEnabled = true;
+    private readonly NodeCanvas _nodeCanvas;
+    private          bool       _isEnabled = true;
 
     [JsonConstructor]
-    public Connection(IOutputPort source, IInputPort target)
-        : this(Guid.NewGuid(), source, target)
+    public Connection(NodeCanvas canvas, IOutputPort source, IInputPort target)
+        : this(Guid.NewGuid(), canvas, source, target)
     {
     }
 
-    public Connection(Guid guid, IOutputPort source, IInputPort target)
+    public Connection(Guid guid, NodeCanvas nodeCanvas, IOutputPort source, IInputPort target)
     {
         if (source == null)
             throw new NodeConnectionException("소스 포트가 null입니다.");
@@ -25,6 +26,7 @@ public class Connection : IConnection
             throw new NodeConnectionException("소스 포트가 노드에 연결되어 있지 않습니다.", source, target);
         if (target.Node == null)
             throw new NodeConnectionException("타겟 포트가 노드에 연결되어 있지 않습니다.", source, target);
+        _nodeCanvas = nodeCanvas;
 
         Guid = guid;
         Source = source;
@@ -64,8 +66,7 @@ public class Connection : IConnection
     public void Disconnect()
     {
         // 양쪽 포트에서 연결 제거
-        Source.RemoveConnection(this);
-        Target.RemoveConnection(this);
+        _nodeCanvas.Disconnect(this);
     }
 
     public void WriteJson(Utf8JsonWriter writer)

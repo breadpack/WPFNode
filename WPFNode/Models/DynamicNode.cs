@@ -152,9 +152,11 @@ public class DynamicNode : NodeBase
         var property = Properties
             .FirstOrDefault(p => p.Name == name && p.PropertyType == type);
 
-        if (property != null)
+        if (property != null) {
+            property.CanConnectToPort = canConnectToPort;
             return property;
-        
+        }
+
         property = CreateProperty(name, displayName, type, format, canConnectToPort);
         return property;
     }
@@ -242,7 +244,7 @@ public class DynamicNode : NodeBase
             // 어트리뷰트로 정의되지 않은 프로퍼티만 저장
             var propertyInfo = type.GetProperty(property.Name);
             if (propertyInfo?.GetCustomAttribute<NodePropertyAttribute>() == null && 
-                property.Value is IJsonSerializable serializable)
+                property is IJsonSerializable)
             {
                 writer.WriteStartObject();
                 writer.WriteString("Name", property.Name);
@@ -374,7 +376,10 @@ public class DynamicNode : NodeBase
 
     public override void ReadJson(JsonElement element, JsonSerializerOptions options)
     {
-        // 동적 프로퍼티 먼저 복원
+        // 기본 속성 및 어트리뷰트 기반 프로퍼티 먼저 복원
+        base.ReadJson(element, options);
+
+        // 동적 프로퍼티 복원 시 기존 값 보존
         if (element.TryGetProperty("DynamicProperties", out var dynamicPropsElement))
         {
             foreach (var propElement in dynamicPropsElement.EnumerateArray())
@@ -390,12 +395,26 @@ public class DynamicNode : NodeBase
                         var type = Type.GetType(typeName);
                         if (type != null)
                         {
-                            // 프로퍼티 생성
+                            // 기존 프로퍼티 확인
+                            var existingProperty = Properties.FirstOrDefault(p => p.Name == name && p.PropertyType == type);
+                            
+                            // 프로퍼티 생성 또는 업데이트
                             var displayName = propElement.GetProperty("DisplayName").GetString() ?? name;
                             var format = propElement.GetProperty("Format").GetString();
                             var canConnectToPort = propElement.GetProperty("CanConnectToPort").GetBoolean();
                             
-                            var property = AddProperty(name, displayName, type, format, canConnectToPort);
+                            INodeProperty property;
+                            if (existingProperty != null)
+                            {
+                                // 기존 프로퍼티 업데이트
+                                existingProperty.CanConnectToPort = canConnectToPort;
+                                property = existingProperty;
+                            }
+                            else
+                            {
+                                // 새 프로퍼티 생성
+                                property = AddProperty(name, displayName, type, format, canConnectToPort);
+                            }
 
                             // 값 복원
                             if (propElement.TryGetProperty("Value", out var valueElement))
@@ -410,9 +429,6 @@ public class DynamicNode : NodeBase
                 }
             }
         }
-
-        // 기본 속성 및 어트리뷰트 기반 프로퍼티 복원
-        base.ReadJson(element, options);
 
         // 포트 정의 복원
         RestorePortDefinitions(element, options);

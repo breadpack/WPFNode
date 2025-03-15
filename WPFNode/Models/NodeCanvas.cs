@@ -249,7 +249,7 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
                 source, target);
         }
 
-        var connection = new Connection(outputPort, inputPort);
+        var connection = new Connection(this, outputPort, inputPort);
         source.AddConnection(connection);
         target.AddConnection(connection);
         _connections.Add(connection);
@@ -343,7 +343,7 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
 
     internal Connection CreateConnection(IOutputPort source, IInputPort target)
     {
-        return new Connection(source, target);
+        return new(this, source, target);
     }
 
     public string ToJson()
@@ -418,7 +418,7 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
             throw new NodeConnectionException("이미 연결되어 있는 포트입니다.", source, target);
         }
 
-        var connection = new Connection(id, outputPort, inputPort);
+        var connection = new Connection(id, this, outputPort, inputPort);
         source.AddConnection(connection);
         target.AddConnection(connection);
         _connections.Add(connection);

@@ -99,11 +99,11 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         return port;
     }
 
-    internal IInputPort CreateInputPort(string name, Type type, string? format = null) {
+    internal IInputPort CreateInputPort(string name, Type type) {
         var portIndex = _inputPorts.Count;
         var port = (IInputPort)Activator.CreateInstance(
             typeof(InputPort<>).MakeGenericType(type),
-            name, this, portIndex, format)!;
+            name, this, portIndex)!;
         RegisterInputPort(port);
         return port;
     }
@@ -213,6 +213,7 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
 
     internal void RemoveOutputPort(IOutputPort port) {
         if (_outputPorts.Contains(port)) {
+            port.Disconnect();
             _outputPorts.Remove(port);
             OnPropertyChanged(nameof(OutputPorts));
         }
@@ -440,8 +441,7 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
             if (inputAttr != null) {
                 var port = CreateInputPort(
                     inputAttr.DisplayName ?? property.Name,
-                    property.PropertyType.GenericTypeArguments[0],
-                    inputAttr.Format);
+                    property.PropertyType.GenericTypeArguments[0]);
 
                 // 멤버 프로퍼티에 할당
                 if (property.CanWrite) {
