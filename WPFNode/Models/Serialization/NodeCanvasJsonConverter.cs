@@ -14,7 +14,7 @@ public class PropertySerializationData
 
 public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
 {
-    private static readonly JsonSerializerOptions _serializerOptions = new()
+    private static JsonSerializerOptions _serializerOptions = new()
     {
         WriteIndented = true,
         Converters = 
@@ -23,7 +23,67 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
         }
     };
 
-    public static JsonSerializerOptions SerializerOptions => _serializerOptions;
+    public static JsonSerializerOptions SerializerOptions
+    {
+        get => _serializerOptions;
+        set
+        {
+            if (value == null)
+                throw new ArgumentNullException(nameof(value));
+            _serializerOptions = value;
+        }
+    }
+
+    /// <summary>
+    /// JsonSerializerOptions를 초기화합니다.
+    /// </summary>
+    /// <param name="configure">JsonSerializerOptions를 구성하는 Action</param>
+    public static void ConfigureSerializerOptions(Action<JsonSerializerOptions> configure)
+    {
+        if (configure == null)
+            throw new ArgumentNullException(nameof(configure));
+
+        var options = new JsonSerializerOptions(_serializerOptions);
+        configure(options);
+        _serializerOptions = options;
+    }
+
+    /// <summary>
+    /// JsonConverter를 추가합니다.
+    /// </summary>
+    /// <param name="converter">추가할 JsonConverter</param>
+    public static void AddConverter(JsonConverter converter)
+    {
+        if (converter == null)
+            throw new ArgumentNullException(nameof(converter));
+
+        _serializerOptions.Converters.Add(converter);
+    }
+
+    /// <summary>
+    /// JsonConverter를 제거합니다.
+    /// </summary>
+    /// <param name="converter">제거할 JsonConverter</param>
+    public static bool RemoveConverter(JsonConverter converter)
+    {
+        if (converter == null)
+            throw new ArgumentNullException(nameof(converter));
+
+        return _serializerOptions.Converters.Remove(converter);
+    }
+
+    /// <summary>
+    /// 특정 타입의 JsonConverter를 제거합니다.
+    /// </summary>
+    /// <typeparam name="T">제거할 JsonConverter 타입</typeparam>
+    public static void RemoveConverter<T>() where T : JsonConverter
+    {
+        var converterToRemove = _serializerOptions.Converters.FirstOrDefault(c => c is T);
+        if (converterToRemove != null)
+        {
+            _serializerOptions.Converters.Remove(converterToRemove);
+        }
+    }
 
     public override NodeCanvas? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
