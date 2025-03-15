@@ -14,9 +14,9 @@ public interface INode : INotifyPropertyChanged, IJsonSerializable
     double X { get; set; }
     double Y { get; set; }
     
-    IReadOnlyList<IInputPort> InputPorts { get; }
-    IReadOnlyList<IOutputPort> OutputPorts { get; }
-    IReadOnlyDictionary<string, INodeProperty> Properties { get; }
+    IReadOnlyList<IInputPort>    InputPorts  { get; }
+    IReadOnlyList<IOutputPort>   OutputPorts { get; }
+    IReadOnlyList<INodeProperty> Properties  { get; }
     
     Task ExecuteAsync(CancellationToken cancellationToken = default);
     bool CanExecuteCommand(string commandName, object? parameter = null);

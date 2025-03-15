@@ -341,23 +341,6 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         await executable.ExecuteAsync(new Execution.ExecutionContext(), cancellationToken);
     }
 
-    public async Task ExecuteAsync(IDictionary<Guid, object> parameters, CancellationToken cancellationToken = default)
-    {
-        // 파라미터를 각 노드에 설정
-        foreach (var (nodeId, value) in parameters)
-        {
-            var node = _nodes.FirstOrDefault(n => n.Guid == nodeId);
-            if (node != null)
-            {
-                await node.SetParameterAsync(value);
-            }
-        }
-
-        // 실행 계획 생성 및 실행
-        var executionPlan = new Execution.ExecutionPlan(_nodes, _connections, true);
-        await executionPlan.ExecuteAsync(cancellationToken);
-    }
-
     internal Connection CreateConnection(IOutputPort source, IInputPort target)
     {
         return new Connection(source, target);

@@ -19,22 +19,11 @@ public class DynamicNode : NodeBase
 {
     private string _category;
     private bool _isInitialized = false;
-    private readonly HashSet<string> _initializedProperties = new HashSet<string>();
 
     private record PortDefinition(string Name, Type Type, int Index, bool IsVisible)
     {
         public JsonElement? Value { get; init; }
     }
-    
-    private record PropertyDefinition(
-        string Name, 
-        string DisplayName, 
-        Type Type, 
-        string? Format, 
-        bool CanConnectToPort, 
-        int Index,
-        JsonElement? Value = null,
-        List<JsonElement>? Options = null);
 
     [JsonConstructor]
     public DynamicNode(INodeCanvas canvas, Guid guid) 
@@ -54,9 +43,6 @@ public class DynamicNode : NodeBase
 
         try
         {
-            // 1. 필수 속성 초기화
-            InitializeRequiredProperties();
-            
             // 2. 노드 구성 (이벤트 핸들러, 포트 설정 등)
             ConfigureNode();
             
@@ -70,14 +56,6 @@ public class DynamicNode : NodeBase
             Logger?.LogError(ex, $"{GetType().Name} 노드 초기화 중 오류 발생");
             throw;
         }
-    }
-
-    /// <summary>
-    /// 필수 속성을 초기화합니다. 파생 클래스에서 오버라이드하여 필수 속성을 추가할 수 있습니다.
-    /// </summary>
-    protected virtual void InitializeRequiredProperties()
-    {
-        // 기본 구현은 비어있음 - 파생 클래스에서 오버라이드
     }
 
     /// <summary>
@@ -161,14 +139,7 @@ public class DynamicNode : NodeBase
         string? format = null,
         bool canConnectToPort = false)
     {
-        if (_initializedProperties.Contains(name) && Properties.TryGetValue(name, out var existingProperty))
-        {
-            return (NodeProperty<T>)existingProperty;
-        }
-
-        var property = CreateProperty<T>(name, displayName, format, canConnectToPort);
-        _initializedProperties.Add(name);
-        return property;
+        return (NodeProperty<T>)AddProperty(name, displayName, typeof(T), format, canConnectToPort);
     }
 
     public INodeProperty AddProperty(
@@ -178,14 +149,29 @@ public class DynamicNode : NodeBase
         string? format = null,
         bool canConnectToPort = false)
     {
-        if (_initializedProperties.Contains(name) && Properties.TryGetValue(name, out var existingProperty))
-        {
-            return existingProperty;
-        }
+        var property = Properties
+            .FirstOrDefault(p => p.Name == name && p.PropertyType == type);
 
-        var property = CreateProperty(name, displayName, type, format, canConnectToPort);
-        _initializedProperties.Add(name);
+        if (property != null)
+            return property;
+        
+        property = CreateProperty(name, displayName, type, format, canConnectToPort);
         return property;
+    }
+    
+    public void Remove(IInputPort port)
+    {
+        RemoveInputPort(port);
+    }
+    
+    public void Remove(IOutputPort port)
+    {
+        RemoveOutputPort(port);
+    }
+    
+    public void Remove(INodeProperty property)
+    {
+        RemoveProperty(property);
     }
 
     public InputPort<T>? GetInputPort<T>(string name)
@@ -209,8 +195,7 @@ public class DynamicNode : NodeBase
         
         // 제거할 속성 목록 생성 (제외 목록에 없는 속성만)
         var propertiesToRemove = Properties
-            .Where(p => !excludeSet.Contains(p.Key))
-            .Select(p => p.Value)
+            .Where(p => !excludeSet.Contains(p.Name))
             .ToList();
             
         // 속성 제거
@@ -228,7 +213,7 @@ public class DynamicNode : NodeBase
         
         // 입력 포트 제거 (속성이 아닌 입력 포트만)
         var inputPortsToRemove = InputPorts
-            .Where(p => Properties.Values.All(prop => prop != p))
+            .Where(p => Properties.All(prop => prop != p))
             .ToList();
             
         foreach (var port in inputPortsToRemove)
@@ -248,81 +233,104 @@ public class DynamicNode : NodeBase
     {
         base.WriteJson(writer);
 
-        // 입력 포트 정의 저장 (일반 InputPort와 NodeProperty 모두 포함)
-        writer.WriteStartArray("InputPortDefinitions");
-        foreach (var port in InputPorts.OrderBy(p => p.GetPortIndex()))
+        var type = GetType();
+
+        // 동적 프로퍼티 정의 저장
+        writer.WriteStartArray("DynamicProperties");
+        foreach (var property in Properties)
         {
-            // NodeProperty인 경우 건너뛰기 (PropertyDefinitions에서 처리)
+            // 어트리뷰트로 정의되지 않은 프로퍼티만 저장
+            var propertyInfo = type.GetProperty(property.Name);
+            if (propertyInfo?.GetCustomAttribute<NodePropertyAttribute>() == null && 
+                property.Value is IJsonSerializable serializable)
+            {
+                writer.WriteStartObject();
+                writer.WriteString("Name", property.Name);
+                writer.WriteString("DisplayName", property.DisplayName);
+                writer.WriteString("Type", property.PropertyType.AssemblyQualifiedName);
+                writer.WriteString("Format", property.Format);
+                writer.WriteBoolean("CanConnectToPort", property.CanConnectToPort);
+                writer.WriteBoolean("IsVisible", property.IsVisible);
+                
+                // 값이 있는 경우에만 직렬화
+                if (property.Value != null || property.PropertyType.IsValueType)
+                {
+                    writer.WritePropertyName("Value");
+                    JsonSerializer.Serialize(writer, property.Value, property.PropertyType, NodeCanvasJsonConverter.SerializerOptions);
+                }
+                
+                // 옵션 정보 저장
+                if (property.Options.Any())
+                {
+                    writer.WriteStartArray("Options");
+                    foreach (var option in property.Options)
+                    {
+                        writer.WriteStartObject();
+                        writer.WriteString("OptionType", option.OptionType);
+                        
+                        if (option is IJsonSerializable jsonSerializable)
+                        {
+                            jsonSerializable.WriteJson(writer);
+                        }
+                        
+                        writer.WriteEndObject();
+                    }
+                    writer.WriteEndArray();
+                }
+                
+                writer.WriteEndObject();
+            }
+        }
+        writer.WriteEndArray();
+
+        // 동적으로 생성된 입력 포트 저장
+        writer.WriteStartArray("DynamicInputPorts");
+        foreach (var port in InputPorts)
+        {
+            // NodeProperty이거나 어트리뷰트로 정의된 포트는 제외
             if (Properties.Any(prop => prop.Value == port))
                 continue;
 
-            writer.WriteStartObject();
-            writer.WriteString("Name", port.Name);
-            writer.WriteString("Type", port.DataType.AssemblyQualifiedName);
-            writer.WriteNumber("Index", port.GetPortIndex());
-            writer.WriteBoolean("IsVisible", port.IsVisible);
-            writer.WriteEndObject();
+            var propertyInfo = type.GetProperties()
+                .FirstOrDefault(p => p.GetCustomAttribute<NodeInputAttribute>() != null && 
+                                   p.GetValue(this) == port);
+            
+            if (propertyInfo == null && port is IJsonSerializable serializable)
+            {
+                writer.WriteStartObject();
+                writer.WriteString("Name", port.Name);
+                writer.WriteString("Type", port.DataType.AssemblyQualifiedName);
+                writer.WriteNumber("Index", port.GetPortIndex());
+                writer.WriteBoolean("IsVisible", port.IsVisible);
+                writer.WriteEndObject();
+            }
         }
         writer.WriteEndArray();
 
-        // 출력 포트 정의 저장
-        writer.WriteStartArray("OutputPortDefinitions");
+        // 동적으로 생성된 출력 포트 저장
+        writer.WriteStartArray("DynamicOutputPorts");
         foreach (var port in OutputPorts)
         {
-            writer.WriteStartObject();
-            writer.WriteString("Name", port.Name);
-            writer.WriteString("Type", port.DataType.AssemblyQualifiedName);
-            writer.WriteNumber("Index", port.GetPortIndex());
-            writer.WriteBoolean("IsVisible", port.IsVisible);
-            writer.WriteEndObject();
-        }
-        writer.WriteEndArray();
-
-        // 프로퍼티 정의 저장
-        writer.WriteStartArray("PropertyDefinitions");
-        foreach (var prop in Properties.OrderBy(p => ((IInputPort)p.Value).GetPortIndex()))
-        {
-            writer.WriteStartObject();
-            writer.WriteString("Name", prop.Key);
-            writer.WriteString("DisplayName", prop.Value.DisplayName);
-            writer.WriteString("Type", prop.Value.PropertyType.AssemblyQualifiedName);
-            writer.WriteString("Format", prop.Value.Format);
-            writer.WriteBoolean("CanConnectToPort", prop.Value.CanConnectToPort);
-            writer.WriteNumber("Index", ((IInputPort)prop.Value).GetPortIndex());
-            if(prop.Value.Value != null)
-            {
-                writer.WritePropertyName("Value");
-                JsonSerializer.Serialize(writer, prop.Value.Value, prop.Value.PropertyType, NodeCanvasJsonConverter.SerializerOptions);
-            }
+            var propertyInfo = type.GetProperties()
+                .FirstOrDefault(p => p.GetCustomAttribute<NodeOutputAttribute>() != null && 
+                                   p.GetValue(this) == port);
             
-            // INodePropertyOption 정보 직렬화
-            if (prop.Value.Options.Any())
+            if (propertyInfo == null && port is IJsonSerializable serializable)
             {
-                writer.WriteStartArray("Options");
-                foreach (var option in prop.Value.Options)
-                {
-                    writer.WriteStartObject();
-                    writer.WriteString("OptionType", option.OptionType);
-                    
-                    // option을 JsonSerializable로 직렬화
-                    if (option is IJsonSerializable jsonSerializable)
-                    {
-                        jsonSerializable.WriteJson(writer);
-                    }
-                    
-                    writer.WriteEndObject();
-                }
-                writer.WriteEndArray();
+                writer.WriteStartObject();
+                writer.WriteString("Name", port.Name);
+                writer.WriteString("Type", port.DataType.AssemblyQualifiedName);
+                writer.WriteNumber("Index", port.GetPortIndex());
+                writer.WriteBoolean("IsVisible", port.IsVisible);
+                writer.WriteEndObject();
             }
-            
-            writer.WriteEndObject();
         }
         writer.WriteEndArray();
     }
 
     private IEnumerable<PortDefinition> CollectInputPortDefinitions(JsonElement element)
     {
-        if (!element.TryGetProperty("InputPortDefinitions", out var inputPortDefinitions))
+        if (!element.TryGetProperty("DynamicInputPorts", out var inputPortDefinitions))
             yield break;
 
         foreach (var portDef in inputPortDefinitions.EnumerateArray())
@@ -340,50 +348,9 @@ public class DynamicNode : NodeBase
         }
     }
 
-    private IEnumerable<PropertyDefinition> CollectPropertyDefinitions(JsonElement element)
-    {
-        if (!element.TryGetProperty("PropertyDefinitions", out var propertyDefinitions))
-            yield break;
-
-        foreach (var propDef in propertyDefinitions.EnumerateArray())
-        {
-            var name = propDef.GetProperty("Name").GetString()!;
-            var displayName = propDef.GetProperty("DisplayName").GetString()!;
-            var typeName = propDef.GetProperty("Type").GetString()!;
-            var type = Type.GetType(typeName);
-            var format = propDef.GetProperty("Format").GetString();
-            var canConnectToPort = propDef.GetProperty("CanConnectToPort").GetBoolean();
-            var index = propDef.GetProperty("Index").GetInt32();
-
-            JsonElement? value = null;
-            if (propDef.TryGetProperty("Value", out var valueElement))
-            {
-                value = valueElement;
-            }
-            
-            // Options 수집
-            List<JsonElement>? options = null;
-            if (propDef.TryGetProperty("Options", out var optionsElement))
-            {
-                options = new List<JsonElement>();
-                foreach (var optionElement in optionsElement.EnumerateArray())
-                {
-                    options.Add(optionElement);
-                }
-            }
-
-            if (type != null)
-            {
-                yield return new PropertyDefinition(
-                    name, displayName, type, format, 
-                    canConnectToPort, index, value, options);
-            }
-        }
-    }
-
     private IEnumerable<PortDefinition> CollectOutputPortDefinitions(JsonElement element)
     {
-        if (!element.TryGetProperty("OutputPortDefinitions", out var outputPortDefinitions))
+        if (!element.TryGetProperty("DynamicOutputPorts", out var outputPortDefinitions))
             yield break;
 
         foreach (var portDef in outputPortDefinitions.EnumerateArray())
@@ -407,79 +374,78 @@ public class DynamicNode : NodeBase
 
     public override void ReadJson(JsonElement element, JsonSerializerOptions options)
     {
-        // 초기화 상태 리셋
-        _isInitialized = false;
-        
+        // 동적 프로퍼티 먼저 복원
+        if (element.TryGetProperty("DynamicProperties", out var dynamicPropsElement))
+        {
+            foreach (var propElement in dynamicPropsElement.EnumerateArray())
+            {
+                if (propElement.TryGetProperty("Name", out var nameElement) &&
+                    propElement.TryGetProperty("Type", out var typeElement))
+                {
+                    var name = nameElement.GetString();
+                    var typeName = typeElement.GetString();
+
+                    if (name != null && typeName != null)
+                    {
+                        var type = Type.GetType(typeName);
+                        if (type != null)
+                        {
+                            // 프로퍼티 생성
+                            var displayName = propElement.GetProperty("DisplayName").GetString() ?? name;
+                            var format = propElement.GetProperty("Format").GetString();
+                            var canConnectToPort = propElement.GetProperty("CanConnectToPort").GetBoolean();
+                            
+                            var property = AddProperty(name, displayName, type, format, canConnectToPort);
+
+                            // 값 복원
+                            if (propElement.TryGetProperty("Value", out var valueElement))
+                            {
+                                property.Value = JsonSerializer.Deserialize(
+                                    valueElement.GetRawText(),
+                                    type,
+                                    options);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 기본 속성 및 어트리뷰트 기반 프로퍼티 복원
+        base.ReadJson(element, options);
+
+        // 포트 정의 복원
+        RestorePortDefinitions(element, options);
+    }
+
+    private void RestorePortDefinitions(JsonElement element, JsonSerializerOptions options)
+    {
         try
         {
-            base.ReadJson(element, options);
-
-            ResetNode();
-            _initializedProperties.Clear();
-
-            // Category 값 복원
-            if (element.TryGetProperty("Category", out var categoryElement))
-            {
-                _category = categoryElement.GetString() ?? "Dynamic";
-            }
-
-            // 기본 포트와 프로퍼티 복원
+            // 기존 포트와 프로퍼티 정의 복원
             var inputPorts = CollectInputPortDefinitions(element).ToList();
-            var properties = CollectPropertyDefinitions(element).ToList();
             var outputPorts = CollectOutputPortDefinitions(element).ToList();
 
-            // InputPort와 Property를 인덱스 순서대로 복원
-            var orderedItems = inputPorts
-                .Select(p => (Definition: p, IsProperty: false))
-                .Concat(properties.Select(p => 
-                    (Definition: new PortDefinition(p.Name, p.Type, p.Index, true), IsProperty: true)))
-                .OrderBy(x => x.Definition.Index);
+            // 이미 존재하는 포트 이름 수집
+            var existingPortNames = InputPorts.Select(p => p.Name)
+                .Concat(OutputPorts.Select(p => p.Name))
+                .ToHashSet();
 
-            // 포트와 프로퍼티 생성
-            foreach (var item in orderedItems)
+            // 새로운 포트만 추가
+            foreach (var portDef in inputPorts)
             {
-                if (item.IsProperty)
+                if (!existingPortNames.Contains(portDef.Name))
                 {
-                    var prop = properties.First(p => p.Name == item.Definition.Name);
-                    var property = CreateProperty(
-                        prop.Name,
-                        prop.DisplayName,
-                        prop.Type,
-                        prop.Format,
-                        prop.CanConnectToPort);
-
-                    if (prop.Value.HasValue)
-                    {
-                        property.Value = JsonSerializer.Deserialize(
-                            prop.Value.Value.GetRawText(),
-                            prop.Type,
-                            options);
-                    }
-                    
-                    // Options 정보가 있지만 현재 역직렬화 지원이 구현되지 않았으므로
-                    // 로그만 남기고 향후 구현 예정
-                    if (prop.Options != null && prop.Options.Count > 0)
-                    {
-                        // 여기서는 옵션 정보가 존재한다는 것만 로그로 남김
-                        Logger?.LogInformation($"Property {prop.Name}에 {prop.Options.Count}개의 옵션이 있지만, 역직렬화 지원이 아직 구현되지 않았습니다.");
-                    }
-                    
-                    _initializedProperties.Add(prop.Name);
-                }
-                else
-                {
-                    var port = CreateInputPort(item.Definition.Name, item.Definition.Type);
-                    port.IsVisible = item.Definition.IsVisible;
+                    var port = CreateInputPort(portDef.Name, portDef.Type);
+                    port.IsVisible = portDef.IsVisible;
                 }
             }
 
-            // 출력 포트 생성 및 값 복원
             foreach (var portDef in outputPorts)
             {
-                var port = CreateOutputPort(portDef.Name, portDef.Type);
-                
-                if (port != null)
+                if (!existingPortNames.Contains(portDef.Name))
                 {
+                    var port = CreateOutputPort(portDef.Name, portDef.Type);
                     port.IsVisible = portDef.IsVisible;
                     
                     if (portDef.Value.HasValue)
@@ -500,7 +466,7 @@ public class DynamicNode : NodeBase
         }
         catch (Exception ex)
         {
-            Logger?.LogError(ex, "DynamicNode 역직렬화 중 오류 발생");
+            Logger?.LogError(ex, "DynamicNode 포트 정의 복원 중 오류 발생");
             throw;
         }
     }

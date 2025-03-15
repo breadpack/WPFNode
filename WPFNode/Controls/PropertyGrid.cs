@@ -179,7 +179,7 @@ public class PropertyGrid : Control, INotifyPropertyChanged, IDisposable
         }
         
         // 새로운 NodePropertyViewModel 인스턴스 생성
-        var properties = _selectedNode?.Model?.Properties.Values
+        var properties = _selectedNode?.Model?.Properties
             .Select(p => new NodePropertyViewModel(p))
             .ToList() ?? new List<NodePropertyViewModel>();
         

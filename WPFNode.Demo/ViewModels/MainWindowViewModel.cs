@@ -119,7 +119,6 @@ public partial class MainWindowViewModel : ObservableObject
         _pluginService.LoadPlugins("Plugins");
         
         // 테스트 노드 등록
-        _pluginService.RegisterNodeType(typeof(TestNode));
         _pluginService.RegisterNodeType(typeof(ExcelInputNode));
         _pluginService.RegisterNodeType(typeof(TableOutputNode));
 

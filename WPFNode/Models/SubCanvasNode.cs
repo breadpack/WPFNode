@@ -184,16 +184,16 @@ public class SubCanvasNode : NodeBase
         foreach (var prop in Properties.OrderBy(p => ((IInputPort)p.Value).GetPortIndex()))
         {
             writer.WriteStartObject();
-            writer.WriteString("Name", prop.Key);
-            writer.WriteString("DisplayName", prop.Value.DisplayName);
-            writer.WriteString("Type", prop.Value.PropertyType.AssemblyQualifiedName);
-            writer.WriteString("Format", prop.Value.Format);
-            writer.WriteBoolean("CanConnectToPort", prop.Value.CanConnectToPort);
-            writer.WriteNumber("Index", ((IInputPort)prop.Value).GetPortIndex());
-            if(prop.Value.Value != null)
+            writer.WriteString("Name", prop.Name);
+            writer.WriteString("DisplayName", prop.DisplayName);
+            writer.WriteString("Type", prop.PropertyType.AssemblyQualifiedName);
+            writer.WriteString("Format", prop.Format);
+            writer.WriteBoolean("CanConnectToPort", prop.CanConnectToPort);
+            writer.WriteNumber("Index", ((IInputPort)prop).GetPortIndex());
+            if(prop.Value != null)
             {
                 writer.WritePropertyName("Value");
-                JsonSerializer.Serialize(writer, prop.Value.Value, prop.Value.PropertyType, NodeCanvasJsonConverter.SerializerOptions);
+                JsonSerializer.Serialize(writer, prop.Value, prop.PropertyType, NodeCanvasJsonConverter.SerializerOptions);
             }
             writer.WriteEndObject();
         }
@@ -505,8 +505,8 @@ public class SubCanvasNode : NodeBase
                 foreach (var prop in propsVisibility.EnumerateArray())
                 {
                     var key = prop.GetProperty("Key").GetString()!;
-                    if (Properties.TryGetValue(key, out var property) && 
-                        property is IInputPort inputPort)
+                    var property = Properties.FirstOrDefault(p => p.Name == key);
+                    if (property is IInputPort inputPort)
                     {
                         inputPort.IsVisible = prop.GetProperty("IsVisible").GetBoolean();
                     }

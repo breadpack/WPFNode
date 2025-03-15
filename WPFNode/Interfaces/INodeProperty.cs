@@ -1,6 +1,8 @@
-﻿﻿﻿﻿using System.ComponentModel;
+﻿﻿using System.ComponentModel;
 using System.Collections.Generic;
 using WPFNode.Constants;
+using System;
+using WPFNode.Models.Properties;
 
 namespace WPFNode.Interfaces;
 

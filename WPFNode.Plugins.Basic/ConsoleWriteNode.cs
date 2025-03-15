@@ -9,16 +9,13 @@ namespace WPFNode.Plugins.Basic;
 [NodeDescription("콘솔에 문자열을 출력하는 노드입니다.")]
 [OutputNode]
 public class ConsoleWriteNode : NodeBase {
-    private readonly InputPort<string> _input;
-    
-    public InputPort<string> Input => _input;
+    [NodeInput("Text")]
+    public InputPort<string> Input { get; set; }
 
-    public ConsoleWriteNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) {
-        _input = CreateInputPort<string>("Text");
-    }
+    public ConsoleWriteNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) { }
 
     protected override Task ProcessAsync(CancellationToken cancellationToken = default) {
-        Console.WriteLine(_input.GetValueOrDefault(string.Empty));
+        Console.WriteLine(Input.GetValueOrDefault(string.Empty));
         return Task.CompletedTask;
     }
 }

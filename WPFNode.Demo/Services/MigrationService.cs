@@ -197,8 +197,7 @@ namespace WPFNode.Demo.Services
             var (canvas, _, tableOutputNode) = LoadOrCreateMigrationPlanWithNodes(sourceData);
 
             // 마이그레이션 실행
-            var parameters = new Dictionary<Guid, object>();
-            await canvas.ExecuteAsync(parameters);
+            await canvas.ExecuteAsync();
 
             // JSON 결과 반환
             return tableOutputNode.ResultJson;
@@ -214,8 +213,7 @@ namespace WPFNode.Demo.Services
             var (canvas, _, tableOutputNode) = LoadOrCreateMigrationPlanWithNodes(sourceData);
 
             // 마이그레이션 실행
-            var parameters = new Dictionary<Guid, object>();
-            await canvas.ExecuteAsync(parameters);
+            await canvas.ExecuteAsync();
 
             // 결과 객체 반환
             return tableOutputNode.Result ?? 

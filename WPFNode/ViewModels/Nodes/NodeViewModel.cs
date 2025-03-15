@@ -107,7 +107,7 @@ public class NodeViewModel : ViewModelBase, INodeViewModel, ISelectable, IDispos
         set => _model.IsVisible = value;
     }
 
-    public IReadOnlyDictionary<string, INodeProperty> Properties => _model.Properties;
+    public IReadOnlyList<INodeProperty> Properties => _model.Properties;
     
     public Point Position
     {
