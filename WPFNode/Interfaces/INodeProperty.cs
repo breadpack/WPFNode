@@ -16,8 +16,6 @@ public interface INodeProperty : INotifyPropertyChanged, IJsonSerializable {
     bool    IsVisible        { get; }
 
     // 값 관련
-    object? Value { get; set; }
-
-    // 추가 옵션
-    IEnumerable<INodePropertyOption> Options { get; }
+    object?               Value { get; set; }
+    public INode Node  { get; }
 }

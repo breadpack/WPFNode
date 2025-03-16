@@ -261,25 +261,6 @@ public class DynamicNode : NodeBase
                     JsonSerializer.Serialize(writer, property.Value, property.PropertyType, NodeCanvasJsonConverter.SerializerOptions);
                 }
                 
-                // 옵션 정보 저장
-                if (property.Options.Any())
-                {
-                    writer.WriteStartArray("Options");
-                    foreach (var option in property.Options)
-                    {
-                        writer.WriteStartObject();
-                        writer.WriteString("OptionType", option.OptionType);
-                        
-                        if (option is IJsonSerializable jsonSerializable)
-                        {
-                            jsonSerializable.WriteJson(writer);
-                        }
-                        
-                        writer.WriteEndObject();
-                    }
-                    writer.WriteEndArray();
-                }
-                
                 writer.WriteEndObject();
             }
         }

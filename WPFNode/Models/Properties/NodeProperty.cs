@@ -9,13 +9,12 @@ using WPFNode.Models.Serialization;
 namespace WPFNode.Models.Properties;
 
 public class NodeProperty<T> : INodeProperty, IInputPort<T> {
-    private          T?                         _value;
-    private readonly INode?                     _node;
-    private readonly List<IConnection>          _connections = new();
-    private readonly List<INodePropertyOption>  _options = new();
-    private          bool                       _canConnectToPort;
-    private          bool                       _isVisible;
-    private          int                        _portIndex;
+    private          T?                _value;
+    private readonly INode             _node;
+    private readonly List<IConnection> _connections = new();
+    private          bool              _canConnectToPort;
+    private          bool              _isVisible;
+    private          int               _portIndex;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -80,11 +79,10 @@ public class NodeProperty<T> : INodeProperty, IInputPort<T> {
         }
     }
 
-    public Type                       PropertyType      { get; }
-    public Type?                      ElementType       { get; }
-    public IInputPort?                ConnectedPort     => IsConnected ? this : null;
-    public bool                       IsConnectedToPort => IsConnected;
-    public IEnumerable<INodePropertyOption> Options     => _options;
+    public Type                             PropertyType      { get; }
+    public Type?                            ElementType       { get; }
+    public IInputPort?                      ConnectedPort     => IsConnected ? this : null;
+    public bool                             IsConnectedToPort => IsConnected;
 
     object? INodeProperty.Value {
         get => Value;
@@ -120,12 +118,12 @@ public class NodeProperty<T> : INodeProperty, IInputPort<T> {
                     if (TryConvertValue(sourceValue, out T? convertedValue)) {
                         return convertedValue;
                     }
-                    
+
                     // 2. 일반적인 타입 변환 시도
                     if (sourceValue.TryConvertTo(out T? convertedValue2)) {
                         return convertedValue2;
                     }
-                    
+
                     // 3. 마지막으로 문자열 변환 시도 (대상 타입이 string이 아닌 경우에만)
                     if (PropertyType != typeof(string) && sourceValue.ToString() is string stringValue) {
                         if (stringValue.TryConvertTo(out T? stringConvertedValue)) {
@@ -146,7 +144,7 @@ public class NodeProperty<T> : INodeProperty, IInputPort<T> {
     private bool TryConvertValue(object? sourceValue, out T? result) {
         result = default;
         if (sourceValue == null) return false;
-        
+
         try {
             // TypeConverter를 통해 변환 시도
             var converter = TypeDescriptor.GetConverter(PropertyType);
@@ -154,14 +152,14 @@ public class NodeProperty<T> : INodeProperty, IInputPort<T> {
                 result = (T?)converter.ConvertFrom(sourceValue);
                 return true;
             }
-            
+
             // 소스 타입의 TypeConverter로 변환 시도
             var sourceConverter = TypeDescriptor.GetConverter(sourceValue.GetType());
             if (sourceConverter.CanConvertTo(PropertyType)) {
                 result = (T?)sourceConverter.ConvertTo(sourceValue, PropertyType);
                 return true;
             }
-            
+
             // 기본 TryConvertTo 메서드 호출
             return sourceValue.TryConvertTo(out result);
         }
@@ -186,7 +184,7 @@ public class NodeProperty<T> : INodeProperty, IInputPort<T> {
     public bool                       IsInput     => true;
     public bool                       IsConnected => Connections.Count > 0;
     public IReadOnlyList<IConnection> Connections => _connections;
-    public INode?                     Node        => _node;
+    public INode                      Node        => _node;
 
     public void AddConnection(IConnection connection) {
         if (connection == null)

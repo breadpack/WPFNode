@@ -11,7 +11,7 @@ public interface IPort : INotifyPropertyChanged, IJsonSerializable {
     bool                       IsConnected { get; }
     bool                       IsVisible   { get; set; }
     IReadOnlyList<IConnection> Connections { get; }
-    INode?                     Node        { get; }
+    INode                      Node        { get; }
     void                       AddConnection(IConnection    connection);
     void                       RemoveConnection(IConnection connection);
     int                        GetPortIndex();
