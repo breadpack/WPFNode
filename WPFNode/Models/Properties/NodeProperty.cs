@@ -252,7 +252,12 @@ public class NodeProperty<T> : INodeProperty, IInputPort<T> {
 
     public void ReadJson(JsonElement element, JsonSerializerOptions options) {
         if (element.TryGetProperty("Value", out var valueElement)) {
-            Value = JsonSerializer.Deserialize<T>(valueElement.GetRawText(), NodeCanvasJsonConverter.SerializerOptions);
+            try {
+                Value = JsonSerializer.Deserialize<T>(valueElement.GetRawText(), NodeCanvasJsonConverter.SerializerOptions);
+            }
+            catch {
+                Value = default;
+            }
         }
 
         if (element.TryGetProperty("IsVisible", out var isVisibleElement)) {
