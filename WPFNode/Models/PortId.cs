@@ -4,13 +4,20 @@ public readonly struct PortId : IEquatable<PortId>
 {
     public Guid NodeId { get; }
     public bool IsInput { get; }
-    public int Index { get; }
+    public string Name { get; }
 
-    public PortId(Guid nodeId, bool isInput, int index)
+    public PortId(Guid nodeId, bool isInput, string name)
     {
         NodeId = nodeId;
         IsInput = isInput;
-        Index = index;
+        Name = name ?? throw new ArgumentNullException(nameof(name));
+    }
+
+    // 이전 버전과의 호환성을 위한 생성자
+    [Obsolete("Name 기반 생성자를 사용하세요. 이 생성자는 역호환성을 위해 유지됩니다.")]
+    public PortId(Guid nodeId, bool isInput, int index)
+        : this(nodeId, isInput, index.ToString())
+    {
     }
 
     public override bool Equals(object? obj)
@@ -22,12 +29,12 @@ public readonly struct PortId : IEquatable<PortId>
     {
         return NodeId.Equals(other.NodeId) && 
                IsInput == other.IsInput && 
-               Index == other.Index;
+               Name == other.Name;
     }
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(NodeId, IsInput, Index);
+        return HashCode.Combine(NodeId, IsInput, Name);
     }
 
     public static bool operator ==(PortId left, PortId right)
@@ -42,6 +49,6 @@ public readonly struct PortId : IEquatable<PortId>
 
     public override string ToString()
     {
-        return $"{NodeId}:{(IsInput ? "in" : "out")}[{Index}]";
+        return $"{NodeId}:{(IsInput ? "in" : "out")}[{Name}]";
     }
-} 
+}

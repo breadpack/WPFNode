@@ -217,72 +217,128 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
         {
             try
             {
-                // 1. 연결 생성에 필요한 기본 정보 파싱
+                // 연결 ID 파싱
                 var connectionId = Guid.Parse(connectionElement.GetProperty("Guid").GetString()!);
-                var sourcePortIdStr = connectionElement.GetProperty("SourcePortId").GetString()!;
-                var targetPortIdStr = connectionElement.GetProperty("TargetPortId").GetString()!;
-
-                // 포트 ID 문자열 파싱
-                var sourcePortIdParts = sourcePortIdStr.Split(new[] { ':', '[', ']' }, StringSplitOptions.None);
-                var targetPortIdParts = targetPortIdStr.Split(new[] { ':', '[', ']' }, StringSplitOptions.None);
-
-                if (sourcePortIdParts.Length != 4 || targetPortIdParts.Length != 4)
+                
+                // 포트 검색을 위한 변수
+                IOutputPort? sourcePort = null;
+                IInputPort? targetPort = null;
+                
+                // 1. 새로운 방식: Name 기반 포트 찾기 시도
+                if (connectionElement.TryGetProperty("SourceNodeId", out var sourceNodeIdElement) &&
+                    connectionElement.TryGetProperty("SourcePortName", out var sourcePortNameElement) &&
+                    connectionElement.TryGetProperty("SourceIsInput", out var sourceIsInputElement) &&
+                    connectionElement.TryGetProperty("TargetNodeId", out var targetNodeIdElement) &&
+                    connectionElement.TryGetProperty("TargetPortName", out var targetPortNameElement) &&
+                    connectionElement.TryGetProperty("TargetIsInput", out var targetIsInputElement))
                 {
-                    throw new JsonException($"잘못된 포트 ID 형식입니다. 소스: {sourcePortIdStr}, 타겟: {targetPortIdStr}");
-                }
-
-                var sourceNodeId = Guid.Parse(sourcePortIdParts[0]);
-                var sourceIsInput = sourcePortIdParts[1] == "in";
-                var sourceIndex = int.Parse(sourcePortIdParts[2]);
-
-                var targetNodeId = Guid.Parse(targetPortIdParts[0]);
-                var targetIsInput = targetPortIdParts[1] == "in";
-                var targetIndex = int.Parse(targetPortIdParts[2]);
-
-                // 2. 포트 찾기
-                IPort? sourcePort = null;
-                IPort? targetPort = null;
-
-                // 소스 노드와 타겟 노드 찾기
-                if (!nodesById.TryGetValue(sourceNodeId, out var sourceNode))
-                {
-                    throw new JsonException($"소스 노드를 찾을 수 없습니다: {sourceNodeId}");
-                }
-
-                if (!nodesById.TryGetValue(targetNodeId, out var targetNode))
-                {
-                    throw new JsonException($"타겟 노드를 찾을 수 없습니다: {targetNodeId}");
-                }
-
-                // 소스 포트 찾기 (출력 포트에서)
-                var sourcePortId = new PortId(sourceNodeId, sourceIsInput, sourceIndex);
-                foreach (var port in sourceNode.OutputPorts)
-                {
-                    if (port.Id == sourcePortId)
+                    // Name 기반으로 포트 찾기
+                    var sourceNodeId = Guid.Parse(sourceNodeIdElement.GetString()!);
+                    var sourceIsInput = bool.Parse(sourceIsInputElement.GetString()!);
+                    var sourcePortName = sourcePortNameElement.GetString()!;
+                    
+                    var targetNodeId = Guid.Parse(targetNodeIdElement.GetString()!);
+                    var targetIsInput = bool.Parse(targetIsInputElement.GetString()!);
+                    var targetPortName = targetPortNameElement.GetString()!;
+                    
+                    // 소스 노드와 타겟 노드 찾기
+                    if (!nodesById.TryGetValue(sourceNodeId, out var sourceNode))
                     {
-                        sourcePort = port;
-                        Console.WriteLine($"소스 포트 찾음: {port.Id}");
-                        break;
+                        throw new JsonException($"소스 노드를 찾을 수 없습니다: {sourceNodeId}");
+                    }
+
+                    if (!nodesById.TryGetValue(targetNodeId, out var targetNode))
+                    {
+                        throw new JsonException($"타겟 노드를 찾을 수 없습니다: {targetNodeId}");
+                    }
+                    
+                    // Name으로 포트 찾기
+                    if (!sourceIsInput)
+                    {
+                        sourcePort = sourceNode.OutputPorts.FirstOrDefault(p => p.Name == sourcePortName) as IOutputPort;
+                    }
+                    
+                    if (targetIsInput)
+                    {
+                        targetPort = targetNode.InputPorts.FirstOrDefault(p => p.Name == targetPortName) as IInputPort;
+                    }
+
+                    if (sourcePort != null && targetPort != null)
+                    {
+                        Console.WriteLine($"Name 기반으로 포트 찾음 - 소스: {sourcePortName}, 타겟: {targetPortName}");
                     }
                 }
-
-                // 타겟 포트 찾기 (입력 포트에서)
-                var targetPortId = new PortId(targetNodeId, targetIsInput, targetIndex);
-                foreach (var port in targetNode.InputPorts)
-                {
-                    if (port.Id == targetPortId)
-                    {
-                        targetPort = port;
-                        Console.WriteLine($"타겟 포트 찾음: {port.Id}");
-                        break;
-                    }
-                }
-
+                
+                // 2. 기존 방식(PortId 기반)으로 포트 찾기 시도 (Name 기반 검색이 실패한 경우)
                 if (sourcePort == null || targetPort == null)
                 {
-                    Console.WriteLine($"포트를 찾을 수 없음: 소스={sourcePortId}, 타겟={targetPortId}");
-                    throw new JsonException(
-                        $"포트를 찾을 수 없습니다. 소스: {sourcePortIdStr}, 타겟: {targetPortIdStr}");
+                    Console.WriteLine("Name 기반 포트 검색 실패. PortId 기반으로 시도합니다.");
+                    
+                    var sourcePortIdStr = connectionElement.GetProperty("SourcePortId").GetString()!;
+                    var targetPortIdStr = connectionElement.GetProperty("TargetPortId").GetString()!;
+
+                    // 포트 ID 문자열 파싱
+                    var sourcePortIdParts = sourcePortIdStr.Split(new[] { ':', '[', ']' }, StringSplitOptions.None);
+                    var targetPortIdParts = targetPortIdStr.Split(new[] { ':', '[', ']' }, StringSplitOptions.None);
+
+                    if (sourcePortIdParts.Length < 4 || targetPortIdParts.Length < 4)
+                    {
+                        throw new JsonException($"잘못된 포트 ID 형식입니다. 소스: {sourcePortIdStr}, 타겟: {targetPortIdStr}");
+                    }
+
+                    var sourceNodeId = Guid.Parse(sourcePortIdParts[0]);
+                    var sourceIsInput = sourcePortIdParts[1] == "in";
+                    var sourceIndexOrName = sourcePortIdParts[2]; // 인덱스 또는 이름일 수 있음
+
+                    var targetNodeId = Guid.Parse(targetPortIdParts[0]);
+                    var targetIsInput = targetPortIdParts[1] == "in";
+                    var targetIndexOrName = targetPortIdParts[2]; // 인덱스 또는 이름일 수 있음
+
+                    // 소스 노드와 타겟 노드 찾기
+                    if (!nodesById.TryGetValue(sourceNodeId, out var sourceNode))
+                    {
+                        throw new JsonException($"소스 노드를 찾을 수 없습니다: {sourceNodeId}");
+                    }
+
+                    if (!nodesById.TryGetValue(targetNodeId, out var targetNode))
+                    {
+                        throw new JsonException($"타겟 노드를 찾을 수 없습니다: {targetNodeId}");
+                    }
+
+                    // 소스 포트 찾기
+                    if (!sourceIsInput) // 출력 포트에서 찾기
+                    {
+                        // 먼저 이름으로 찾기 시도
+                        sourcePort = sourceNode.OutputPorts.FirstOrDefault(p => p.Name == sourceIndexOrName) as IOutputPort;
+                        
+                        // 이름으로 찾지 못한 경우, 인덱스로 시도 (이전 버전 호환성)
+                        if (sourcePort == null && int.TryParse(sourceIndexOrName, out var sourceIndex))
+                        {
+                            sourcePort = sourceNode.OutputPorts
+                                                   .FirstOrDefault(p => p.GetPortIndex() == sourceIndex) as IOutputPort;
+                        }
+                    }
+
+                    // 타겟 포트 찾기
+                    if (targetIsInput) // 입력 포트에서 찾기
+                    {
+                        // 먼저 이름으로 찾기 시도
+                        targetPort = targetNode.InputPorts.FirstOrDefault(p => p.Name == targetIndexOrName) as IInputPort;
+                        
+                        // 이름으로 찾지 못한 경우, 인덱스로 시도 (이전 버전 호환성)
+                        if (targetPort == null && int.TryParse(targetIndexOrName, out var targetIndex))
+                        {
+                            targetPort = targetNode.InputPorts
+                                                   .FirstOrDefault(p => p.GetPortIndex() == targetIndex) as IInputPort;
+                        }
+                    }
+                }
+
+                // 포트를 찾지 못한 경우 예외 발생
+                if (sourcePort == null || targetPort == null)
+                {
+                    Console.WriteLine("모든 방법으로 포트를 찾을 수 없습니다.");
+                    throw new JsonException($"포트를 찾을 수 없습니다. 소스 포트 또는 타겟 포트가 존재하지 않습니다.");
                 }
 
                 // 3. 연결 생성
@@ -488,4 +544,4 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
 
         return false;
     }
-} 
+}

@@ -20,7 +20,7 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
         _index = index;
     }
 
-    public PortId Id          => new(Node.Guid, true, _index);
+    public PortId Id          => new(Node.Guid, true, Name);
     public string Name        { get; set; }
     public Type   DataType    => typeof(T);
     public bool   IsInput     => true;

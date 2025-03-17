@@ -72,8 +72,20 @@ public class Connection : IConnection
     public void WriteJson(Utf8JsonWriter writer)
     {
         writer.WriteString("Guid", Guid.ToString());
+        
+        // 기존 PortId 문자열도 유지 (역호환성)
         writer.WriteString("SourcePortId", Source.Id.ToString());
         writer.WriteString("TargetPortId", Target.Id.ToString());
+        
+        // 명시적인 Port 정보 추가
+        writer.WriteString("SourceNodeId", Source.Node.Guid.ToString());
+        writer.WriteString("SourcePortName", Source.Name);
+        writer.WriteString("SourceIsInput", Source.IsInput.ToString());
+        
+        writer.WriteString("TargetNodeId", Target.Node.Guid.ToString());
+        writer.WriteString("TargetPortName", Target.Name);
+        writer.WriteString("TargetIsInput", Target.IsInput.ToString());
+        
         writer.WriteBoolean("IsEnabled", IsEnabled);
     }
 
@@ -85,4 +97,4 @@ public class Connection : IConnection
             IsEnabled = isEnabledElement.GetBoolean();
         }
     }
-} 
+}
