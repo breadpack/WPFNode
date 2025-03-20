@@ -47,8 +47,7 @@ namespace WPFNode.Controls.PropertyControls {
             return contentControl;
         }
 
-        // EnumFlags(100)보다 낮고 List(90)보다 높은 우선순위
-        public int Priority => 95;
+        public int Priority => 110;
 
         public string ControlTypeId => "DropDown";
     }
