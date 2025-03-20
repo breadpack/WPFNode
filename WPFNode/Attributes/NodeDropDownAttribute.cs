@@ -25,9 +25,9 @@ public class NodeDropDownAttribute : Attribute
     /// </code>
     public string NameConverterMethodName { get; set; }
 
-    public NodeDropDownAttribute(string elementsMethodName)
+    public NodeDropDownAttribute(string elementsMethodName, string nameConverterMethodName = "")
     {
         ElementsMethodName = elementsMethodName;
-        NameConverterMethodName = string.Empty;
+        NameConverterMethodName = nameConverterMethodName;
     }
 } 
