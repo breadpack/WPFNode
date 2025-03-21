@@ -1,6 +1,9 @@
+using System;
+using System.Threading;
 using System.Threading.Tasks;
 using WPFNode.Attributes;
 using WPFNode.Interfaces;
+using WPFNode.Interfaces.Flow;
 using WPFNode.Models;
 
 namespace WPFNode.Plugins.Basic;
@@ -10,11 +13,17 @@ namespace WPFNode.Plugins.Basic;
 [NodeDescription("두 수를 더합니다.")]
 public class AdditionNode : NodeBase
 {
+    [FlowInPort("In")]
+    public IFlowInPort FlowIn { get; private set; }
+    
+    [FlowOutPort("Out")]
+    public IFlowOutPort FlowOut { get; private set; }
+    
     [NodeInput("A")]
-    public InputPort<double>  InputA { get; set; }
+    public InputPort<double> InputA { get; set; }
     
     [NodeInput("B")]
-    public InputPort<double>  InputB { get; set; }
+    public InputPort<double> InputB { get; set; }
     
     [NodeOutput("Output")]
     public OutputPort<double> Result { get; set; }
@@ -29,4 +38,4 @@ public class AdditionNode : NodeBase
         Result.Value = a + b;
         await Task.CompletedTask;
     }
-} 
+}

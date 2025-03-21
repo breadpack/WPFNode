@@ -243,4 +243,98 @@ public class ExecutionContext
             
         return nodes.All(IsNodeExecuted);
     }
+    
+    /// <summary>
+    /// 노드의 모든 입력 포트에 연결된 소스 노드들이 실행되었는지 확인하고,
+    /// 실행되지 않은 노드가 있으면 실행합니다.
+    /// </summary>
+    /// <param name="node">입력을 확인할 노드</param>
+    /// <param name="cancellationToken">취소 토큰</param>
+    public async Task EnsureInputsExecutedAsync(NodeBase node, CancellationToken cancellationToken)
+    {
+        // 이미 처리 중인 노드는 중복 처리 방지 (순환 참조 방지)
+        if (_nodeBeingProcessed.Contains(node.Guid))
+            return;
+        
+        try
+        {
+            _nodeBeingProcessed.Add(node.Guid);
+            
+            // 모든 입력 포트 확인
+            foreach (var inputPort in node.InputPorts)
+            {
+                if (inputPort.IsConnected)
+                {
+                    var connection = inputPort.Connections.FirstOrDefault();
+                    if (connection != null && connection.Source != null && 
+                        connection.Source.Node is NodeBase sourceNode)
+                    {
+                        // 소스 노드가 실행되지 않았으면 먼저 실행
+                        if (!IsNodeExecuted(sourceNode))
+                        {
+                            // 소스 노드의 입력도 먼저 확인 (재귀)
+                            await EnsureInputsExecutedAsync(sourceNode, cancellationToken);
+                            
+                            // 소스 노드 실행
+                            await sourceNode.ExecuteAsync(cancellationToken);
+                            MarkNodeExecuted(sourceNode);
+                        }
+                    }
+                }
+            }
+        }
+        finally
+        {
+            _nodeBeingProcessed.Remove(node.Guid);
+        }
+    }
+    
+    // 순환 참조 감지를 위한 처리 중인 노드 목록
+    private readonly HashSet<Guid> _nodeBeingProcessed = new();
+    
+    /// <summary>
+    /// 노드의 모든 흐름 입력 포트에 연결된 소스 노드들이 실행되었는지 확인하고,
+    /// 실행되지 않은 노드가 있으면 실행합니다.
+    /// </summary>
+    /// <param name="node">흐름 입력을 확인할 노드</param>
+    /// <param name="cancellationToken">취소 토큰</param>
+    public async Task EnsureFlowInputsExecutedAsync(NodeBase node, CancellationToken cancellationToken)
+    {
+        // 이미 처리 중인 노드는 중복 처리 방지 (순환 참조 방지)
+        if (_nodeBeingProcessed.Contains(node.Guid))
+            return;
+        
+        try
+        {
+            _nodeBeingProcessed.Add(node.Guid);
+            
+            // 모든 흐름 입력 포트 확인
+            foreach (var flowInPort in node.FlowInPorts)
+            {
+                foreach (var connection in flowInPort.Connections)
+                {
+                    if (connection.Source.Node is NodeBase sourceNode)
+                    {
+                        // 소스 노드가 실행되지 않았으면 먼저 실행
+                        if (!IsNodeExecuted(sourceNode))
+                        {
+                            // 소스 노드의 흐름 입력 포트도 먼저 확인 (재귀)
+                            await EnsureFlowInputsExecutedAsync(sourceNode, cancellationToken);
+                            
+                            // 일반 입력 포트도 확인
+                            await EnsureInputsExecutedAsync(sourceNode, cancellationToken);
+                            
+                            // 소스 노드 실행
+                            await sourceNode.ExecuteAsync(cancellationToken);
+                            MarkNodeExecuted(sourceNode);
+                        }
+                    }
+                }
+            }
+        }
+        finally
+        {
+            _nodeBeingProcessed.Remove(node.Guid);
+        }
+    }
 }

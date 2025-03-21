@@ -32,9 +32,24 @@ public class ExecutionPlan {
         _logger?.LogDebug("ExecutionPlan initialized with parallelExecution: {Parallel}", parallelExecution);
     }
 
+    /// <summary>
+    /// 실행 계획을 실행합니다.
+    /// </summary>
+    /// <param name="cancellationToken">취소 토큰</param>
     public async Task ExecuteAsync(CancellationToken cancellationToken = default) {
         var context = new ExecutionContext();
-        
+        await ExecuteAsync(context, cancellationToken);
+    }
+    
+    /// <summary>
+    /// 주어진 실행 컨텍스트를 사용하여 실행 계획을 실행합니다.
+    /// </summary>
+    /// <param name="context">실행 컨텍스트</param>
+    /// <param name="cancellationToken">취소 토큰</param>
+    public async Task ExecuteAsync(ExecutionContext context, CancellationToken cancellationToken = default) {
+        if (context == null)
+            throw new ArgumentNullException(nameof(context));
+            
         // 루트 실행기 실행
         await _rootExecutor.ExecuteAsync(context, cancellationToken);
         

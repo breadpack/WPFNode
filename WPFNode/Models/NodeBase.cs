@@ -7,6 +7,7 @@ using System.Linq;
 using WPFNode.Attributes;
 using WPFNode.Constants;
 using WPFNode.Interfaces;
+using WPFNode.Interfaces.Flow;
 using WPFNode.Models.Properties;
 using WPFNode.Models.Serialization;
 using System.Windows;
@@ -25,6 +26,8 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
     private readonly   List<IInputPort>    _inputPorts  = new();
     private readonly   List<IOutputPort>   _outputPorts = new();
     private readonly   List<INodeProperty> _properties  = new();
+    private readonly   List<IFlowInPort>   _flowInPorts = new();
+    private readonly   List<IFlowOutPort>  _flowOutPorts = new();
     private            bool                _isInitialized;
     private readonly   INodeCanvas         _canvas;
     protected readonly ILogger?            Logger;
@@ -88,7 +91,9 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
 
     public IReadOnlyList<IInputPort>            InputPorts  => _inputPorts;
     public IReadOnlyList<IOutputPort>           OutputPorts => _outputPorts;
-    public IReadOnlyList<INodeProperty> Properties  => _properties;
+    public IReadOnlyList<INodeProperty>         Properties  => _properties;
+    public IReadOnlyList<IFlowInPort>           FlowInPorts => _flowInPorts.AsReadOnly();
+    public IReadOnlyList<IFlowOutPort>          FlowOutPorts => _flowOutPorts.AsReadOnly();
 
     internal INodeCanvas Canvas => _canvas;
 
@@ -318,7 +323,49 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
 
     public virtual async Task ExecuteAsync(CancellationToken cancellationToken = default) {
         Logger?.LogDebug("Executing node {NodeName}", Name);
-        await ProcessAsync(cancellationToken);
+        
+        // 취소 토큰 확인
+        cancellationToken.ThrowIfCancellationRequested();
+        
+        // 실행 컨텍스트 얻기 또는 생성
+        Models.Execution.ExecutionContext context = null;
+        if (Canvas is NodeCanvas canvas && canvas.CurrentContext != null)
+        {
+            context = canvas.CurrentContext;
+            
+            // 실행 전 선행 노드 확인 및 실행
+            await context.EnsureInputsExecutedAsync(this, cancellationToken);
+            
+            // 흐름 입력 포트도 확인
+            await context.EnsureFlowInputsExecutedAsync(this, cancellationToken);
+            
+            // 노드 상태 변경
+            context.SetNodeState(this, Models.Execution.NodeExecutionState.Running);
+        }
+        
+        try
+        {
+            // 노드 처리 로직 실행
+            await ProcessAsync(cancellationToken);
+            
+            // 노드 상태 업데이트
+            if (context != null)
+            {
+                context.SetNodeState(this, Models.Execution.NodeExecutionState.Completed);
+                context.MarkNodeExecuted(this);
+            }
+        }
+        catch (Exception ex)
+        {
+            // 예외 처리
+            if (context != null)
+            {
+                context.SetNodeState(this, Models.Execution.NodeExecutionState.Failed);
+            }
+            
+            Logger?.LogError(ex, "Error executing node {NodeName}", Name);
+            throw;
+        }
     }
 
     protected abstract Task ProcessAsync(CancellationToken cancellationToken = default);
@@ -396,11 +443,87 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         }
     }
 
+    internal IFlowInPort AddFlowInPort(string name) {
+        var port = new Models.Flow.FlowInPort(this, name);
+        RegisterFlowInPort(port);
+        return port;
+    }
+    
+    internal IFlowOutPort AddFlowOutPort(string name) {
+        var port = new Models.Flow.FlowOutPort(this, name);
+        RegisterFlowOutPort(port);
+        return port;
+    }
+    
+    private void RegisterFlowInPort(IFlowInPort port) {
+        if (port == null)
+            throw new ArgumentNullException(nameof(port));
+        _flowInPorts.Add(port);
+        OnPropertyChanged(nameof(FlowInPorts));
+    }
+    
+    private void RegisterFlowOutPort(IFlowOutPort port) {
+        if (port == null)
+            throw new ArgumentNullException(nameof(port));
+        _flowOutPorts.Add(port);
+        OnPropertyChanged(nameof(FlowOutPorts));
+    }
+    
+    public virtual async Task PropagateFlowAsync(Models.Execution.ExecutionContext context, CancellationToken cancellationToken) {
+        // 기본 구현: 첫 번째 흐름 출력 포트로만 전파
+        if (_flowOutPorts.Count > 0) {
+            await _flowOutPorts[0].PropagateFlowAsync(context, cancellationToken);
+        }
+    }
+
     private void InitializeFromAttributes() {
         var type = GetType();
         InitializeNodeProperties(type);
         InitializeInputPorts(type);
         InitializeOutputPorts(type);
+        InitializeFlowPorts(type);
+    }
+    
+    private void InitializeFlowPorts(Type type) {
+        // FlowInPortAttribute가 적용된 프로퍼티 처리
+        var flowInPorts = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                             .Where(p => p.GetCustomAttribute<FlowInPortAttribute>() != null)
+                             .Where(p => p.GetValue(this) == null);
+                             
+        foreach (var property in flowInPorts) {
+            if (property.GetValue(this) != null)
+                continue;
+                
+            var attrIn = property.GetCustomAttribute<FlowInPortAttribute>();
+            if (attrIn != null) {
+                var portName = !string.IsNullOrEmpty(attrIn.DisplayName) ? attrIn.DisplayName : property.Name;
+                var port = AddFlowInPort(portName);
+                
+                if (property.CanWrite) {
+                    property.SetValue(this, port);
+                }
+            }
+        }
+        
+        // FlowOutPortAttribute가 적용된 프로퍼티 처리
+        var flowOutPorts = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                              .Where(p => p.GetCustomAttribute<FlowOutPortAttribute>() != null)
+                              .Where(p => p.GetValue(this) == null);
+                              
+        foreach (var property in flowOutPorts) {
+            if (property.GetValue(this) != null)
+                continue;
+                
+            var attrOut = property.GetCustomAttribute<FlowOutPortAttribute>();
+            if (attrOut != null) {
+                var portName = !string.IsNullOrEmpty(attrOut.DisplayName) ? attrOut.DisplayName : property.Name;
+                var port = AddFlowOutPort(portName);
+                
+                if (property.CanWrite) {
+                    property.SetValue(this, port);
+                }
+            }
+        }
     }
 
     private void InitializeOutputPorts(Type type) {

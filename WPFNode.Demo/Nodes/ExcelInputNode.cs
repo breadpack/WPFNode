@@ -7,14 +7,18 @@ using WPFNode.Models;
 using WPFNode.Demo.Models;
 using WPFNode.Attributes;
 using WPFNode.Interfaces;
+using WPFNode.Interfaces.Flow;
 
 namespace WPFNode.Demo.Nodes
 {
     [NodeName("Excel Input")]
     [NodeCategory("Data")]
     [NodeDescription("엑셀 테이블 데이터를 입력으로 사용하는 노드")]
-    public class ExcelInputNode : DynamicNode, ILoopNode
+    public class ExcelInputNode : DynamicNode, ILoopNode, IFlowEntryPoint
     {
+        [FlowOutPort]
+        public IFlowOutPort OutPort { get; private set; }
+        
         private TableData _tableData;
         private int _currentRowIndex;
         private string _identifier;

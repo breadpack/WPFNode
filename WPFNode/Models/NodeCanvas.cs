@@ -3,6 +3,8 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using WPFNode.Interfaces.Flow;
+using WPFNode.Models.Flow;
 using WPFNode.Commands;
 using WPFNode.Exceptions;
 using WPFNode.Interfaces;
@@ -18,6 +20,7 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
     private readonly List<NodeBase> _nodes;
     private readonly List<IConnection> _connections;
     private readonly List<NodeGroup> _groups;
+    private readonly List<FlowConnection> _flowConnections;
     private readonly INodePluginService _pluginService;
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -27,6 +30,18 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
     public event EventHandler<IConnection>? ConnectionRemoved;
     public event EventHandler<NodeGroup>? GroupAdded;
     public event EventHandler<NodeGroup>? GroupRemoved;
+    public event EventHandler<IFlowConnection>? FlowConnectionAdded;
+    public event EventHandler<IFlowConnection>? FlowConnectionRemoved;
+
+    protected virtual void OnFlowConnectionAdded(IFlowConnection connection)
+    {
+        FlowConnectionAdded?.Invoke(this, connection);
+    }
+
+    protected virtual void OnFlowConnectionRemoved(IFlowConnection connection)
+    {
+        FlowConnectionRemoved?.Invoke(this, connection);
+    }
 
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
@@ -73,7 +88,16 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
     public IReadOnlyList<NodeGroup> Groups => _groups;
     
     [JsonIgnore]
+    public IReadOnlyList<IFlowConnection> FlowConnections => _flowConnections.AsReadOnly();
+    
+    [JsonIgnore]
     public CommandManager CommandManager { get; }
+    
+    /// <summary>
+    /// 현재 실행 중인 실행 컨텍스트 참조
+    /// </summary>
+    [JsonIgnore]
+    public Models.Execution.ExecutionContext CurrentContext { get; private set; }
 
     private static readonly JsonSerializerOptions DefaultJsonOptions = new()
     {
@@ -95,8 +119,11 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         _nodes = new();
         _connections = new();
         _groups = new();
+        _flowConnections = new();
         CommandManager = new CommandManager();
     }
+    
+    public List<FlowConnection> SerializableFlowConnections => _flowConnections;
 
     public List<NodeBase> SerializableNodes
     {
@@ -331,14 +358,79 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
 
     public async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        var executionPlan = new Execution.ExecutionPlan(_nodes, _connections, true);
-        await executionPlan.ExecuteAsync(cancellationToken);
+        // 실행 컨텍스트 생성
+        var context = new Execution.ExecutionContext();
+        
+        // 현재 컨텍스트 참조 저장
+        CurrentContext = context;
+        
+        try
+        {
+            // 먼저 모든 IFlowEntryPoint 노드 찾기
+            var entryPoints = _nodes.OfType<IFlowEntryPoint>().ToList();
+            
+            if (entryPoints.Count > 0)
+            {
+                // Flow 기반 실행: 엔트리 포인트부터 시작
+                foreach (var entryPoint in entryPoints)
+                {
+                    if (entryPoint is NodeBase nodeBase)
+                    {
+                        // 노드 실행
+                        await nodeBase.ExecuteAsync(cancellationToken);
+                        
+                        // 다음 흐름 전파
+                        await nodeBase.PropagateFlowAsync(context, cancellationToken);
+                        
+                        // 기본적으로 첫 번째 엔트리 포인트만 실행 (옵션으로 변경 가능)
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                // 기존 실행 계획 기반 실행 (하위 호환성 유지)
+                var executionPlan = new Execution.ExecutionPlan(_nodes, _connections, true);
+                await executionPlan.ExecuteAsync(context, cancellationToken);
+            }
+        }
+        finally
+        {
+            // 컨텍스트 참조 제거
+            CurrentContext = null;
+        }
     }
 
     public async Task ExecuteAsync(Execution.ExecutionPlanBuilder executionPlanBuilder, CancellationToken cancellationToken = default)
     {
         var executable = executionPlanBuilder.BuildExecutionPlan(_nodes, _connections, true);
         await executable.ExecuteAsync(new Execution.ExecutionContext(), cancellationToken);
+    }
+    
+    /// <summary>
+    /// 입력 기반 반응형 실행 방식으로 캔버스를 실행합니다.
+    /// </summary>
+    /// <param name="cancellationToken">취소 토큰</param>
+    /// <returns>실행 작업</returns>
+    public async Task ExecuteReactiveAsync(CancellationToken cancellationToken = default)
+    {
+        var planBuilder = new Execution.ReactiveExecutionPlanBuilder();
+        var executable = planBuilder.BuildExecutionPlan(this);
+        await executable.ExecuteAsync(cancellationToken);
+    }
+    
+    /// <summary>
+    /// 지정된 반응형 실행 계획 빌더를 사용하여 캔버스를 실행합니다.
+    /// </summary>
+    /// <param name="planBuilder">실행 계획 빌더</param>
+    /// <param name="cancellationToken">취소 토큰</param>
+    /// <returns>실행 작업</returns>
+    public async Task ExecuteReactiveAsync(
+        Execution.ReactiveExecutionPlanBuilder planBuilder, 
+        CancellationToken cancellationToken = default)
+    {
+        var executable = planBuilder.BuildExecutionPlan(this);
+        await executable.ExecuteAsync(cancellationToken);
     }
 
     internal Connection CreateConnection(IOutputPort source, IInputPort target)
@@ -441,6 +533,78 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         }
         _groups.Add(group);
         return group;
+    }
+    
+    // 흐름 포트 연결 메서드
+    public IFlowConnection ConnectFlow(IFlowOutPort source, IFlowInPort target)
+    {
+        // 유효성 검사
+        if (source == null || target == null)
+            throw new NodeConnectionException("소스 또는 타겟 흐름 포트가 null입니다");
+            
+        if (source.Node == null || target.Node == null)
+            throw new NodeConnectionException("흐름 포트는 노드에 연결되어 있어야 합니다");
+            
+        // 중복 연결 체크
+        if (_flowConnections.Any(c => c.Source == source && c.Target == target))
+            throw new NodeConnectionException("이미 연결된 흐름 포트입니다");
+            
+        // 연결 생성
+        var connection = new FlowConnection(Guid.NewGuid(), source, target);
+        source.AddConnection(connection);
+        target.AddConnection(connection);
+        _flowConnections.Add(connection);
+        
+        OnFlowConnectionAdded(connection);
+        OnPropertyChanged(nameof(FlowConnections));
+        
+        return connection;
+    }
+    
+    // ID를 지정한 흐름 포트 연결 메서드 (역직렬화 용)
+    public IFlowConnection ConnectFlowWithId(Guid id, IFlowOutPort source, IFlowInPort target)
+    {
+        // 유효성 검사
+        if (source == null || target == null)
+            throw new NodeConnectionException("소스 또는 타겟 흐름 포트가 null입니다");
+            
+        if (source.Node == null || target.Node == null)
+            throw new NodeConnectionException("흐름 포트는 노드에 연결되어 있어야 합니다");
+            
+        // 중복 연결 체크
+        if (_flowConnections.Any(c => c.Source == source && c.Target == target))
+            throw new NodeConnectionException("이미 연결된 흐름 포트입니다");
+            
+        // 연결 생성
+        var connection = new FlowConnection(id, source, target);
+        source.AddConnection(connection);
+        target.AddConnection(connection);
+        _flowConnections.Add(connection);
+        
+        OnFlowConnectionAdded(connection);
+        OnPropertyChanged(nameof(FlowConnections));
+        
+        return connection;
+    }
+    
+    // 흐름 포트 연결 해제 메서드
+    public void DisconnectFlow(IFlowConnection connection)
+    {
+        if (connection == null)
+            throw new NodeValidationException("연결이 null입니다");
+            
+        if (!_flowConnections.Contains(connection))
+            throw new NodeValidationException("존재하지 않는 흐름 연결입니다");
+            
+        // 흐름 연결 컬렉션에서 제거
+        _flowConnections.Remove((FlowConnection)connection);
+        
+        // 포트에서 연결 제거
+        connection.Source.RemoveConnection(connection);
+        connection.Target.RemoveConnection(connection);
+        
+        OnFlowConnectionRemoved(connection);
+        OnPropertyChanged(nameof(FlowConnections));
     }
 
     // 포트 ID로 연결을 찾는 유틸리티 메서드

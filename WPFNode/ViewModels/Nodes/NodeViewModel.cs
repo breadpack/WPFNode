@@ -21,8 +21,13 @@ public class NodeViewModel : ViewModelBase, INodeViewModel, ISelectable, IDispos
 
     private readonly ObservableCollection<NodePortViewModel> _inputPorts;
     private readonly ObservableCollection<NodePortViewModel> _outputPorts;
+    private readonly ObservableCollection<FlowPortViewModel> _flowInPorts;
+    private readonly ObservableCollection<FlowPortViewModel> _flowOutPorts;
+    
     public ReadOnlyObservableCollection<NodePortViewModel> InputPorts { get; }
     public ReadOnlyObservableCollection<NodePortViewModel> OutputPorts { get; }
+    public ReadOnlyObservableCollection<FlowPortViewModel> FlowInPorts { get; }
+    public ReadOnlyObservableCollection<FlowPortViewModel> FlowOutPorts { get; }
 
     public NodeViewModel(NodeBase model, INodeCommandService commandService, NodeCanvasViewModel canvas)
     {
@@ -32,14 +37,21 @@ public class NodeViewModel : ViewModelBase, INodeViewModel, ISelectable, IDispos
         _position       = new(model.X, model.Y);
         _name           = model.Name;
 
-        // 포트 컬렉션 초기화
+        // 일반 데이터 포트 컬렉션 초기화
         _inputPorts = new(model.InputPorts.Select(p => new NodePortViewModel(p, canvas)));
         _outputPorts = new(model.OutputPorts.Select(p => new NodePortViewModel(p, canvas)));
 
         InputPorts  = new(_inputPorts);
         OutputPorts = new(_outputPorts);
+        
+        // 흐름 포트 컬렉션 초기화
+        _flowInPorts = new(model.FlowInPorts.Select(p => new FlowPortViewModel(p)));
+        _flowOutPorts = new(model.FlowOutPorts.Select(p => new FlowPortViewModel(p)));
+        
+        FlowInPorts = new(_flowInPorts);
+        FlowOutPorts = new(_flowOutPorts);
 
-        // 포트의 Parent 설정
+        // 일반 포트의 Parent 설정
         foreach (var port in InputPorts.Concat(OutputPorts))
         {
             port.Parent = this;
@@ -48,6 +60,8 @@ public class NodeViewModel : ViewModelBase, INodeViewModel, ISelectable, IDispos
         // 포트 컬렉션 변경 이벤트 구독
         _inputPorts.CollectionChanged += OnPortsCollectionChanged;
         _outputPorts.CollectionChanged += OnPortsCollectionChanged;
+        _flowInPorts.CollectionChanged += OnFlowPortsCollectionChanged;
+        _flowOutPorts.CollectionChanged += OnFlowPortsCollectionChanged;
 
         // 모델 속성 변경 이벤트 구독
         _model.PropertyChanged += Model_PropertyChanged;
@@ -164,6 +178,12 @@ public class NodeViewModel : ViewModelBase, INodeViewModel, ISelectable, IDispos
         // 포트 컬렉션이 변경되면 캔버스에 알림
         _canvas.OnPortsChanged();
     }
+    
+    private void OnFlowPortsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        // 흐름 포트 컬렉션이 변경되면 캔버스에 알림
+        _canvas.OnPortsChanged();
+    }
 
     public bool ExecuteCommand(string commandName, object? parameter = null)
     {
@@ -242,4 +262,4 @@ public class NodeViewModel : ViewModelBase, INodeViewModel, ISelectable, IDispos
 
     // ISelectable 인터페이스 구현
     public string SelectionType => "Node";
-} 
+}
