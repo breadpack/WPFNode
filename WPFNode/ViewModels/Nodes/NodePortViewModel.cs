@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Windows;
 using WPFNode.Interfaces;
 using WPFNode.Models;
 using WPFNode.ViewModels.Base;
@@ -27,6 +29,9 @@ public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
                 case nameof(IPort.IsVisible):
                     OnPropertyChanged(nameof(IsVisible));
                     break;
+                case nameof(IPort.DataType):
+                    OnPropertyChanged(nameof(DataType));
+                    break;
             }
         };
     }
@@ -44,8 +49,8 @@ public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
         set => SetProperty(ref _isSelected, value);
     }
     
-    public bool IsInput => _port.IsInput;
-    public Type DataType => _port.DataType;
+    public bool IsInput     => _port.IsInput;
+    public Type DataType    => _port.DataType;
     public bool IsConnected => _port.IsConnected;
     public IReadOnlyList<ConnectionViewModel> Connections => 
         _port.Connections
@@ -56,23 +61,42 @@ public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
 
     public bool IsVisible => _port.IsVisible;
 
+    /// <summary>
+    /// 포트가 Flow 포트인지 여부를 가져옵니다.
+    /// </summary>
+    public bool IsFlow => _port is IFlowOutPort or IFlowInPort;
+
     public bool CanConnectTo(NodePortViewModel other)
     {
-        // 입력 포트에서 출력 포트로의 연결
-        if (IsInput && !other.IsInput)
+        // 같은 노드의 포트끼리는 연결할 수 없음
+        if (Parent == other.Parent)
+            return false;
+
+        // 입력/출력 방향이 같으면 연결할 수 없음
+        if (IsInput == other.IsInput)
+            return false;
+            
+        // Flow 포트와 데이터 포트는 서로 연결할 수 없음
+        if (IsFlow != other.IsFlow)
+            return false;
+            
+        // 데이터 포트인 경우 타입 호환성 검사
+        if (!IsFlow)
         {
-            return _port is IInputPort inputPort && other._port is IOutputPort outputPort && 
-                   outputPort.CanConnectTo(inputPort);
+            // 둘 다 데이터 포트일 때만 타입 검사
+            if (DataType != null && other.DataType != null)
+            {
+                // 타입이 일치하지 않으면 연결할 수 없음
+                if (!DataType.IsAssignableFrom(other.DataType) &&
+                    !other.DataType.IsAssignableFrom(DataType))
+                {
+                    return false;
+                }
+            }
         }
 
-        // 출력 포트에서 입력 포트로의 연결
-        if (!IsInput && other.IsInput)
-        {
-            return other._port is IInputPort inputPort && _port is IOutputPort outputPort && 
-                   outputPort.CanConnectTo(inputPort);
-        }
-
-        return false;
+        // 모든 검사를 통과하면 연결 가능
+        return true;
     }
 
     public IPort Model => _port;

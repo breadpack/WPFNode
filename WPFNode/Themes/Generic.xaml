@@ -52,7 +52,7 @@
                                     </Grid.RowDefinitions>
                                     
                                     <!-- Flow In 포트 -->
-                                    <ItemsControl Grid.Row="0"
+                                    <ItemsControl x:Name="FlowInPortsPanel" Grid.Row="0"
                                                 HorizontalAlignment="Center"
                                                 ItemsSource="{Binding FlowInPorts}"
                                                 Margin="0,0,0,4">
@@ -70,7 +70,7 @@
                                     </ItemsControl>
 
                                     <!-- Input 포트 -->
-                                    <ItemsControl Grid.Row="1"
+                                    <ItemsControl x:Name="InputPortsPanel" Grid.Row="1"
                                                 ItemsSource="{Binding InputPorts}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
@@ -93,7 +93,7 @@
                                     </Grid.RowDefinitions>
                                     
                                     <!-- Flow Out 포트 -->
-                                    <ItemsControl Grid.Row="0"
+                                    <ItemsControl x:Name="FlowOutPortsPanel" Grid.Row="0"
                                                 HorizontalAlignment="Center"
                                                 ItemsSource="{Binding FlowOutPorts}"
                                                 Margin="0,0,0,4">
@@ -111,7 +111,7 @@
                                     </ItemsControl>
 
                                     <!-- Output 포트 -->
-                                    <ItemsControl Grid.Row="1"
+                                    <ItemsControl x:Name="OutputPortsPanel" Grid.Row="1"
                                                 ItemsSource="{Binding OutputPorts}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>

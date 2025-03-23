@@ -15,10 +15,18 @@ public class ConnectionControl : Control
     private PathFigure? _pathFigure;
     private BezierSegment? _bezierSegment;
     
+    // 데이터 연결 스타일
     private static readonly Brush DefaultBrush = Brushes.Gray;
     private static readonly Brush SelectedBrush = Brushes.Orange;
     private const double DefaultThickness = 2.0;
     private const double SelectedThickness = 3.0;
+    
+    // Flow 연결 스타일
+    private static readonly Brush FlowDefaultBrush = Brushes.Green;
+    private static readonly Brush FlowSelectedBrush = Brushes.LimeGreen;
+    private const double FlowDefaultThickness = 2.5;
+    private const double FlowSelectedThickness = 3.5;
+    private static readonly DoubleCollection FlowDashArray = new DoubleCollection(new double[] { 4, 2 });
 
     static ConnectionControl()
     {
@@ -30,6 +38,9 @@ public class ConnectionControl : Control
         get => (ConnectionViewModel?)DataContext;
         set => DataContext = value;
     }
+
+    // 현재 연결이 Flow 포트 간 연결인지 확인
+    private bool IsFlowConnection => ViewModel?.Source?.IsFlow == true && ViewModel?.Target?.IsFlow == true;
 
     public ConnectionControl()
     {
@@ -66,23 +77,40 @@ public class ConnectionControl : Control
     {
         if (ViewModel == null || _path == null) return;
         
+        // Flow 연결인지 확인
+        bool isFlow = IsFlowConnection;
+        
         if (ViewModel.IsSelected)
         {
-            _path.Stroke = SelectedBrush;
-            _path.StrokeThickness = SelectedThickness;
+            // 선택된 상태
+            _path.Stroke = isFlow ? FlowSelectedBrush : SelectedBrush;
+            _path.StrokeThickness = isFlow ? FlowSelectedThickness : SelectedThickness;
+            
             if (_arrow != null)
             {
-                _arrow.Fill = SelectedBrush;
+                _arrow.Fill = isFlow ? FlowSelectedBrush : SelectedBrush;
             }
         }
         else
         {
-            _path.Stroke = DefaultBrush;
-            _path.StrokeThickness = DefaultThickness;
+            // 기본 상태
+            _path.Stroke = isFlow ? FlowDefaultBrush : DefaultBrush;
+            _path.StrokeThickness = isFlow ? FlowDefaultThickness : DefaultThickness;
+            
             if (_arrow != null)
             {
-                _arrow.Fill = DefaultBrush;
+                _arrow.Fill = isFlow ? FlowDefaultBrush : DefaultBrush;
             }
+        }
+        
+        // Flow 연결은 점선으로 표시
+        if (isFlow)
+        {
+            _path.StrokeDashArray = FlowDashArray;
+        }
+        else
+        {
+            _path.StrokeDashArray = null;
         }
     }
     
@@ -184,6 +212,7 @@ public class ConnectionControl : Control
                 if (_pathFigure != null && _bezierSegment != null && _arrow != null)
                 {
                     UpdateConnection();
+                    UpdateVisualState(); // 시각 스타일도 업데이트
                 }
             }), System.Windows.Threading.DispatcherPriority.ContextIdle);
             return;
@@ -207,10 +236,16 @@ public class ConnectionControl : Control
         var startPoint = GetPortEdgePosition(sourceCenter, targetCenter);
         var endPoint = GetPortEdgePosition(targetCenter, sourceCenter);
 
+        // Flow 연결일 경우 곡선 제어점 계산 방식 조정
+        bool isFlow = IsFlowConnection;
+        
         // 베지어 곡선의 제어점 계산
         var deltaX = Math.Abs(endPoint.X - startPoint.X);
-        var controlPoint1 = new Point(startPoint.X + deltaX * 0.5, startPoint.Y);
-        var controlPoint2 = new Point(endPoint.X - deltaX * 0.5, endPoint.Y);
+        
+        // Flow 연결은 더 직선에 가깝게 표현
+        var controlOffset = isFlow ? 0.2 : 0.5;
+        var controlPoint1 = new Point(startPoint.X + deltaX * controlOffset, startPoint.Y);
+        var controlPoint2 = new Point(endPoint.X - deltaX * controlOffset, endPoint.Y);
 
         // 연결선 업데이트
         _pathFigure.StartPoint = startPoint;
@@ -232,5 +267,8 @@ public class ConnectionControl : Control
         arrowTransform.Children.Add(new TranslateTransform(arrowPosition.X, arrowPosition.Y));
         arrowTransform.Children.Add(new RotateTransform(angle + 180));
         _arrow.RenderTransform = arrowTransform;
+        
+        // 시각적 스타일 업데이트
+        UpdateVisualState();
     }
 }

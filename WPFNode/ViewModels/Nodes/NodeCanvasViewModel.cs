@@ -37,19 +37,20 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
 
     [ObservableProperty]
     private double _offsetY;
-    public IWpfCommand          AddNodeCommand     { get; init; }
-    public IWpfCommand          RemoveNodeCommand  { get; init; }
-    public IWpfCommand          ConnectCommand     { get; init; }
-    public IWpfCommand          DisconnectCommand  { get; init; }
-    public IWpfCommand          AddGroupCommand    { get; init; }
-    public IWpfCommand          RemoveGroupCommand { get; init; }
-    public IWpfCommand          UndoCommand        { get; init; }
-    public IWpfCommand          RedoCommand        { get; init; }
-    public IWpfCommand          ExecuteCommand     { get; init; }
-    public IWpfCommand          CopyCommand        { get; init; }
-    public IWpfCommand          PasteCommand       { get; init; }
-    public IWpfCommand          SaveCommand        { get; init; }
-    public IWpfCommand          LoadCommand        { get; init; }
+
+    public IWpfCommand AddNodeCommand     { get; init; }
+    public IWpfCommand RemoveNodeCommand  { get; init; }
+    public IWpfCommand ConnectCommand     { get; init; }
+    public IWpfCommand DisconnectCommand  { get; init; }
+    public IWpfCommand AddGroupCommand    { get; init; }
+    public IWpfCommand RemoveGroupCommand { get; init; }
+    public IWpfCommand UndoCommand        { get; init; }
+    public IWpfCommand RedoCommand        { get; init; }
+    public IWpfCommand ExecuteCommand     { get; init; }
+    public IWpfCommand CopyCommand        { get; init; }
+    public IWpfCommand PasteCommand       { get; init; }
+    public IWpfCommand SaveCommand        { get; init; }
+    public IWpfCommand LoadCommand        { get; init; }
 
     public NodeCanvasViewModel() : this(new()) { }
 
@@ -143,10 +144,10 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
 
         foreach (var connection in sourceCanvas.Connections) {
             var sourcePort = _canvas.Nodes
-                                    .SelectMany(n => n.OutputPorts)
+                                    .SelectMany(n => n.OutputPorts.Concat(n.FlowOutPorts))
                                     .FirstOrDefault(p => p.Id == connection.SourcePortId);
             var targetPort = _canvas.Nodes
-                                    .SelectMany(n => n.InputPorts)
+                                    .SelectMany(n => n.InputPorts.Concat(n.FlowInPorts))
                                     .FirstOrDefault(p => p.Id == connection.TargetPortId);
 
             if (sourcePort != null && targetPort != null) {
@@ -290,9 +291,11 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
 
         // 같은 노드의 포트인 경우 연결 불가
         var sourceNode = Nodes.FirstOrDefault(n =>
-                                                  n.InputPorts.Contains(sourcePort) || n.OutputPorts.Contains(sourcePort));
+                                                  n.OutputPorts.Contains(sourcePort)
+                                               || n.FlowOutPorts.Contains(sourcePort));
         var targetNode = Nodes.FirstOrDefault(n =>
-                                                  n.InputPorts.Contains(targetPort) || n.OutputPorts.Contains(targetPort));
+                                                  n.InputPorts.Contains(targetPort)
+                                               || n.FlowInPorts.Contains(targetPort));
 
         if (sourceNode == null || targetNode == null || sourceNode == targetNode)
             return false;
@@ -303,7 +306,8 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
 
         // 이미 연결된 포트인지 확인
         if (Connections.Any(c =>
-                                (c.Source == sourcePort && c.Target == targetPort) || (c.Source == targetPort && c.Target == sourcePort)))
+                                (c.Source == sourcePort && c.Target == targetPort)
+                             || (c.Source == targetPort && c.Target == sourcePort)))
             return false;
 
         // 포트 타입 호환성 확인
@@ -325,10 +329,10 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
 
         // 새 연결 생성
         var sourcePort = _canvas.Nodes
-                                .SelectMany(n => n.OutputPorts)
+                                .SelectMany(n => n.OutputPorts.Concat(n.FlowOutPorts))
                                 .FirstOrDefault(p => p.Id == ports.source.Id);
         var targetPort = _canvas.Nodes
-                                .SelectMany(n => n.InputPorts)
+                                .SelectMany(n => n.InputPorts.Concat(n.FlowInPorts))
                                 .FirstOrDefault(p => p.Id == ports.target.Id);
 
         if (sourcePort != null && targetPort != null) {
@@ -529,7 +533,10 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
 
     public NodePortViewModel FindPortViewModel(IPort port) {
         foreach (var node in Nodes) {
-            var foundPort = node.InputPorts.FirstOrDefault(p => p.Model == port) ?? node.OutputPorts.FirstOrDefault(p => p.Model == port);
+            var foundPort = node.InputPorts.FirstOrDefault(p => p.Model == port) 
+                ?? node.OutputPorts.FirstOrDefault(p => p.Model == port)
+                ?? node.FlowInPorts.FirstOrDefault(p => p.Model == port)
+                ?? node.FlowOutPorts.FirstOrDefault(p => p.Model == port);
             if (foundPort != null)
                 return foundPort;
         }

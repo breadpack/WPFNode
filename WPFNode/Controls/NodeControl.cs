@@ -327,30 +327,21 @@ public class NodeControl : ContentControl, INodeControl
 
     public PortControl? FindPortControl(NodePortViewModel port)
     {
-        // 캐시 확인 대신 항상 검색
-        // if (_portControlCache.TryGetValue(port, out var cachedControl))
-        //     return cachedControl;
-
         // 모든 ItemsControl 찾기
         var portItemsControls = FindChildrenOfType<ItemsControl>(this);
         
-        // 각 ItemsControl에서 포트 검색
+        // ItemsSource로 포트 컬렉션을 가진 ItemsControl 찾기
         foreach (var itemsControl in portItemsControls)
         {
-            // 데이터 소스가 포트 컬렉션인지 확인하고 해당 포트가 포함되어 있는지 체크
             if (itemsControl.ItemsSource is IEnumerable<NodePortViewModel> ports &&
                 ports.Contains(port))
             {
-                // 해당 포트의 컨테이너 가져오기
                 var container = itemsControl.ItemContainerGenerator.ContainerFromItem(port) as ContentPresenter;
                 if (container == null) continue;
                 
-                // 컨테이너에서 PortControl 찾기
                 var portControl = FindChildOfType<PortControl>(container);
                 if (portControl != null)
                 {
-                    // 캐싱 제거
-                    // _portControlCache[port] = portControl;
                     return portControl;
                 }
             }

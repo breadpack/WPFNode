@@ -309,12 +309,15 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                     if (!sourceIsInput) // 출력 포트에서 찾기
                     {
                         // 먼저 이름으로 찾기 시도
-                        sourcePort = sourceNode.OutputPorts.FirstOrDefault(p => p.Name == sourceIndexOrName) as IOutputPort;
+                        sourcePort = sourceNode.OutputPorts
+                                               .Concat(sourceNode.FlowOutPorts)
+                                               .FirstOrDefault(p => p.Name == sourceIndexOrName) as IOutputPort;
                         
                         // 이름으로 찾지 못한 경우, 인덱스로 시도 (이전 버전 호환성)
                         if (sourcePort == null && int.TryParse(sourceIndexOrName, out var sourceIndex))
                         {
                             sourcePort = sourceNode.OutputPorts
+                                                   .Concat(sourceNode.FlowOutPorts)
                                                    .FirstOrDefault(p => p.GetPortIndex() == sourceIndex) as IOutputPort;
                         }
                     }
@@ -323,12 +326,15 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                     if (targetIsInput) // 입력 포트에서 찾기
                     {
                         // 먼저 이름으로 찾기 시도
-                        targetPort = targetNode.InputPorts.FirstOrDefault(p => p.Name == targetIndexOrName) as IInputPort;
+                        targetPort = targetNode.InputPorts
+                                               .Concat(targetNode.FlowInPorts)
+                                               .FirstOrDefault(p => p.Name == targetIndexOrName) as IInputPort;
                         
                         // 이름으로 찾지 못한 경우, 인덱스로 시도 (이전 버전 호환성)
                         if (targetPort == null && int.TryParse(targetIndexOrName, out var targetIndex))
                         {
                             targetPort = targetNode.InputPorts
+                                                   .Concat(targetNode.FlowInPorts)
                                                    .FirstOrDefault(p => p.GetPortIndex() == targetIndex) as IInputPort;
                         }
                     }

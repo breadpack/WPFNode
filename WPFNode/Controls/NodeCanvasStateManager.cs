@@ -295,7 +295,7 @@ public class NodeCanvasStateManager
         var canvas = _owner.GetDragCanvas();
         if (canvas == null) return null;
 
-        // 노드를 표시하는 ItemsControl 찾기
+        // 노드를 표시하는 ItemsControl 찾기 (일반적으로 두 번째 ItemsControl)
         var nodeItemsControl = FindChildrenOfType<ItemsControl>(canvas).Skip(1).FirstOrDefault();
         if (nodeItemsControl == null) return null;
 

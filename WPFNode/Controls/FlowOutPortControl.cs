@@ -1,4 +1,6 @@
 using System.Windows;
+using System.Windows.Controls;
+using WPFNode.Models;
 
 namespace WPFNode.Controls;
 
