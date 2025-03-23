@@ -34,6 +34,7 @@ namespace WPFNode.Models.Execution
         public void RemoveConnection(IConnection connection) { }
         public bool CanConnectTo(IInputPort targetPort) => false;
         public IConnection Connect(IInputPort target) => throw new NotSupportedException("루프백 마커는 연결할 수 없습니다.");
+        public IConnection Connect(IPort otherPort) => throw new NotSupportedException("루프백 마커는 연결할 수 없습니다.");
         public void Disconnect(IInputPort target) { }
         public int GetPortIndex() => -1;
         

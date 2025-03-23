@@ -104,6 +104,21 @@ public class FlowInPort : IFlowInPort, IFlowNodePort, INotifyPropertyChanged
         return canvas.Connect(source, this);
     }
 
+    public IConnection Connect(IPort otherPort)
+    {
+        if (otherPort == null)
+            throw new NodeConnectionException("대상 포트가 null입니다.");
+            
+        if (otherPort is IFlowOutPort flowOutPort)
+        {
+            return Connect(flowOutPort);
+        }
+        else
+        {
+            throw new NodeConnectionException("Flow In 포트는 Flow Out 포트만 연결할 수 있습니다.");
+        }
+    }
+
     public void Disconnect()
     {
         _connection?.Disconnect();

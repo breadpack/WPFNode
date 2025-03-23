@@ -17,6 +17,12 @@ namespace WPFNode.Plugins.Basic.Nodes {
     [NodeDescription("다양한 타입의 객체 리스트를 생성합니다.")]
     [NodeCategory("데이터 변환")]
     public class ObjectCollectionNode : DynamicNode {
+        [NodeFlowIn]
+        public IFlowInPort FlowIn { get; set; }
+        
+        [NodeFlowOut]
+        public IFlowOutPort FlowOut { get; set; }
+        
         [NodeProperty("Target Type", OnValueChanged = nameof(SelectedType_PropertyChanged))]
         NodeProperty<Type> SelectedType { get; set; }
 
@@ -137,13 +143,14 @@ namespace WPFNode.Plugins.Basic.Nodes {
             }
         }
 
-        protected override async Task ProcessAsync(CancellationToken cancellationToken = default) {
+        
+        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
             var targetType = SelectedType.Value;
-            if (targetType == null) return;
+            if (targetType == null) throw new InvalidOperationException("Target type is not selected.");
 
             var itemCount = ItemCount.Value;
             if (itemCount == 0) {
-                return;
+                yield return FlowOut;
             }
 
             try {
@@ -203,13 +210,13 @@ namespace WPFNode.Plugins.Basic.Nodes {
                     // 리플렉션을 사용하여 포트의 Value 속성에 값 설정
                     _outputPort.Value = collection;
                 }
-
-                await Task.CompletedTask;
             }
             catch (Exception ex) {
                 Console.WriteLine($"컬렉션 처리 중 오류: {ex.Message}");
                 throw;
             }
+
+            yield return FlowOut;
         }
 
         public override void ReadJson(JsonElement element, JsonSerializerOptions options) {

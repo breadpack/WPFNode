@@ -12,6 +12,12 @@ namespace WPFNode.Models;
 
 public class SubCanvasNode : NodeBase
 {
+    [NodeFlowIn]
+    public IFlowInPort FlowIn { get; set; }
+    
+    [NodeFlowOut]
+    public IFlowOutPort FlowOut { get; set; }
+    
     private NodeCanvas _innerCanvas;
     private string _category;
     private readonly Dictionary<string, INode> _inputs;
@@ -91,9 +97,9 @@ public class SubCanvasNode : NodeBase
         return outputNode;
     }
 
-    protected override async Task ProcessAsync(CancellationToken cancellationToken = default)
-    {
+    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
         await _innerCanvas.ExecuteAsync(cancellationToken);
+        yield return FlowOut;
     }
 
     public InputPort<T> AddInputPort<T>(string name)

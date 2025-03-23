@@ -328,6 +328,78 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         return new NodeCanvas();
     }
 
+    /// <summary>
+    /// 빌더 패턴을 사용하여 노드를 생성하고 캔버스에 추가한 후 노드를 반환합니다.
+    /// </summary>
+    /// <typeparam name="T">생성할 노드 타입</typeparam>
+    /// <param name="x">노드 X 위치</param>
+    /// <param name="y">노드 Y 위치</param>
+    /// <returns>생성된 노드</returns>
+    public T AddNode<T>(double x = 0, double y = 0) where T : INode
+    {
+        return CreateNode<T>(x, y);
+    }
+
+    /// <summary>
+    /// 노드를 쉽게 찾고 접근할 수 있는 메서드입니다.
+    /// 캔버스에서 첫번째로 발견된 지정 타입의 노드를 반환합니다.
+    /// </summary>
+    /// <typeparam name="T">찾을 노드 타입</typeparam>
+    /// <returns>발견된 노드 또는 null</returns>
+    public T? FindNode<T>() where T : INode
+    {
+        return _nodes.OfType<T>().FirstOrDefault();
+    }
+
+    /// <summary>
+    /// 캔버스에서 지정된 타입의 모든 노드를 반환합니다.
+    /// </summary>
+    /// <typeparam name="T">찾을 노드 타입</typeparam>
+    /// <returns>발견된 노드 컬렉션</returns>
+    public IEnumerable<T> FindNodes<T>() where T : INode
+    {
+        return _nodes.OfType<T>();
+    }
+
+    /// <summary>
+    /// 캔버스에 포함된 모든 노드를 재설정합니다.
+    /// </summary>
+    public void ResetAllNodes()
+    {
+        foreach (var node in _nodes)
+        {
+            // 노드에 ResetNode 메서드가 있다면 호출
+            if (node.GetType().GetMethod("ResetNode") != null)
+            {
+                node.GetType().GetMethod("ResetNode")!.Invoke(node, null);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 모든 노드와 연결을 제거합니다.
+    /// </summary>
+    public void Clear()
+    {
+        // 모든 연결 제거
+        foreach (var connection in _connections.ToList())
+        {
+            Disconnect(connection);
+        }
+
+        // 모든 노드 제거
+        foreach (var node in _nodes.ToList())
+        {
+            RemoveNode(node);
+        }
+
+        // 모든 그룹 제거
+        foreach (var group in _groups.ToList())
+        {
+            RemoveGroup(group);
+        }
+    }
+
     public T CreateNodeWithGuid<T>(Guid guid, double x = 0, double y = 0) where T : INode
     {
         var nodeType = typeof(T);

@@ -375,31 +375,29 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
     /// </summary>
     public virtual async Task ExecuteAsync(CancellationToken cancellationToken = default) {
         Logger?.LogDebug("Executing node {NodeName} (legacy method)", Name);
-        await ProcessAsync(cancellationToken);
+        // 기존 코드와의 호환성을 위해 ExecuteAsyncFlow 결과 소비
+        await foreach (var _ in ExecuteAsyncFlow(cancellationToken)) { }
     }
     
     /// <summary>
     /// 노드를 실행하고 활성화할 FlowOutPort를 yield return으로 순차적으로 반환합니다.
+    /// 이 메서드는 ProcessAsync를 호출하여 결과를 전달합니다.
     /// </summary>
-    public virtual async IAsyncEnumerable<IFlowOutPort> ExecuteAsyncFlow(
+    public virtual IAsyncEnumerable<IFlowOutPort> ExecuteAsyncFlow(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         Logger?.LogDebug("Executing node {NodeName} with IAsyncEnumerable", Name);
         
-        // 노드의 처리 로직 실행
-        await ProcessAsync(cancellationToken);
-        
-        // 기본 구현: 모든 FlowOutPort 반환
-        foreach (var port in FlowOutPorts)
-        {
-            if (cancellationToken.IsCancellationRequested)
-                yield break;
-                
-            yield return port;
-        }
+        // ProcessAsync에서 반환된 IAsyncEnumerable을 그대로 전달
+        return ProcessAsync(cancellationToken);
     }
 
-    protected abstract Task ProcessAsync(CancellationToken cancellationToken = default);
+    /// <summary>
+    /// 노드의 실제 처리 로직을 구현합니다.
+    /// 상속받은 클래스에서 반드시 구현해야 합니다.
+    /// 이 메서드는 실행 중에 활성화할 FlowOutPort를 순차적으로 yield return해야 합니다.
+    /// </summary>
+    protected abstract IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default);
 
     public virtual void WriteJson(Utf8JsonWriter writer) {
         writer.WriteString("Guid", Guid.ToString());

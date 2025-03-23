@@ -15,6 +15,12 @@ public interface IPort : INotifyPropertyChanged, IJsonSerializable {
     void                       AddConnection(IConnection    connection);
     void                       RemoveConnection(IConnection connection);
     int                        GetPortIndex();
+    /// <summary>
+    /// 다른 포트와 직접 연결합니다.
+    /// </summary>
+    /// <param name="otherPort">연결할 대상 포트</param>
+    /// <returns>생성된 연결 객체</returns>
+    IConnection Connect(IPort otherPort);
 }
 
 public interface IInputPort : IPort {

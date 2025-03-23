@@ -68,18 +68,7 @@ public class WhileNode : NodeBase
     /// <summary>
     /// 노드의 처리 로직을 구현합니다.
     /// </summary>
-    protected override Task ProcessAsync(CancellationToken cancellationToken = default)
-    {
-        // 아무 작업도 하지 않음 - 실제 로직은 ExecuteAsync에서 처리
-        return Task.CompletedTask;
-    }
-    
-    /// <summary>
-    /// 노드를 실행하고 다음에 실행할 FlowOutPort를 yield return으로 반환합니다.
-    /// </summary>
-    public override async IAsyncEnumerable<IFlowOutPort> ExecuteAsyncFlow(
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
-    {
+    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
         Logger?.LogDebug("Executing WhileNode");
         
         // 첫 실행 또는 루프백 후 구분하여 처리

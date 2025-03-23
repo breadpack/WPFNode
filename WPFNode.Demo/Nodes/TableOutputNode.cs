@@ -125,13 +125,17 @@ public class TableOutputNode : DynamicNode, IDisposable {
                ? JsonSerializer.Serialize(_resultObject, _targetType, _jsonOptions)
                : string.Empty;
 
-    protected override async Task ProcessAsync(CancellationToken cancellationToken = default) {
-        if (_targetType == null) return;
+    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
+        if (_targetType == null) {
+            throw new InvalidOperationException("대상 타입이 지정되지 않았습니다.");
+        }
 
         try {
             // 새 인스턴스 생성
             _resultObject = Activator.CreateInstance(_targetType);
-            if (_resultObject == null) return;
+            if (_resultObject == null) {
+                throw new InvalidOperationException("객체 생성에 실패했습니다.");
+            }
 
             // 각 프로퍼티에 대해 입력 포트의 값을 설정
             var properties = _targetType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -159,7 +163,7 @@ public class TableOutputNode : DynamicNode, IDisposable {
             throw new InvalidOperationException($"객체 처리 중 오류 발생: {ex.Message}", ex);
         }
 
-        await Task.CompletedTask;
+        yield return FlowOut;
     }
 
     public void Dispose() {

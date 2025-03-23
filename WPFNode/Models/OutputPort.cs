@@ -71,6 +71,18 @@ public class OutputPort<T> : IOutputPort, INotifyPropertyChanged {
         return canvas.Connect(this, target);
     }
 
+    public IConnection Connect(IPort otherPort) {
+        if (otherPort == null)
+            throw new NodeConnectionException("대상 포트가 null입니다.");
+            
+        if (otherPort is IInputPort inputPort) {
+            return Connect(inputPort);
+        }
+        else {
+            throw new NodeConnectionException("출력 포트는 다른 출력 포트와 연결할 수 없습니다.");
+        }
+    }
+
     public void Disconnect() {
         var connections = Connections.ToList();
         foreach (var connection in connections) {

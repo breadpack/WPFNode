@@ -43,25 +43,26 @@ public class IfNode : NodeBase
     {
     }
     
-    /// <summary>
-    /// 노드의 처리 로직을 구현합니다.
-    /// </summary>
-    protected override Task ProcessAsync(CancellationToken cancellationToken = default)
+    // 테스트에서 사용하는 생성자 추가
+    public IfNode(INodeCanvas canvas, Guid id) 
+        : this(canvas, id, null)
     {
-        // 아무 작업도 하지 않음 - 실제 로직은 ExecuteAsync에서 처리
-        return Task.CompletedTask;
     }
     
     /// <summary>
-    /// 노드를 실행하고 다음에 실행할 FlowOutPort를 yield return으로 반환합니다.
+    /// 노드의 처리 로직을 구현합니다.
+    /// 조건에 따라 True 또는 False 포트를 반환합니다.
     /// </summary>
-    public override async IAsyncEnumerable<IFlowOutPort> ExecuteAsyncFlow(
+    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         // 조건 평가
         bool condition = Condition.GetValueOrDefault(false);
         
         Logger?.LogDebug("IfNode: Condition evaluated to {Condition}", condition);
+        
+        // 필요한 비동기 작업 처리
+        await Task.CompletedTask;
         
         // 조건에 따라 적절한 FlowOutPort 반환
         if (condition)

@@ -10,6 +10,12 @@ namespace WPFNode.Plugins.Basic;
 [NodeDescription("첫 번째 수를 두 번째 수로 나눕니다.")]
 public class DivisionNode : NodeBase
 {
+    [NodeFlowIn]
+    public FlowInPort FlowIn { get; set; }
+    
+    [NodeFlowOut]
+    public FlowOutPort FlowOut { get; set; }
+    
     [NodeInput("A")]
     public InputPort<double>  InputA { get; set; }
     
@@ -22,8 +28,7 @@ public class DivisionNode : NodeBase
     public DivisionNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) {
     }
 
-    protected override async Task ProcessAsync(CancellationToken cancellationToken = default)
-    {
+    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
         var a = InputA.GetValueOrDefault(0.0);
         var b = InputB.GetValueOrDefault(1.0); // 0으로 나누는 것을 방지하기 위해 기본값을 1.0으로 설정
         
@@ -35,7 +40,7 @@ public class DivisionNode : NodeBase
         {
             Result.Value = a / b;
         }
-        
-        await Task.CompletedTask;
+
+        yield return FlowOut;
     }
 } 

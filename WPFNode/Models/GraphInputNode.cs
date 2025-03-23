@@ -25,13 +25,13 @@ public class GraphInputNode<T> : NodeBase
     }
 
     public OutputPort<T> Output => _output;
-
-    protected override async Task ProcessAsync(CancellationToken cancellationToken = default)
-    {
+    
+    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
         if (_parentInput != null)
         {
             _output.Value = _parentInput.GetValueOrDefault();
         }
-        await Task.CompletedTask;
+
+        yield break;
     }
 } 

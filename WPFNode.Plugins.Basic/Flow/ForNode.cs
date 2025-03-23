@@ -78,19 +78,17 @@ public class ForNode : NodeBase
     {
     }
     
-    /// <summary>
-    /// 노드의 처리 로직을 구현합니다.
-    /// </summary>
-    protected override Task ProcessAsync(CancellationToken cancellationToken = default)
+    // 테스트에서 사용하는 생성자 추가
+    public ForNode(INodeCanvas canvas, Guid id) 
+        : this(canvas, id, null)
     {
-        // 아무 작업도 하지 않음 - 실제 로직은 ExecuteAsync에서 처리
-        return Task.CompletedTask;
     }
     
     /// <summary>
-    /// 노드를 실행하고 다음에 실행할 FlowOutPort를 yield return으로 반환합니다.
+    /// 노드의 처리 로직을 구현합니다.
+    /// 루프 실행 및 흐름 제어를 담당합니다.
     /// </summary>
-    public override async IAsyncEnumerable<IFlowOutPort> ExecuteAsyncFlow(
+    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         Logger?.LogDebug("Executing ForNode: {StartIndex} to {EndIndex} step {Step}", 
@@ -110,6 +108,9 @@ public class ForNode : NodeBase
         
         // 현재 인덱스를 출력 포트에 설정
         CurrentIndex.Value = _currentIndex;
+        
+        // 비동기 작업이 필요한 경우 사용
+        await Task.CompletedTask;
         
         // 루프 조건 검사 및 최대 반복 횟수 확인
         if (ShouldContinueLoop() && CurrentIteration < MaxIterations)

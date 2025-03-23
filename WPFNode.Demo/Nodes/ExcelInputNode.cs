@@ -159,13 +159,12 @@ namespace WPFNode.Demo.Nodes
 
             return Task.FromResult(true);
         }
-
-        protected override async Task ProcessAsync(CancellationToken cancellationToken = default)
-        {
+        
+        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
             if (_currentRowIndex >= _tableData.Rows.Count)
             {
                 _currentRowIndex = 0;
-                return;
+                yield return FlowOut;
             }
 
             // 현재 행의 데이터를 출력 포트로 전달
@@ -185,10 +184,12 @@ namespace WPFNode.Demo.Nodes
                         valueProperty.SetValue(port, value);
                     }
                 }
+
+                yield return FlowOut;
             }
 
             _currentRowIndex++;
-            await Task.CompletedTask;
+            yield return FlowOut;
         }
 
         public override string ToString()

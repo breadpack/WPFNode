@@ -302,4 +302,19 @@ public class NodeProperty<T> : INodeProperty, IInputPort<T> {
         var canvas = ((NodeBase)Node!).Canvas;
         return canvas.Connect(source, this);
     }
+
+    public IConnection Connect(IPort otherPort)
+    {
+        if (otherPort == null)
+            throw new NodeConnectionException("대상 포트가 null입니다.");
+            
+        if (otherPort is IOutputPort outputPort)
+        {
+            return Connect(outputPort);
+        }
+        else
+        {
+            throw new NodeConnectionException("입력 포트는 다른 입력 포트와 연결할 수 없습니다.");
+        }
+    }
 }

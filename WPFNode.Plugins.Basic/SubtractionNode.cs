@@ -10,6 +10,12 @@ namespace WPFNode.Plugins.Basic;
 [NodeDescription("첫 번째 수에서 두 번째 수를 뺍니다.")]
 public class SubtractionNode : NodeBase
 {
+    [NodeFlowIn]
+    public IFlowInPort FlowIn { get; set; }
+    
+    [NodeFlowOut]
+    public IFlowOutPort FlowOut { get; set; }
+    
     [NodeInput("A")]
     public InputPort<double>  InputA { get; set; }
     
@@ -22,11 +28,10 @@ public class SubtractionNode : NodeBase
     public SubtractionNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) {
     }
 
-    protected override async Task ProcessAsync(CancellationToken cancellationToken = default)
-    {
+    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
         var a = InputA.GetValueOrDefault(0.0);
         var b = InputB.GetValueOrDefault(0.0);
         Result.Value = a - b;
-        await Task.CompletedTask;
+        yield return FlowOut;
     }
 } 

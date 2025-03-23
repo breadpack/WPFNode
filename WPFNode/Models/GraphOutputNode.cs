@@ -7,6 +7,9 @@ namespace WPFNode.Models;
 [OutputNode]
 public class GraphOutputNode<T> : NodeBase
 {
+    [NodeFlowOut]
+    public IFlowOutPort FlowOut { get; private set; }
+    
     private readonly InputPort<T> _input;
     private readonly OutputPort<T> _parentOutput;
 
@@ -28,12 +31,11 @@ public class GraphOutputNode<T> : NodeBase
 
     public InputPort<T> Input => _input;
 
-    protected override async Task ProcessAsync(CancellationToken cancellationToken = default)
-    {
+    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
         if (_parentOutput != null)
         {
             _parentOutput.Value = _input.GetValueOrDefault();
         }
-        await Task.CompletedTask;
+        yield return FlowOut;
     }
 } 

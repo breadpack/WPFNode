@@ -260,11 +260,8 @@ public class DynamicNode : NodeBase
         }
     }
 
-    protected override async Task ProcessAsync(CancellationToken cancellationToken = default)
-    {
-        // 기본 구현은 아무 작업도 수행하지 않습니다.
-        // 파생 클래스에서 이 메서드를 재정의하여 실제 처리 로직을 구현해야 합니다.
-        await Task.CompletedTask;
+    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
+        yield break;
     }
 
     public override void WriteJson(Utf8JsonWriter writer)
