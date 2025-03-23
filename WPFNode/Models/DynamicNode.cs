@@ -133,6 +133,42 @@ public class DynamicNode : NodeBase
         return CreateOutputPort(name, type);
     }
 
+    public FlowInPort AddFlowInPort(string name)
+    {
+        // 이미 해당 이름의 Flow In 포트가 있는지 확인
+        var existingPort = FlowInPorts.FirstOrDefault(p => p.Name == name);
+        if (existingPort is FlowInPort flowInPort)
+        {
+            return flowInPort;
+        }
+
+        // 없으면 새로 생성
+        return CreateFlowInPort(name);
+    }
+
+    public FlowOutPort AddFlowOutPort(string name)
+    {
+        // 이미 해당 이름의 Flow Out 포트가 있는지 확인
+        var existingPort = FlowOutPorts.FirstOrDefault(p => p.Name == name);
+        if (existingPort is FlowOutPort flowOutPort)
+        {
+            return flowOutPort;
+        }
+
+        // 없으면 새로 생성
+        return CreateFlowOutPort(name);
+    }
+
+    public void RemoveFlowInPort(IFlowInPort port)
+    {
+        base.RemoveFlowInPort(port);
+    }
+
+    public void RemoveFlowOutPort(IFlowOutPort port)
+    {
+        base.RemoveFlowOutPort(port);
+    }
+
     public NodeProperty<T> AddProperty<T>(
         string name,
         string displayName,

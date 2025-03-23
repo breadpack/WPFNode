@@ -293,17 +293,21 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         OnGroupRemoved(group);
     }
 
+    /// <summary>
+    /// Flow 기반 실행 엔진을 사용하여 캔버스의 노드들을 실행합니다.
+    /// </summary>
     public async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        var executionPlanBuilder = new Execution.ExecutionPlanBuilder();
-        var executable = executionPlanBuilder.BuildExecutionPlanWithEntryPoints(_nodes, _connections, true);
-        await executable.ExecuteAsync(new Execution.ExecutionContext(), cancellationToken);
+        var flowExecutionEngine = new Execution.FlowExecutionEngine();
+        await flowExecutionEngine.ExecuteAsync(_nodes, _connections, cancellationToken);
     }
 
-    public async Task ExecuteAsync(Execution.ExecutionPlanBuilder executionPlanBuilder, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// 지정된 Flow 기반 실행 엔진을 사용하여 캔버스의 노드들을 실행합니다.
+    /// </summary>
+    public async Task ExecuteAsync(Execution.FlowExecutionEngine executionEngine, CancellationToken cancellationToken = default)
     {
-        var executable = executionPlanBuilder.BuildExecutionPlanWithEntryPoints(_nodes, _connections, true);
-        await executable.ExecuteAsync(new Execution.ExecutionContext(), cancellationToken);
+        await executionEngine.ExecuteAsync(_nodes, _connections, cancellationToken);
     }
 
     public string ToJson()

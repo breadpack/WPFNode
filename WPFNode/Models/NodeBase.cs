@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Linq;
+using System.Threading.Tasks.Sources;
 using WPFNode.Attributes;
 using WPFNode.Constants;
 using WPFNode.Interfaces;
@@ -368,9 +369,34 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         ClearProperties();
     }
 
+    /// <summary>
+    /// 노드의 레거시 실행 메서드 - 하위 호환성을 위해 유지됩니다.
+    /// 내부적으로 새로운 ExecuteAsyncFlow를 호출합니다.
+    /// </summary>
     public virtual async Task ExecuteAsync(CancellationToken cancellationToken = default) {
-        Logger?.LogDebug("Executing node {NodeName}", Name);
+        Logger?.LogDebug("Executing node {NodeName} (legacy method)", Name);
         await ProcessAsync(cancellationToken);
+    }
+    
+    /// <summary>
+    /// 노드를 실행하고 활성화할 FlowOutPort를 yield return으로 순차적으로 반환합니다.
+    /// </summary>
+    public virtual async IAsyncEnumerable<IFlowOutPort> ExecuteAsyncFlow(
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        Logger?.LogDebug("Executing node {NodeName} with IAsyncEnumerable", Name);
+        
+        // 노드의 처리 로직 실행
+        await ProcessAsync(cancellationToken);
+        
+        // 기본 구현: 모든 FlowOutPort 반환
+        foreach (var port in FlowOutPorts)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                yield break;
+                
+            yield return port;
+        }
     }
 
     protected abstract Task ProcessAsync(CancellationToken cancellationToken = default);
