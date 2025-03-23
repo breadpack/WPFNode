@@ -5,30 +5,27 @@ using WPFNode.Interfaces;
 
 namespace WPFNode.Models;
 
-public class OutputPort<T> : IOutputPort, INotifyPropertyChanged {
+public class FlowOutPort : IFlowOutPort, INotifyPropertyChanged
+{
     private readonly List<IConnection> _connections = new();
-    private          T?                _value;
-    private readonly int               _index;
-    private          INodeCanvas       Canvas => ((NodeBase)Node).Canvas;
+    private readonly int _index;
     private bool _isVisible = true;
+    private INodeCanvas Canvas => ((NodeBase)Node).Canvas;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public OutputPort(string name, INode node, int index) {
-        Name   = name;
-        Node   = node;
+    public FlowOutPort(string name, INode node, int index)
+    {
+        Name = name;
+        Node = node;
         _index = index;
     }
 
-    public PortId                     Id             => new(Node.Guid, false, Name);
-    public string                     Name           { get; set; }
-    public Type                       DataType       => typeof(T);
-    public bool                       IsInput        => false;
-    public bool                       IsConnected    => _connections.Count > 0;
-    public IReadOnlyList<IConnection> Connections    => _connections;
-    public INode                      Node           { get; private set; }
-    public int                        GetPortIndex() => _index;
-
+    public PortId Id => new(Node.Guid, false, Name);
+    public string Name { get; set; }
+    public Type DataType => typeof(void); // Flow 포트는 타입이 없음을 void로 표현
+    public bool IsInput => false;
+    public bool IsConnected => _connections.Count > 0;
     public bool IsVisible
     {
         get => _isVisible;
@@ -47,38 +44,58 @@ public class OutputPort<T> : IOutputPort, INotifyPropertyChanged {
         }
     }
 
-    public object? Value {
-        get => _value;
-        set {
-            if (value is T typedValue && !Equals(_value, typedValue)) {
-                _value = typedValue;
-                OnPropertyChanged(nameof(Value));
-            }
+    public IReadOnlyList<IConnection> Connections => _connections;
+    public INode Node { get; private set; }
+    public object? Value { get; set; } // Flow 포트는 값이 없지만, 인터페이스 구현을 위해 포함
+    public int GetPortIndex() => _index;
+
+    public IEnumerable<IFlowInPort> ConnectedFlowPorts
+    {
+        get
+        {
+            return _connections
+                .Select(c => c.Target)
+                .OfType<IFlowInPort>();
         }
     }
 
-    public bool CanConnectTo(IInputPort targetPort) {
+    public bool CanConnectTo(IInputPort targetPort)
+    {
         // 같은 노드의 포트와는 연결 불가
         if (targetPort.Node == Node) return false;
 
-        if (IsInput == targetPort.IsInput) return false;
+        // 입력 포트여야 하고, Flow In 포트여야 함
+        if (!targetPort.IsInput || !(targetPort is IFlowInPort)) return false;
 
-        return targetPort.CanAcceptType(DataType);
+        return true;
     }
 
-    public IConnection Connect(IInputPort target) {
-        var canvas = ((NodeBase)Node).Canvas;
-        return canvas.Connect(this, target);
+    public IConnection Connect(IInputPort target)
+    {
+        if (target == null)
+            throw new NodeConnectionException("타겟 포트가 null입니다.");
+
+        if (!(target is IFlowInPort))
+            throw new NodeConnectionException("Flow Out 포트는 Flow In 포트만 연결할 수 있습니다.", this, target);
+
+        if (target.Node == Node)
+            throw new NodeConnectionException("같은 노드의 포트와는 연결할 수 없습니다.", this, target);
+
+        // Canvas를 통해 새로운 연결 생성
+        return Canvas.Connect(this, target);
     }
 
-    public void Disconnect() {
+    public void Disconnect()
+    {
         var connections = Connections.ToList();
-        foreach (var connection in connections) {
+        foreach (var connection in connections)
+        {
             connection.Disconnect();
         }
     }
 
-    public void Disconnect(IInputPort target) {
+    public void Disconnect(IInputPort target)
+    {
         Connections.FirstOrDefault(c => c.Target == target)
                    ?.Disconnect();
     }
@@ -89,10 +106,11 @@ public class OutputPort<T> : IOutputPort, INotifyPropertyChanged {
             throw new NodeConnectionException("연결이 null입니다.");
         if (!connection.Source.Equals(this))
             throw new NodeConnectionException("연결의 소스 포트가 일치하지 않습니다.", this, connection.Source);
-            
+        
         _connections.Add(connection);
         OnPropertyChanged(nameof(Connections));
         OnPropertyChanged(nameof(IsConnected));
+        OnPropertyChanged(nameof(ConnectedFlowPorts));
     }
 
     public void RemoveConnection(IConnection connection)
@@ -101,13 +119,15 @@ public class OutputPort<T> : IOutputPort, INotifyPropertyChanged {
             throw new NodeConnectionException("연결이 null입니다.");
         if (!connection.Source.Equals(this))
             throw new NodeConnectionException("연결의 소스 포트가 일치하지 않습니다.", this, connection.Source);
-            
+        
         _connections.Remove(connection);
         OnPropertyChanged(nameof(Connections));
         OnPropertyChanged(nameof(IsConnected));
+        OnPropertyChanged(nameof(ConnectedFlowPorts));
     }
 
-    protected virtual void OnPropertyChanged(string propertyName) {
+    protected virtual void OnPropertyChanged(string propertyName)
+    {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
@@ -115,14 +135,9 @@ public class OutputPort<T> : IOutputPort, INotifyPropertyChanged {
     {
         writer.WriteStartObject();
         writer.WriteString("Name", Name);
-        writer.WriteString("Type", DataType.AssemblyQualifiedName);
+        writer.WriteString("Type", "Flow");
         writer.WriteNumber("Index", GetPortIndex());
         writer.WriteBoolean("IsVisible", IsVisible);
-        if (_value != null)
-        {
-            writer.WritePropertyName("Value");
-            JsonSerializer.Serialize(writer, _value);
-        }
         writer.WriteEndObject();
     }
 
@@ -132,9 +147,5 @@ public class OutputPort<T> : IOutputPort, INotifyPropertyChanged {
             Name = nameElement.GetString()!;
         if (element.TryGetProperty("IsVisible", out var visibleElement))
             IsVisible = visibleElement.GetBoolean();
-        if (element.TryGetProperty("Value", out var valueElement))
-        {
-            Value = JsonSerializer.Deserialize<T>(valueElement.GetRawText());
-        }
     }
 }

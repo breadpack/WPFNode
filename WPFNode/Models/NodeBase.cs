@@ -24,6 +24,8 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
     private            bool                _isVisible   = true;
     private readonly   List<IInputPort>    _inputPorts  = new();
     private readonly   List<IOutputPort>   _outputPorts = new();
+    private readonly   List<IFlowInPort>   _flowInPorts = new();
+    private readonly   List<IFlowOutPort>  _flowOutPorts = new();
     private readonly   List<INodeProperty> _properties  = new();
     private            bool                _isInitialized;
     private readonly   INodeCanvas         _canvas;
@@ -86,8 +88,10 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
 
     public bool IsOutputNode => GetType().GetCustomAttribute<OutputNodeAttribute>() != null;
 
-    public IReadOnlyList<IInputPort>            InputPorts  => _inputPorts;
-    public IReadOnlyList<IOutputPort>           OutputPorts => _outputPorts;
+    public IReadOnlyList<IInputPort>    InputPorts  => _inputPorts;
+    public IReadOnlyList<IOutputPort>   OutputPorts => _outputPorts;
+    public IReadOnlyList<IFlowInPort>   FlowInPorts => _flowInPorts;
+    public IReadOnlyList<IFlowOutPort>  FlowOutPorts => _flowOutPorts;
     public IReadOnlyList<INodeProperty> Properties  => _properties;
 
     internal INodeCanvas Canvas => _canvas;
@@ -121,6 +125,20 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
             typeof(OutputPort<>).MakeGenericType(type),
             name, this, portIndex)!;
         RegisterOutputPort(port);
+        return port;
+    }
+
+    internal FlowInPort CreateFlowInPort(string name) {
+        var portIndex = _flowInPorts.Count;
+        var port = new FlowInPort(name, this, portIndex);
+        RegisterFlowInPort(port);
+        return port;
+    }
+
+    internal FlowOutPort CreateFlowOutPort(string name) {
+        var portIndex = _flowOutPorts.Count;
+        var port = new FlowOutPort(name, this, portIndex);
+        RegisterFlowOutPort(port);
         return port;
     }
 
@@ -298,11 +316,45 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         OnPropertyChanged(nameof(OutputPorts));
     }
 
+    internal void RemoveFlowInPort(IFlowInPort port) {
+        if (_flowInPorts.Contains(port)) {
+            port.Disconnect();
+            _flowInPorts.Remove(port);
+            OnPropertyChanged(nameof(FlowInPorts));
+        }
+    }
+
+    internal void RemoveFlowOutPort(IFlowOutPort port) {
+        if (_flowOutPorts.Contains(port)) {
+            port.Disconnect();
+            _flowOutPorts.Remove(port);
+            OnPropertyChanged(nameof(FlowOutPorts));
+        }
+    }
+
+    private void RegisterFlowInPort(IFlowInPort port) {
+        if (port == null)
+            throw new ArgumentNullException(nameof(port));
+        _flowInPorts.Add(port);
+        OnPropertyChanged(nameof(FlowInPorts));
+    }
+
+    private void RegisterFlowOutPort(IFlowOutPort port) {
+        if (port == null)
+            throw new ArgumentNullException(nameof(port));
+        _flowOutPorts.Add(port);
+        OnPropertyChanged(nameof(FlowOutPorts));
+    }
+
     protected void ClearPorts() {
         _inputPorts.Clear();
         _outputPorts.Clear();
+        _flowInPorts.Clear();
+        _flowOutPorts.Clear();
         OnPropertyChanged(nameof(InputPorts));
         OnPropertyChanged(nameof(OutputPorts));
+        OnPropertyChanged(nameof(FlowInPorts));
+        OnPropertyChanged(nameof(FlowOutPorts));
     }
 
     protected void ClearProperties() {
@@ -401,6 +453,52 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         InitializeNodeProperties(type);
         InitializeInputPorts(type);
         InitializeOutputPorts(type);
+        InitializeFlowInPorts(type);
+        InitializeFlowOutPorts(type);
+    }
+
+    private void InitializeFlowInPorts(Type type) {
+        var flowInPorts = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                             .Where(p => p.GetCustomAttribute<NodeFlowInAttribute>() != null)
+                             .Where(p => p.GetValue(this) == null);
+
+        foreach (var property in flowInPorts) {
+            // 이미 초기화된 속성은 건너뜀
+            if (property.GetValue(this) != null)
+                continue;
+
+            var flowInAttr = property.GetCustomAttribute<NodeFlowInAttribute>();
+            if (flowInAttr != null) {
+                var port = CreateFlowInPort(flowInAttr.DisplayName ?? property.Name);
+
+                // 멤버 프로퍼티에 할당
+                if (property.CanWrite) {
+                    property.SetValue(this, port);
+                }
+            }
+        }
+    }
+
+    private void InitializeFlowOutPorts(Type type) {
+        var flowOutPorts = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                             .Where(p => p.GetCustomAttribute<NodeFlowOutAttribute>() != null)
+                             .Where(p => p.GetValue(this) == null);
+
+        foreach (var property in flowOutPorts) {
+            // 이미 초기화된 속성은 건너뜀
+            if (property.GetValue(this) != null)
+                continue;
+
+            var flowOutAttr = property.GetCustomAttribute<NodeFlowOutAttribute>();
+            if (flowOutAttr != null) {
+                var port = CreateFlowOutPort(flowOutAttr.DisplayName ?? property.Name);
+
+                // 멤버 프로퍼티에 할당
+                if (property.CanWrite) {
+                    property.SetValue(this, port);
+                }
+            }
+        }
     }
 
     private void InitializeOutputPorts(Type type) {

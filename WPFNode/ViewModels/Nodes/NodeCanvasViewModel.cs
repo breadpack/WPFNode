@@ -325,10 +325,10 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
 
         // 새 연결 생성
         var sourcePort = _canvas.Nodes
-                                .SelectMany(n => n.InputPorts.Cast<IPort>().Concat(n.OutputPorts.Cast<IPort>()))
+                                .SelectMany(n => n.OutputPorts)
                                 .FirstOrDefault(p => p.Id == ports.source.Id);
         var targetPort = _canvas.Nodes
-                                .SelectMany(n => n.InputPorts.Cast<IPort>().Concat(n.OutputPorts.Cast<IPort>()))
+                                .SelectMany(n => n.InputPorts)
                                 .FirstOrDefault(p => p.Id == ports.target.Id);
 
         if (sourcePort != null && targetPort != null) {

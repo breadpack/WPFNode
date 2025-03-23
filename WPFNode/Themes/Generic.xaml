@@ -5,6 +5,10 @@
     xmlns:media="clr-namespace:System.Windows.Media;assembly=PresentationCore"
     xmlns:converters="clr-namespace:WPFNode.Converters"
     x:Class="WPFNode.Themes.Generic">
+    
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="/WPFNode;component/Themes/FlowPortStyles.xaml"/>
+    </ResourceDictionary.MergedDictionaries>
 
     <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
 
@@ -19,12 +23,32 @@
                             Effect="{TemplateBinding Effect}">
                         <Grid>
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/> <!-- Flow In 영역 -->
+                                <RowDefinition Height="Auto"/> <!-- 헤더 -->
+                                <RowDefinition Height="*"/>    <!-- 메인 콘텐츠 -->
+                                <RowDefinition Height="Auto"/> <!-- Flow Out 영역 -->
                             </Grid.RowDefinitions>
                             
+                            <!-- Flow In 포트 -->
+                            <ItemsControl Grid.Row="0"
+                                        HorizontalAlignment="Center"
+                                        ItemsSource="{Binding FlowInPorts}"
+                                        Margin="0,4,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <local:FlowInPortControl DataContext="{Binding}"
+                                                              Visibility="{Binding IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
+                            
                             <!-- 헤더 -->
-                            <Border Grid.Row="0" 
+                            <Border Grid.Row="1" 
                                     Background="#FF2D2D30" 
                                     Padding="8,4">
                                 <TextBlock Text="{Binding Model.Name}"
@@ -33,7 +57,7 @@
                             </Border>
 
                             <!-- 포트 영역 -->
-                            <Grid Grid.Row="1" Margin="4">
+                            <Grid Grid.Row="2" Margin="4">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
@@ -70,6 +94,24 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                             </Grid>
+                            
+                            <!-- Flow Out 포트 -->
+                            <ItemsControl Grid.Row="3"
+                                        HorizontalAlignment="Center"
+                                        ItemsSource="{Binding FlowOutPorts}"
+                                        Margin="0,0,0,4">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <local:FlowOutPortControl DataContext="{Binding}"
+                                                               Visibility="{Binding IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
                         </Grid>
                     </Border>
                     <ControlTemplate.Triggers>

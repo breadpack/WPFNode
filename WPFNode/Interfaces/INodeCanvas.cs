@@ -12,8 +12,8 @@ public interface INodeCanvas
     T?    Q<T>(string          id) where T : INode;
     
     // 연결 관리
-    IConnection Connect(IPort source, IPort target);
-    void Disconnect(IConnection connection);
+    IConnection Connect(IOutputPort    source, IInputPort target);
+    void        Disconnect(IConnection connection);
     
     // 실행
     Task               ExecuteAsync(CancellationToken cancellationToken = default);

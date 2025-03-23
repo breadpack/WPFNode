@@ -202,59 +202,23 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         OnNodeRemoved(node);
     }
 
-    public IConnection Connect(IPort source, IPort target)
+    public IConnection Connect(IOutputPort source, IInputPort target)
     {
-        // 기본 유효성 검사
         if (source == null || target == null)
-            throw new NodeConnectionException(
-                ExceptionMessages.GetMessage(ExceptionMessages.NodeIsNull));
+            throw new NodeConnectionException("소스 또는 타겟 포트가 null입니다.");
 
-        // 포트 타입 검사
-        if (source is not IOutputPort outputPort)
-            throw new NodeConnectionException(
-                ExceptionMessages.GetMessage(ExceptionMessages.SourceMustBeOutputPort),
-                source, target);
-        if (target is not IInputPort inputPort)
-            throw new NodeConnectionException(
-                ExceptionMessages.GetMessage(ExceptionMessages.TargetMustBeInputPort),
-                source, target);
-        if (source.Node == null || target.Node == null)
-            throw new NodeConnectionException(
-                ExceptionMessages.GetMessage(ExceptionMessages.PortsMustBeAttachedToNode),
-                source, target);
+        if (!source.CanConnectTo(target))
+            throw new NodeConnectionException("포트 간 연결이 불가능합니다.", source, target);
 
-        // 포트 연결 가능 여부 검사
-        if (!outputPort.CanConnectTo(inputPort))
-        {
-            throw new NodeConnectionException(
-                ExceptionMessages.GetMessage(ExceptionMessages.PortsCannotBeConnected),
-                source, target);
-        }
-
-        var sourcePortId = new PortId(
-            source.Node.Guid,
-            false,
-            source.GetPortIndex());
-            
-        var targetPortId = new PortId(
-            target.Node.Guid,
-            true,
-            target.GetPortIndex());
-
-        // 중복 연결 체크
-        if (_connections.Any(c => c.SourcePortId == sourcePortId && c.TargetPortId == targetPortId))
-        {
-            throw new NodeConnectionException(
-                ExceptionMessages.GetMessage(ExceptionMessages.PortsAlreadyConnected),
-                source, target);
-        }
-
-        var connection = new Connection(this, outputPort, inputPort);
+        var connection = new Connection(this, source, target);
         source.AddConnection(connection);
         target.AddConnection(connection);
+        
+        // 캔버스의 연결 목록에 추가
         _connections.Add(connection);
         OnConnectionAdded(connection);
         OnPropertyChanged(nameof(Connections));
+        
         return connection;
     }
 
@@ -339,11 +303,6 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
     {
         var executable = executionPlanBuilder.BuildExecutionPlan(_nodes, _connections, true);
         await executable.ExecuteAsync(new Execution.ExecutionContext(), cancellationToken);
-    }
-
-    internal Connection CreateConnection(IOutputPort source, IInputPort target)
-    {
-        return new(this, source, target);
     }
 
     public string ToJson()

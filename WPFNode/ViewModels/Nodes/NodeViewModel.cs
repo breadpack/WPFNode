@@ -21,8 +21,12 @@ public class NodeViewModel : ViewModelBase, INodeViewModel, ISelectable, IDispos
 
     private readonly ObservableCollection<NodePortViewModel> _inputPorts;
     private readonly ObservableCollection<NodePortViewModel> _outputPorts;
+    private readonly ObservableCollection<NodePortViewModel> _flowInPorts;
+    private readonly ObservableCollection<NodePortViewModel> _flowOutPorts;
     public ReadOnlyObservableCollection<NodePortViewModel> InputPorts { get; }
     public ReadOnlyObservableCollection<NodePortViewModel> OutputPorts { get; }
+    public ReadOnlyObservableCollection<NodePortViewModel> FlowInPorts { get; }
+    public ReadOnlyObservableCollection<NodePortViewModel> FlowOutPorts { get; }
 
     public NodeViewModel(NodeBase model, INodeCommandService commandService, NodeCanvasViewModel canvas)
     {
@@ -35,12 +39,16 @@ public class NodeViewModel : ViewModelBase, INodeViewModel, ISelectable, IDispos
         // 포트 컬렉션 초기화
         _inputPorts = new(model.InputPorts.Select(p => new NodePortViewModel(p, canvas)));
         _outputPorts = new(model.OutputPorts.Select(p => new NodePortViewModel(p, canvas)));
+        _flowInPorts = new(model.FlowInPorts.Select(p => new NodePortViewModel(p, canvas)));
+        _flowOutPorts = new(model.FlowOutPorts.Select(p => new NodePortViewModel(p, canvas)));
 
-        InputPorts  = new(_inputPorts);
+        InputPorts = new(_inputPorts);
         OutputPorts = new(_outputPorts);
+        FlowInPorts = new(_flowInPorts);
+        FlowOutPorts = new(_flowOutPorts);
 
         // 포트의 Parent 설정
-        foreach (var port in InputPorts.Concat(OutputPorts))
+        foreach (var port in InputPorts.Concat(OutputPorts).Concat(FlowInPorts).Concat(FlowOutPorts))
         {
             port.Parent = this;
         }
@@ -48,6 +56,8 @@ public class NodeViewModel : ViewModelBase, INodeViewModel, ISelectable, IDispos
         // 포트 컬렉션 변경 이벤트 구독
         _inputPorts.CollectionChanged += OnPortsCollectionChanged;
         _outputPorts.CollectionChanged += OnPortsCollectionChanged;
+        _flowInPorts.CollectionChanged += OnPortsCollectionChanged;
+        _flowOutPorts.CollectionChanged += OnPortsCollectionChanged;
 
         // 모델 속성 변경 이벤트 구독
         _model.PropertyChanged += Model_PropertyChanged;
@@ -202,6 +212,20 @@ public class NodeViewModel : ViewModelBase, INodeViewModel, ISelectable, IDispos
                     _outputPorts.Add(new(port, _canvas));
                 }
                 break;
+            case nameof(NodeBase.FlowInPorts):
+                _flowInPorts.Clear();
+                foreach (var port in _model.FlowInPorts)
+                {
+                    _flowInPorts.Add(new(port, _canvas));
+                }
+                break;
+            case nameof(NodeBase.FlowOutPorts):
+                _flowOutPorts.Clear();
+                foreach (var port in _model.FlowOutPorts)
+                {
+                    _flowOutPorts.Add(new(port, _canvas));
+                }
+                break;
             case nameof(INode.Properties):
                 OnPropertyChanged(nameof(Properties));
                 // Properties가 변경되면 InputPorts도 함께 갱신
@@ -230,9 +254,12 @@ public class NodeViewModel : ViewModelBase, INodeViewModel, ISelectable, IDispos
         }
     }
 
-    public (ReadOnlyObservableCollection<NodePortViewModel> InputPorts, ReadOnlyObservableCollection<NodePortViewModel> OutputPorts) GetPorts()
+    public (ReadOnlyObservableCollection<NodePortViewModel> InputPorts, 
+            ReadOnlyObservableCollection<NodePortViewModel> OutputPorts,
+            ReadOnlyObservableCollection<NodePortViewModel> FlowInPorts,
+            ReadOnlyObservableCollection<NodePortViewModel> FlowOutPorts) GetPorts()
     {
-        return (InputPorts, OutputPorts);
+        return (InputPorts, OutputPorts, FlowInPorts, FlowOutPorts);
     }
 
     public Type GetNodeType()
@@ -242,4 +269,4 @@ public class NodeViewModel : ViewModelBase, INodeViewModel, ISelectable, IDispos
 
     // ISelectable 인터페이스 구현
     public string SelectionType => "Node";
-} 
+}
