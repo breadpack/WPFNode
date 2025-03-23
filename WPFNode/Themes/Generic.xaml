@@ -53,7 +53,7 @@
                                     
                                     <!-- Flow In 포트 -->
                                     <ItemsControl x:Name="FlowInPortsPanel" Grid.Row="0"
-                                                HorizontalAlignment="Center"
+                                                HorizontalAlignment="Left"
                                                 ItemsSource="{Binding FlowInPorts}"
                                                 Margin="0,0,0,4">
                                         <ItemsControl.ItemTemplate>
@@ -94,7 +94,7 @@
                                     
                                     <!-- Flow Out 포트 -->
                                     <ItemsControl x:Name="FlowOutPortsPanel" Grid.Row="0"
-                                                HorizontalAlignment="Center"
+                                                HorizontalAlignment="Right"
                                                 ItemsSource="{Binding FlowOutPorts}"
                                                 Margin="0,0,0,4">
                                         <ItemsControl.ItemTemplate>
@@ -243,16 +243,16 @@
     <Style TargetType="{x:Type local:OutputPortControl}" BasedOn="{StaticResource {x:Type local:PortControl}}"/>
 
     <Style TargetType="{x:Type local:ConnectionControl}">
-        <Setter Property="Panel.ZIndex" Value="-1"/>
+        <Setter Property="Panel.ZIndex" Value="3"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type local:ConnectionControl}">
-                    <Canvas Panel.ZIndex="-1">
+                    <Canvas Panel.ZIndex="3">
                         <!-- 메인 연결선 -->
                         <Path x:Name="PART_Path"
                               Stroke="{TemplateBinding Foreground}"
                               StrokeThickness="2"
-                              Panel.ZIndex="-1">
+                              Panel.ZIndex="3">
                             <Path.Data>
                                 <PathGeometry>
                                     <PathGeometry.Figures>
@@ -276,7 +276,7 @@
                               Fill="{TemplateBinding Foreground}"
                               Stroke="{TemplateBinding Foreground}"
                               StrokeThickness="2"
-                              Panel.ZIndex="-1">
+                              Panel.ZIndex="3">
                             <Path.Data>
                                 <PathGeometry>
                                     <PathFigure StartPoint="0,0">
@@ -339,12 +339,12 @@
                                                           ScaleY="{Binding Scale}"/>
                                         </TransformGroup>
                                     </Canvas.RenderTransform>
-
+                                    
                                     <!-- 연결선 -->
                                     <ItemsControl ItemsSource="{Binding Connections}">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
-                                                <Canvas IsItemsHost="True" ZIndex="1"/>
+                                                <Canvas IsItemsHost="True" ZIndex="3"/>
                                             </ItemsPanelTemplate>
                                         </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
@@ -353,12 +353,12 @@
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
-
+                                    
                                     <!-- 노드 -->
                                     <ItemsControl ItemsSource="{Binding Nodes}">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
-                                                <Canvas IsItemsHost="True" ZIndex="2"/>
+                                                <Canvas IsItemsHost="True" ZIndex="1"/>
                                             </ItemsPanelTemplate>
                                         </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>

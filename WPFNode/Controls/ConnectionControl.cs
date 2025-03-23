@@ -50,7 +50,7 @@ public class ConnectionControl : Control
         Unloaded += OnUnloaded;
         MouseLeftButtonDown += OnMouseLeftButtonDown;
         DataContextChanged += OnDataContextChanged;
-        Panel.SetZIndex(this, -1); // 연결선이 노드 뒤에 표시되도록 Z-Index 설정
+        Panel.SetZIndex(this, 2); // 연결선이 노드 뒤에 표시되도록 Z-Index 설정
     }
     
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -120,12 +120,12 @@ public class ConnectionControl : Control
             }
             
             // Panel.SetZIndex 설정
-            Panel.SetZIndex(this, -1);
+            Panel.SetZIndex(this, 2);
         }
         else
         {
             _path.StrokeDashArray = null;
-            Panel.SetZIndex(this, -1);
+            Panel.SetZIndex(this, 2);
         }
     }
     
