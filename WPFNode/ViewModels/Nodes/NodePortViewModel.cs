@@ -83,15 +83,13 @@ public class NodePortViewModel : ViewModelBase, IEquatable<NodePortViewModel>
         // 데이터 포트인 경우 타입 호환성 검사
         if (!IsFlow)
         {
+            if(Model is not IOutputPort outputPort || other.Model is not IInputPort inputPort)
+                return false;
+            
             // 둘 다 데이터 포트일 때만 타입 검사
-            if (DataType != null && other.DataType != null)
+            if (!outputPort.CanConnectTo(inputPort))
             {
-                // 타입이 일치하지 않으면 연결할 수 없음
-                if (!DataType.IsAssignableFrom(other.DataType) &&
-                    !other.DataType.IsAssignableFrom(DataType))
-                {
-                    return false;
-                }
+                return false;
             }
         }
 
