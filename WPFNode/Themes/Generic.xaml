@@ -243,14 +243,16 @@
     <Style TargetType="{x:Type local:OutputPortControl}" BasedOn="{StaticResource {x:Type local:PortControl}}"/>
 
     <Style TargetType="{x:Type local:ConnectionControl}">
+        <Setter Property="Panel.ZIndex" Value="-1"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type local:ConnectionControl}">
-                    <Canvas>
+                    <Canvas Panel.ZIndex="-1">
                         <!-- 메인 연결선 -->
                         <Path x:Name="PART_Path"
                               Stroke="{TemplateBinding Foreground}"
-                              StrokeThickness="2">
+                              StrokeThickness="2"
+                              Panel.ZIndex="-1">
                             <Path.Data>
                                 <PathGeometry>
                                     <PathGeometry.Figures>
@@ -273,7 +275,8 @@
                         <Path x:Name="PART_Arrow"
                               Fill="{TemplateBinding Foreground}"
                               Stroke="{TemplateBinding Foreground}"
-                              StrokeThickness="2">
+                              StrokeThickness="2"
+                              Panel.ZIndex="-1">
                             <Path.Data>
                                 <PathGeometry>
                                     <PathFigure StartPoint="0,0">

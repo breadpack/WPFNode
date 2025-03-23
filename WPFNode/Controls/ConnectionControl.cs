@@ -21,12 +21,13 @@ public class ConnectionControl : Control
     private const double DefaultThickness = 2.0;
     private const double SelectedThickness = 3.0;
     
-    // Flow 연결 스타일
-    private static readonly Brush FlowDefaultBrush = Brushes.Green;
-    private static readonly Brush FlowSelectedBrush = Brushes.LimeGreen;
-    private const double FlowDefaultThickness = 2.5;
-    private const double FlowSelectedThickness = 3.5;
-    private static readonly DoubleCollection FlowDashArray = new DoubleCollection(new double[] { 4, 2 });
+    // Flow 연결 스타일 - 더 진한 연두색으로 변경
+    private static readonly Brush FlowDefaultBrush = new SolidColorBrush(Color.FromRgb(122, 183, 48)); // 진한 연두색
+    private static readonly Brush FlowSelectedBrush = new SolidColorBrush(Color.FromRgb(92, 159, 35)); // 선택 시 더 진한 연두색
+    private static readonly Brush FlowOutlineBrush = new SolidColorBrush(Color.FromArgb(64, 40, 80, 20)); // 반투명 테두리 색상
+    private const double FlowDefaultThickness = 4.5; // 두께 증가
+    private const double FlowSelectedThickness = 5.5; // 선택 시 두께 증가
+    private const double FlowOutlineThickness = 7.0; // 테두리 두께
 
     static ConnectionControl()
     {
@@ -49,6 +50,7 @@ public class ConnectionControl : Control
         Unloaded += OnUnloaded;
         MouseLeftButtonDown += OnMouseLeftButtonDown;
         DataContextChanged += OnDataContextChanged;
+        Panel.SetZIndex(this, -1); // 연결선이 노드 뒤에 표시되도록 Z-Index 설정
     }
     
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -89,6 +91,7 @@ public class ConnectionControl : Control
             if (_arrow != null)
             {
                 _arrow.Fill = isFlow ? FlowSelectedBrush : SelectedBrush;
+                _arrow.Stroke = isFlow ? FlowSelectedBrush : SelectedBrush;
             }
         }
         else
@@ -100,17 +103,29 @@ public class ConnectionControl : Control
             if (_arrow != null)
             {
                 _arrow.Fill = isFlow ? FlowDefaultBrush : DefaultBrush;
+                _arrow.Stroke = isFlow ? FlowDefaultBrush : DefaultBrush;
             }
         }
         
-        // Flow 연결은 점선으로 표시
+        // Flow 연결은 실선으로 표시하되 테두리 추가
         if (isFlow)
         {
-            _path.StrokeDashArray = FlowDashArray;
+            // 주요 경로에 테두리 추가
+            _path.StrokeDashArray = null;
+            
+            // 화살표도 두껍게 표시
+            if (_arrow != null)
+            {
+                _arrow.StrokeThickness = 2.0;
+            }
+            
+            // Panel.SetZIndex 설정
+            Panel.SetZIndex(this, -1);
         }
         else
         {
             _path.StrokeDashArray = null;
+            Panel.SetZIndex(this, -1);
         }
     }
     

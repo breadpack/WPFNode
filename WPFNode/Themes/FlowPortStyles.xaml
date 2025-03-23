@@ -7,12 +7,12 @@
     
     <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
     
-    <!-- Flow 포트 색상 -->
-    <SolidColorBrush x:Key="FlowPortDefaultFill" Color="#FFE8F5E9"/>
-    <SolidColorBrush x:Key="FlowPortDefaultStroke" Color="#FF388E3C"/>
-    <SolidColorBrush x:Key="FlowPortConnectedFill" Color="#FF66BB6A"/>
-    <SolidColorBrush x:Key="FlowPortConnectedStroke" Color="#FF2E7D32"/>
-    <SolidColorBrush x:Key="FlowPortHoverFill" Color="#FF81C784"/>
+    <!-- Flow 포트 색상 - 더 진한 연두색 계열로 변경 -->
+    <SolidColorBrush x:Key="FlowPortDefaultFill" Color="#FFD8EFC0"/>
+    <SolidColorBrush x:Key="FlowPortDefaultStroke" Color="#FF7AB730"/>
+    <SolidColorBrush x:Key="FlowPortConnectedFill" Color="#FFD0E8A9"/>
+    <SolidColorBrush x:Key="FlowPortConnectedStroke" Color="#FF5C9F23"/>
+    <SolidColorBrush x:Key="FlowPortHoverFill" Color="#FFC0DB8C"/>
     
     <!-- 기본 PortControl 스타일 -->
     <Style TargetType="{x:Type local:PortControl}">
@@ -101,50 +101,53 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         
-                        <!-- 향상된 FlowIn 포트: 삼각형 모양 -->
-                        <Grid Grid.Column="0" Width="16" Height="16" Margin="0,2">
-                            <!-- 배경 원 -->
-                            <Ellipse Width="16" Height="16"
-                                    Fill="{StaticResource FlowPortDefaultFill}" 
-                                    Stroke="{StaticResource FlowPortDefaultStroke}"
-                                    StrokeThickness="1.5">
-                                <Ellipse.Style>
-                                    <Style TargetType="Ellipse">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsConnected}" Value="True">
-                                                <Setter Property="Fill" Value="{StaticResource FlowPortConnectedFill}"/>
-                                                <Setter Property="Stroke" Value="{StaticResource FlowPortConnectedStroke}"/>
-                                            </DataTrigger>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Fill" Value="{StaticResource FlowPortHoverFill}"/>
-                                            </Trigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Ellipse.Style>
-                            </Ellipse>
-                            
-                            <!-- 삼각형 아이콘 -->
-                            <Path Width="10" Height="10"
-                                Data="M 0,0 L 10,5 L 0,10 Z"
-                                Fill="{StaticResource FlowPortDefaultStroke}" 
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center">
-                                <Path.Style>
-                                    <Style TargetType="Path">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsConnected}" Value="True">
-                                                <Setter Property="Fill" Value="{StaticResource FlowPortConnectedStroke}"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Path.Style>
-                            </Path>
-                        </Grid>
+                        <!-- 향상된 FlowIn 포트: 삼각형 모양 (왼쪽 정렬) -->
+                        <Ellipse Grid.Column="0" Width="16" Height="16"
+                                Fill="{StaticResource FlowPortDefaultFill}" 
+                                Stroke="{StaticResource FlowPortDefaultStroke}"
+                                StrokeThickness="1.5"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                Margin="0,6,0,6">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsConnected}" Value="True">
+                                            <Setter Property="Fill" Value="{StaticResource FlowPortConnectedFill}"/>
+                                            <Setter Property="Stroke" Value="{StaticResource FlowPortConnectedStroke}"/>
+                                        </DataTrigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Fill" Value="{StaticResource FlowPortHoverFill}"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
                         
-                        <!-- 포트 이름 -->
+                        <!-- 삼각형 아이콘 (왼쪽 정렬) -->
+                        <Path Grid.Column="0" Width="10" Height="10"
+                            Data="M 0,0 L 10,5 L 0,10 Z"
+                            Fill="{StaticResource FlowPortDefaultStroke}" 
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            Margin="3,0,0,0">
+                            <Path.Style>
+                                <Style TargetType="Path">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsConnected}" Value="True">
+                                            <Setter Property="Fill" Value="{StaticResource FlowPortConnectedStroke}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Path.Style>
+                        </Path>
+                        
+                        <!-- 포트 이름 (왼쪽 정렬) -->
                         <TextBlock Grid.Column="1"
                                  Text="{Binding Name}"
                                  Margin="4,0,0,0"
+                                 TextAlignment="Left"
+                                 HorizontalAlignment="Left"
                                  VerticalAlignment="Center"
                                  Foreground="{StaticResource FlowPortDefaultStroke}">
                             <TextBlock.Style>
@@ -175,11 +178,12 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         
-                        <!-- 포트 이름 -->
+                        <!-- 포트 이름 (오른쪽 정렬) -->
                         <TextBlock Grid.Column="0"
                                  Text="{Binding Name}"
                                  Margin="0,0,4,0"
                                  TextAlignment="Right"
+                                 HorizontalAlignment="Right"
                                  VerticalAlignment="Center"
                                  Foreground="{StaticResource FlowPortDefaultStroke}">
                             <TextBlock.Style>
@@ -194,45 +198,46 @@
                             </TextBlock.Style>
                         </TextBlock>
                                    
-                        <!-- 향상된 FlowOut 포트: 삼각형 모양 -->
-                        <Grid Grid.Column="1" Width="16" Height="16" Margin="0,2">
-                            <!-- 배경 원 -->
-                            <Ellipse Width="16" Height="16"
-                                    Fill="{StaticResource FlowPortDefaultFill}" 
-                                    Stroke="{StaticResource FlowPortDefaultStroke}"
-                                    StrokeThickness="1.5">
-                                <Ellipse.Style>
-                                    <Style TargetType="Ellipse">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsConnected}" Value="True">
-                                                <Setter Property="Fill" Value="{StaticResource FlowPortConnectedFill}"/>
-                                                <Setter Property="Stroke" Value="{StaticResource FlowPortConnectedStroke}"/>
-                                            </DataTrigger>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Fill" Value="{StaticResource FlowPortHoverFill}"/>
-                                            </Trigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Ellipse.Style>
-                            </Ellipse>
-                            
-                            <!-- 삼각형 아이콘 -->
-                            <Path Width="10" Height="10"
-                                Data="M 0,0 L 0,10 L 10,5 Z"
-                                Fill="{StaticResource FlowPortDefaultStroke}" 
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center">
-                                <Path.Style>
-                                    <Style TargetType="Path">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsConnected}" Value="True">
-                                                <Setter Property="Fill" Value="{StaticResource FlowPortConnectedStroke}"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Path.Style>
-                            </Path>
-                        </Grid>
+                        <!-- 향상된 FlowOut 포트: 삼각형 모양 (오른쪽 정렬) -->
+                        <Ellipse Grid.Column="1" Width="16" Height="16"
+                                Fill="{StaticResource FlowPortDefaultFill}" 
+                                Stroke="{StaticResource FlowPortDefaultStroke}"
+                                StrokeThickness="1.5"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Margin="0,6,0,6">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsConnected}" Value="True">
+                                            <Setter Property="Fill" Value="{StaticResource FlowPortConnectedFill}"/>
+                                            <Setter Property="Stroke" Value="{StaticResource FlowPortConnectedStroke}"/>
+                                        </DataTrigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Fill" Value="{StaticResource FlowPortHoverFill}"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
+                        
+                        <!-- 삼각형 아이콘 (오른쪽 정렬) -->
+                        <Path Grid.Column="1" Width="10" Height="10"
+                            Data="M 0,0 L 0,10 L 10,5 Z"
+                            Fill="{StaticResource FlowPortDefaultStroke}" 
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Margin="0,0,3,0">
+                            <Path.Style>
+                                <Style TargetType="Path">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsConnected}" Value="True">
+                                            <Setter Property="Fill" Value="{StaticResource FlowPortConnectedStroke}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Path.Style>
+                        </Path>
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>
