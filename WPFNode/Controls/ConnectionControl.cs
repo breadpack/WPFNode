@@ -108,19 +108,30 @@ public class ConnectionControl : Control
         _pathFigure = GetTemplateChild("PART_PathFigure") as PathFigure;
         _bezierSegment = GetTemplateChild("PART_BezierSegment") as BezierSegment;
 
-        UpdateConnection();
-        UpdateVisualState();
+        // 지연 호출로 변경 - Visual Tree가 완전히 구성된 후 실행되도록 함
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            UpdateConnection();
+            UpdateVisualState();
+        }), System.Windows.Threading.DispatcherPriority.ContextIdle);
     }
 
     protected override void OnRender(DrawingContext drawingContext)
     {
         base.OnRender(drawingContext);
-        UpdateConnection();
+        
+        // 지연 호출로 변경
+        Dispatcher.BeginInvoke(new Action(UpdateConnection), 
+            System.Windows.Threading.DispatcherPriority.ContextIdle);
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         System.Diagnostics.Debug.WriteLine($"ConnectionControl OnLoaded: {ViewModel?.Source?.Name} -> {ViewModel?.Target?.Name}");
+        
+        // 로드 후에도 지연 호출 추가
+        Dispatcher.BeginInvoke(new Action(UpdateConnection), 
+            System.Windows.Threading.DispatcherPriority.ContextIdle);
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
@@ -157,14 +168,37 @@ public class ConnectionControl : Control
 
     internal void UpdateConnection()
     {
-        if (ViewModel == null || _pathFigure == null || _bezierSegment == null || _arrow == null)
+        if (ViewModel == null)
             return;
+
+        // 템플릿에서 필요한 요소를 찾지 못했다면 지연 호출로 다시 시도
+        if (_pathFigure == null || _bezierSegment == null || _arrow == null)
+        {
+            Dispatcher.BeginInvoke(new Action(() => {
+                // 템플릿 적용을 기다렸다가 다시 시도
+                _path = GetTemplateChild("PART_Path") as Path;
+                _arrow = GetTemplateChild("PART_Arrow") as Path;
+                _pathFigure = GetTemplateChild("PART_PathFigure") as PathFigure;
+                _bezierSegment = GetTemplateChild("PART_BezierSegment") as BezierSegment;
+                
+                if (_pathFigure != null && _bezierSegment != null && _arrow != null)
+                {
+                    UpdateConnection();
+                }
+            }), System.Windows.Threading.DispatcherPriority.ContextIdle);
+            return;
+        }
 
         var sourcePort = GetPortControl(ViewModel.Source);
         var targetPort = GetPortControl(ViewModel.Target);
 
-        if (sourcePort == null || targetPort == null) 
+        // 포트를 찾지 못했으면 다시 시도
+        if (sourcePort == null || targetPort == null)
+        {
+            Dispatcher.BeginInvoke(new Action(UpdateConnection), 
+                System.Windows.Threading.DispatcherPriority.ContextIdle);
             return;
+        }
 
         var sourceCenter = GetPortCenterPosition(sourcePort);
         var targetCenter = GetPortCenterPosition(targetPort);
@@ -199,4 +233,4 @@ public class ConnectionControl : Control
         arrowTransform.Children.Add(new RotateTransform(angle + 180));
         _arrow.RenderTransform = arrowTransform;
     }
-} 
+}

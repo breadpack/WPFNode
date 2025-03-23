@@ -7,7 +7,7 @@ public class NodeFlowInAttribute : Attribute
 {
     public string? DisplayName { get; }
 
-    public NodeFlowInAttribute(string? displayName = null)
+    public NodeFlowInAttribute(string displayName = "In")
     {
         DisplayName = displayName;
     }

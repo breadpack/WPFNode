@@ -18,6 +18,12 @@ namespace WPFNode.Demo.Nodes;
 [NodeName("Table Output")]
 [NodeDescription("테이블 데이터를 출력하는 노드입니다.")]
 public class TableOutputNode : DynamicNode, IDisposable {
+    [NodeFlowIn]
+    public IFlowInPort FlowIn { get; private set; }
+    
+    [NodeFlowOut]
+    public IFlowOutPort FlowOut { get; private set; }
+    
     [NodeProperty("Target Type")]
     public NodeProperty<Type> SelectedType { get; private set; }
 

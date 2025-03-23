@@ -7,7 +7,7 @@ public class NodeFlowOutAttribute : Attribute
 {
     public string? DisplayName { get; }
 
-    public NodeFlowOutAttribute(string? displayName = null)
+    public NodeFlowOutAttribute(string displayName = "Out")
     {
         DisplayName = displayName;
     }

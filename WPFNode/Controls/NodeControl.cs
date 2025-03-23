@@ -8,6 +8,8 @@ using WPFNode.Models;
 using WPFNode.Services;
 using WPFNode.Utilities;
 using WPFNode.ViewModels.Nodes;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace WPFNode.Controls;
 
@@ -325,21 +327,72 @@ public class NodeControl : ContentControl, INodeControl
 
     public PortControl? FindPortControl(NodePortViewModel port)
     {
-        var portItemsControl = GetTemplateChild(port.IsInput ? "InputPortsPanel" : "OutputPortsPanel") as ItemsControl;
-        if (portItemsControl == null) return null;
+        // 캐시 확인 대신 항상 검색
+        // if (_portControlCache.TryGetValue(port, out var cachedControl))
+        //     return cachedControl;
 
-        var portContainer = portItemsControl.ItemContainerGenerator
-            .ContainerFromItem(port) as ContentPresenter;
-
-        if (portContainer == null) return null;
-
-        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(portContainer); i++)
+        // 모든 ItemsControl 찾기
+        var portItemsControls = FindChildrenOfType<ItemsControl>(this);
+        
+        // 각 ItemsControl에서 포트 검색
+        foreach (var itemsControl in portItemsControls)
         {
-            var child = VisualTreeHelper.GetChild(portContainer, i);
-            if (child is PortControl portControl)
-                return portControl;
+            // 데이터 소스가 포트 컬렉션인지 확인하고 해당 포트가 포함되어 있는지 체크
+            if (itemsControl.ItemsSource is IEnumerable<NodePortViewModel> ports &&
+                ports.Contains(port))
+            {
+                // 해당 포트의 컨테이너 가져오기
+                var container = itemsControl.ItemContainerGenerator.ContainerFromItem(port) as ContentPresenter;
+                if (container == null) continue;
+                
+                // 컨테이너에서 PortControl 찾기
+                var portControl = FindChildOfType<PortControl>(container);
+                if (portControl != null)
+                {
+                    // 캐싱 제거
+                    // _portControlCache[port] = portControl;
+                    return portControl;
+                }
+            }
         }
-
+        
         return null;
+    }
+
+    // 자식 요소 중 특정 타입 찾기 (DFS)
+    private T? FindChildOfType<T>(DependencyObject parent) where T : DependencyObject
+    {
+        if (parent == null) return null;
+
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            
+            if (child is T result)
+                return result;
+                
+            var foundInChild = FindChildOfType<T>(child);
+            if (foundInChild != null)
+                return foundInChild;
+        }
+        
+        return null;
+    }
+
+    // 자식 요소들 중 특정 타입 모두 찾기
+    private IEnumerable<T> FindChildrenOfType<T>(DependencyObject parent) where T : DependencyObject
+    {
+        if (parent == null) yield break;
+
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            
+            if (child is T result)
+                yield return result;
+                
+            foreach (var childOfChild in FindChildrenOfType<T>(child))
+                yield return childOfChild;
+        }
     }
 } 
