@@ -295,13 +295,14 @@ public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
 
     public async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        var executionPlan = new Execution.ExecutionPlan(_nodes, _connections, true);
-        await executionPlan.ExecuteAsync(cancellationToken);
+        var executionPlanBuilder = new Execution.ExecutionPlanBuilder();
+        var executable = executionPlanBuilder.BuildExecutionPlanWithEntryPoints(_nodes, _connections, true);
+        await executable.ExecuteAsync(new Execution.ExecutionContext(), cancellationToken);
     }
 
     public async Task ExecuteAsync(Execution.ExecutionPlanBuilder executionPlanBuilder, CancellationToken cancellationToken = default)
     {
-        var executable = executionPlanBuilder.BuildExecutionPlan(_nodes, _connections, true);
+        var executable = executionPlanBuilder.BuildExecutionPlanWithEntryPoints(_nodes, _connections, true);
         await executable.ExecuteAsync(new Execution.ExecutionContext(), cancellationToken);
     }
 

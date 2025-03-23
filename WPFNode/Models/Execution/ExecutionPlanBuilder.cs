@@ -23,6 +23,30 @@ public class ExecutionPlanBuilder
         return CreateExecutors(nodeHierarchy, enableParallel);
     }
 
+    /// <summary>
+    /// IFlowEntry를 상속받은 노드를 시작점으로 사용하여 실행 계획을 구성합니다.
+    /// </summary>
+    public IExecutable BuildExecutionPlanWithEntryPoints(
+        IEnumerable<NodeBase> nodes,
+        IEnumerable<IConnection> connections,
+        bool enableParallel = true)
+    {
+        // IFlowEntry를 구현한 노드들을 찾습니다.
+        var entryNodes = nodes.Where(n => n is IFlowEntry).ToList();
+        
+        if (entryNodes.Count == 0)
+        {
+            _logger?.LogWarning("No valid IFlowEntry nodes found. Using standard node hierarchy analysis.");
+            return BuildExecutionPlan(nodes, connections, enableParallel);
+        }
+        
+        _logger?.LogInformation("Found {Count} entry points", entryNodes.Count);
+        
+        // 엔트리 포인트 노드를 기준으로 실행 계획 생성
+        var nodeHierarchy = AnalyzeNodeHierarchyWithEntryPoints(entryNodes, nodes, connections);
+        return CreateExecutors(nodeHierarchy, enableParallel);
+    }
+
     private class NodeInfo
     {
         public INode Node { get; }
@@ -30,11 +54,13 @@ public class ExecutionPlanBuilder
         public bool HasParent { get; set; }
         public List<NodeInfo> Children { get; } = new();
         public HashSet<INode> DirectDependencies { get; } = new();
+        public bool IsEntryPoint { get; set; }
 
-        public NodeInfo(INode node)
+        public NodeInfo(INode node, bool isEntryPoint = false)
         {
             Node = node;
             IsLoopNode = node is ILoopNode;
+            IsEntryPoint = isEntryPoint;
         }
     }
 
@@ -64,6 +90,48 @@ public class ExecutionPlanBuilder
         // 의존성 관계 로깅
         LogDependencyInfo(rootNodes);
         
+        return rootNodes;
+    }
+    
+    /// <summary>
+    /// IFlowEntry 노드를 시작점으로 사용하여 노드 계층 구조를 분석합니다.
+    /// </summary>
+    private List<NodeInfo> AnalyzeNodeHierarchyWithEntryPoints(
+        List<NodeBase> entryNodes,
+        IEnumerable<NodeBase> allNodes,
+        IEnumerable<IConnection> connections)
+    {
+        var nodeMap = allNodes.ToDictionary(n => n, n => new NodeInfo(n, entryNodes.Contains(n)));
+        var rootNodes = new List<NodeInfo>();
+
+        // 엔트리 포인트 노드들을 루트 노드로 설정
+        foreach (var entryNode in entryNodes)
+        {
+            rootNodes.Add(nodeMap[entryNode]);
+        }
+
+        // Flow 연결을 기반으로 노드 계층 구조 생성
+        foreach (var connection in connections.Where(c => c.Target is IFlowInPort))
+        {
+            var sourceNode = connection.Source.Node;
+            var targetNode = connection.Target.Node;
+
+            if (sourceNode is NodeBase sourceBase && targetNode is NodeBase targetBase &&
+                nodeMap.TryGetValue(sourceBase, out var sourceInfo) && 
+                nodeMap.TryGetValue(targetBase, out var targetInfo))
+            {
+                sourceInfo.Children.Add(targetInfo);
+                targetInfo.HasParent = true;
+                targetInfo.DirectDependencies.Add(sourceBase);
+            }
+        }
+
+        // 엔트리 포인트가 아닌 부모가 없는 노드들을 추가
+        if (rootNodes.Count == 0)
+        {
+            rootNodes.AddRange(nodeMap.Values.Where(n => !n.HasParent && !n.IsEntryPoint));
+        }
+
         return rootNodes;
     }
     

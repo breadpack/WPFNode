@@ -269,4 +269,9 @@ public class NodeViewModel : ViewModelBase, INodeViewModel, ISelectable, IDispos
 
     // ISelectable 인터페이스 구현
     public string SelectionType => "Node";
+
+    /// <summary>
+    /// 노드가 IFlowEntry 인터페이스를 구현하는지 여부를 확인합니다.
+    /// </summary>
+    public bool IsFlowEntry => Model is IFlowEntry;
 }

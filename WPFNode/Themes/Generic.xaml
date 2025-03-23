@@ -4,6 +4,7 @@
     xmlns:local="clr-namespace:WPFNode.Controls"
     xmlns:media="clr-namespace:System.Windows.Media;assembly=PresentationCore"
     xmlns:converters="clr-namespace:WPFNode.Converters"
+    xmlns:interfaces="clr-namespace:WPFNode.Interfaces"
     x:Class="WPFNode.Themes.Generic">
     
     <ResourceDictionary.MergedDictionaries>
@@ -30,7 +31,7 @@
                             <!-- 헤더 -->
                             <Border Grid.Row="0" 
                                     Background="#FF2D2D30" 
-                                    Padding="8,4">
+                                    Padding="8,4" x:Name="HeaderBorder">
                                 <TextBlock Text="{Binding Model.Name}"
                                          Foreground="White"
                                          FontWeight="Bold"/>
@@ -135,6 +136,10 @@
                                                     Opacity="0.5"/>
                                 </Setter.Value>
                             </Setter>
+                        </DataTrigger>
+                        <!-- IFlowEntry 인터페이스를 구현한 노드의 헤더 색상 변경 -->
+                        <DataTrigger Binding="{Binding IsFlowEntry}" Value="True">
+                            <Setter TargetName="HeaderBorder" Property="Background" Value="#FF6A2DAF"/>
                         </DataTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

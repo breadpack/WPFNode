@@ -28,7 +28,7 @@ public class ExecutionPlan {
     ) {
         _logger = logger;
         var builder = new ExecutionPlanBuilder(_logger);
-        _rootExecutor = builder.BuildExecutionPlan(nodes, connections, parallelExecution);
+        _rootExecutor = builder.BuildExecutionPlanWithEntryPoints(nodes, connections, parallelExecution);
         _logger?.LogDebug("ExecutionPlan initialized with parallelExecution: {Parallel}", parallelExecution);
     }
 
