@@ -4,6 +4,64 @@ using WPFNode.Interfaces;
 
 namespace WPFNode.Models.Serialization;
 
+public class DeserializationError
+{
+    public string ElementType { get; set; } // "Node", "Connection", "Group" 등
+    public string ElementId { get; set; }
+    public string Message { get; set; }
+    public string Details { get; set; }
+    public Exception Exception { get; set; }
+
+    public DeserializationError(string elementType, string elementId, string message, string details, Exception exception)
+    {
+        ElementType = elementType;
+        ElementId = elementId;
+        Message = message;
+        Details = details;
+        Exception = exception;
+    }
+}
+
+public class DeserializationResult
+{
+    public NodeCanvas Canvas { get; }
+    public List<DeserializationError> Errors { get; } = new();
+    public bool HasErrors => Errors.Any();
+
+    public DeserializationResult(NodeCanvas canvas)
+    {
+        Canvas = canvas;
+    }
+
+    public void AddError(string elementType, string elementId, string message, string details, Exception exception)
+    {
+        Errors.Add(new DeserializationError(elementType, elementId, message, details, exception));
+    }
+
+    public string GetErrorSummary()
+    {
+        if (!HasErrors) return "성공적으로 로드되었습니다.";
+
+        var summary = new System.Text.StringBuilder();
+        summary.AppendLine($"{Errors.Count}개 항목 로드 실패:");
+        
+        var nodeErrors = Errors.Where(e => e.ElementType == "Node").ToList();
+        var connectionErrors = Errors.Where(e => e.ElementType == "Connection").ToList();
+        var groupErrors = Errors.Where(e => e.ElementType == "Group").ToList();
+
+        if (nodeErrors.Any())
+            summary.AppendLine($"- {nodeErrors.Count}개 노드 실패");
+        
+        if (connectionErrors.Any())
+            summary.AppendLine($"- {connectionErrors.Count}개 연결 실패");
+        
+        if (groupErrors.Any())
+            summary.AppendLine($"- {groupErrors.Count}개 그룹 실패");
+
+        return summary.ToString();
+    }
+}
+
 public class PropertySerializationData
 {
     public string Name { get; set; } = string.Empty;
@@ -93,34 +151,83 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
             var canvas = NodeCanvas.Create();
             var nodesById = new Dictionary<Guid, INode>();
             
+            // 결과 객체 생성
+            var result = new DeserializationResult(canvas);
+            
             // 순서대로 복원: 노드 -> 연결 -> 그룹
-            ReadNodes(canvasData, canvas, nodesById, options);
-            ReadConnections(canvasData, canvas, nodesById);
-            ReadGroups(canvasData, canvas, nodesById);
+            ReadNodes(canvasData, canvas, nodesById, options, result);
+            ReadConnections(canvasData, canvas, nodesById, result);
+            ReadGroups(canvasData, canvas, nodesById, result);
+            
+            // 오류가 있으면 로그에 기록
+            if (result.HasErrors)
+            {
+                Console.WriteLine(result.GetErrorSummary());
+                foreach (var error in result.Errors)
+                {
+                    Console.WriteLine($"[{error.ElementType}] {error.ElementId}: {error.Message}");
+                }
+            }
             
             return canvas;
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
-            throw;
+            Console.WriteLine($"JSON 파싱 오류: {ex.Message}");
+            throw; // JSON 구문 자체가 잘못된 경우는 여전히 실패로 처리
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"예상치 못한 오류: {ex.Message}");
             throw new JsonException("노드 캔버스 역직렬화 중 오류 발생", ex);
         }
     }
 
-    private void ReadNodes(JsonElement canvasData, NodeCanvas canvas, Dictionary<Guid, INode> nodesById, JsonSerializerOptions options)
+    // JSON 문자열에서 부분 오류를 허용하며 NodeCanvas를 복원하는 정적 메서드
+    public static DeserializationResult DeserializeWithPartialErrors(string json)
+    {
+        try
+        {
+            var document = JsonDocument.Parse(json);
+            var canvas = NodeCanvas.Create();
+            var nodesById = new Dictionary<Guid, INode>();
+            
+            var result = new DeserializationResult(canvas);
+            
+            // 순서대로 복원
+            ReadNodes(document.RootElement, canvas, nodesById, _serializerOptions, result);
+            ReadConnections(document.RootElement, canvas, nodesById, result);
+            ReadGroups(document.RootElement, canvas, nodesById, result);
+            
+            return result;
+        }
+        catch (JsonException ex)
+        {
+            // JSON 구문 자체가 잘못된 경우
+            var canvas = NodeCanvas.Create();
+            var result = new DeserializationResult(canvas);
+            result.AddError("Canvas", "Root", "JSON 구문 오류", ex.Message, ex);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            // 기타 예상치 못한 오류
+            var canvas = NodeCanvas.Create();
+            var result = new DeserializationResult(canvas);
+            result.AddError("Canvas", "Root", "예상치 못한 오류", ex.Message, ex);
+            return result;
+        }
+    }
+
+    private static void ReadNodes(JsonElement canvasData, NodeCanvas canvas, Dictionary<Guid, INode> nodesById, JsonSerializerOptions options, DeserializationResult result)
     {
         if (!canvasData.TryGetProperty("Nodes", out var nodesElement)) return;
-
-        var failedNodes = new List<(JsonElement Element, Exception Error, string Details)>();
 
         foreach (var nodeElement in nodesElement.EnumerateArray())
         {
             try
             {
-                // 1. 노드 생성에 필요한 기본 정보 파싱
+                // 노드 정보 추출
                 if (!nodeElement.TryGetProperty("Type", out var typeElement))
                 {
                     throw new JsonException("필수 노드 속성이 누락되었습니다.");
@@ -134,8 +241,9 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                     throw new JsonException($"노드 타입을 찾을 수 없습니다: {nodeTypeString}");
                 }
 
-                // 2. 노드 생성
-                var nodeGuid = Guid.Parse(nodeElement.GetProperty("Guid").GetString()!);
+                // 노드 생성
+                var nodeGuidStr = nodeElement.GetProperty("Guid").GetString() ?? Guid.NewGuid().ToString();
+                var nodeGuid = Guid.Parse(nodeGuidStr);
                 var x = nodeElement.GetProperty("X").GetDouble();
                 var y = nodeElement.GetProperty("Y").GetDouble();
                 var node = canvas.CreateNodeWithGuid(nodeGuid, nodeType, x, y);
@@ -147,7 +255,7 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                 
                 nodesById[node.Guid] = node;
 
-                // 3. 노드 상태 복원
+                // 노드 상태 복원
                 if (node is IJsonSerializable serializable)
                 {
                     serializable.ReadJson(nodeElement, options);
@@ -156,23 +264,20 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
             catch (Exception ex)
             {
                 var errorDetails = GetDetailedErrorMessage(ex, nodeElement);
-                failedNodes.Add((nodeElement, ex, errorDetails));
+                var nodeId = nodeElement.TryGetProperty("Guid", out var guidElement) 
+                    ? guidElement.GetString() ?? "알 수 없음" 
+                    : "알 수 없음";
+                var nodeName = nodeElement.TryGetProperty("Name", out var nameElement)
+                    ? nameElement.GetString() ?? "알 수 없음"
+                    : "알 수 없음";
+                
+                result.AddError("Node", nodeId, $"노드 '{nodeName}' 복원 실패", errorDetails, ex);
+                // 이 노드는 건너뛰고 다음 노드로 계속 진행
             }
-        }
-
-        if (failedNodes.Any())
-        {
-            var errors = string.Join("\n", failedNodes.Select(f => 
-                $"- 노드 복원 실패: {f.Element.GetProperty("Type").GetString() ?? "알 수 없는 타입"}\n" +
-                $"  노드 정보: {f.Element.GetProperty("Name").GetString() ?? "알 수 없는 이름"} " +
-                $"({f.Element.GetProperty("Type").GetString()?.Split(',')[0].Split('.').Last() ?? "알 수 없는 타입"})\n" +
-                $"  오류 메시지: {f.Error.Message}\n" +
-                $"  상세 정보: {f.Details}"));
-            throw new JsonException($"일부 노드 복원 실패:\n{errors}");
         }
     }
 
-    private string GetDetailedErrorMessage(Exception ex, JsonElement nodeElement)
+    private static string GetDetailedErrorMessage(Exception ex, JsonElement nodeElement)
     {
         var details = new List<string>();
 
@@ -195,30 +300,26 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                 nodeInfo.Add($"Type: {typeElement.GetString()}");
 
             details.Add($"노드 데이터: {string.Join(", ", nodeInfo)}");
-
-            // JSON 데이터 추가
-            details.Add($"전체 JSON: {nodeElement.GetRawText()}");
         }
         catch (Exception)
         {
             details.Add("노드 데이터 파싱 중 추가 오류 발생");
         }
 
-        return string.Join("\n  ", details);
+        return string.Join("\n", details);
     }
 
-    private void ReadConnections(JsonElement canvasData, NodeCanvas canvas, Dictionary<Guid, INode> nodesById)
+    private static void ReadConnections(JsonElement canvasData, NodeCanvas canvas, Dictionary<Guid, INode> nodesById, DeserializationResult result)
     {
         if (!canvasData.TryGetProperty("Connections", out var connectionsElement)) return;
-
-        var failedConnections = new List<(JsonElement Element, Exception Error)>();
 
         foreach (var connectionElement in connectionsElement.EnumerateArray())
         {
             try
             {
                 // 연결 ID 파싱
-                var connectionId = Guid.Parse(connectionElement.GetProperty("Guid").GetString()!);
+                var connectionIdStr = connectionElement.GetProperty("Guid").GetString() ?? Guid.NewGuid().ToString();
+                var connectionId = Guid.Parse(connectionIdStr);
                 
                 // 포트 검색을 위한 변수
                 IOutputPort? sourcePort = null;
@@ -232,14 +333,15 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                     connectionElement.TryGetProperty("TargetPortName", out var targetPortNameElement) &&
                     connectionElement.TryGetProperty("TargetIsInput", out var targetIsInputElement))
                 {
-                    // Name 기반으로 포트 찾기
-                    var sourceNodeId = Guid.Parse(sourceNodeIdElement.GetString()!);
-                    var sourceIsInput = bool.Parse(sourceIsInputElement.GetString()!);
-                    var sourcePortName = sourcePortNameElement.GetString()!;
+                    var sourceNodeIdStr = sourceNodeIdElement.GetString() ?? string.Empty;
+                    var sourceNodeId = Guid.Parse(sourceNodeIdStr);
+                    var sourceIsInput = bool.Parse(sourceIsInputElement.GetString() ?? "false");
+                    var sourcePortName = sourcePortNameElement.GetString() ?? string.Empty;
                     
-                    var targetNodeId = Guid.Parse(targetNodeIdElement.GetString()!);
-                    var targetIsInput = bool.Parse(targetIsInputElement.GetString()!);
-                    var targetPortName = targetPortNameElement.GetString()!;
+                    var targetNodeIdStr = targetNodeIdElement.GetString() ?? string.Empty;
+                    var targetNodeId = Guid.Parse(targetNodeIdStr);
+                    var targetIsInput = bool.Parse(targetIsInputElement.GetString() ?? "true");
+                    var targetPortName = targetPortNameElement.GetString() ?? string.Empty;
                     
                     // 소스 노드와 타겟 노드 찾기
                     if (!nodesById.TryGetValue(sourceNodeId, out var sourceNode))
@@ -262,20 +364,19 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                     {
                         targetPort = targetNode.InputPorts.FirstOrDefault(p => p.Name == targetPortName) as IInputPort;
                     }
-
-                    if (sourcePort != null && targetPort != null)
-                    {
-                        Console.WriteLine($"Name 기반으로 포트 찾음 - 소스: {sourcePortName}, 타겟: {targetPortName}");
-                    }
                 }
                 
                 // 2. 기존 방식(PortId 기반)으로 포트 찾기 시도 (Name 기반 검색이 실패한 경우)
                 if (sourcePort == null || targetPort == null)
                 {
-                    Console.WriteLine("Name 기반 포트 검색 실패. PortId 기반으로 시도합니다.");
-                    
-                    var sourcePortIdStr = connectionElement.GetProperty("SourcePortId").GetString()!;
-                    var targetPortIdStr = connectionElement.GetProperty("TargetPortId").GetString()!;
+                    if (!connectionElement.TryGetProperty("SourcePortId", out var sourcePortIdElement) ||
+                        !connectionElement.TryGetProperty("TargetPortId", out var targetPortIdElement))
+                    {
+                        throw new JsonException("포트 ID 정보가 누락되었습니다.");
+                    }
+
+                    var sourcePortIdStr = sourcePortIdElement.GetString() ?? string.Empty;
+                    var targetPortIdStr = targetPortIdElement.GetString() ?? string.Empty;
 
                     // 포트 ID 문자열 파싱
                     var sourcePortIdParts = sourcePortIdStr.Split(new[] { ':', '[', ']' }, StringSplitOptions.None);
@@ -286,11 +387,21 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                         throw new JsonException($"잘못된 포트 ID 형식입니다. 소스: {sourcePortIdStr}, 타겟: {targetPortIdStr}");
                     }
 
-                    var sourceNodeId = Guid.Parse(sourcePortIdParts[0]);
+                    var sourceNodeIdStr = sourcePortIdParts[0];
+                    if (!Guid.TryParse(sourceNodeIdStr, out var sourceNodeId))
+                    {
+                        throw new JsonException($"잘못된 소스 노드 ID 형식: {sourceNodeIdStr}");
+                    }
+
+                    var targetNodeIdStr = targetPortIdParts[0];
+                    if (!Guid.TryParse(targetNodeIdStr, out var targetNodeId))
+                    {
+                        throw new JsonException($"잘못된 타겟 노드 ID 형식: {targetNodeIdStr}");
+                    }
+
                     var sourceIsInput = sourcePortIdParts[1] == "in";
                     var sourceIndexOrName = sourcePortIdParts[2]; // 인덱스 또는 이름일 수 있음
 
-                    var targetNodeId = Guid.Parse(targetPortIdParts[0]);
                     var targetIsInput = targetPortIdParts[1] == "in";
                     var targetIndexOrName = targetPortIdParts[2]; // 인덱스 또는 이름일 수 있음
 
@@ -343,7 +454,6 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                 // 포트를 찾지 못한 경우 예외 발생
                 if (sourcePort == null || targetPort == null)
                 {
-                    Console.WriteLine("모든 방법으로 포트를 찾을 수 없습니다.");
                     throw new JsonException($"포트를 찾을 수 없습니다. 소스 포트 또는 타겟 포트가 존재하지 않습니다.");
                 }
 
@@ -351,47 +461,44 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                 var connection = canvas.ConnectWithId(connectionId, sourcePort, targetPort);
                 if (connection == null)
                 {
-                    Console.WriteLine("연결 생성 실패");
                     throw new JsonException("연결 생성에 실패했습니다.");
-                }
-                else
-                {
-                    Console.WriteLine($"연결 생성 성공: {connection.Guid}");
                 }
             }
             catch (Exception ex)
             {
-                failedConnections.Add((connectionElement, ex));
+                var connectionId = connectionElement.TryGetProperty("Guid", out var guidElement)
+                    ? guidElement.GetString() ?? "알 수 없음"
+                    : "알 수 없음";
+                
+                result.AddError("Connection", connectionId, "연결 복원 실패", ex.Message, ex);
+                // 이 연결은 건너뛰고 다음 연결로 계속 진행
             }
-        }
-
-        if (failedConnections.Any())
-        {
-            var errors = string.Join("\n", failedConnections.Select(f => 
-                $"- 연결 복원 실패: {f.Element.GetProperty("Guid").GetString() ?? "알 수 없는 ID"}, 오류: {f.Error.Message}"));
-            throw new JsonException($"일부 연결 복원 실패:\n{errors}");
         }
     }
 
-    private void ReadGroups(JsonElement canvasData, NodeCanvas canvas, Dictionary<Guid, INode> nodesById)
+    private static void ReadGroups(JsonElement canvasData, NodeCanvas canvas, Dictionary<Guid, INode> nodesById, DeserializationResult result)
     {
         if (!canvasData.TryGetProperty("Groups", out var groupsElement)) return;
-
-        var failedGroups = new List<(JsonElement Element, Exception Error)>();
 
         foreach (var groupElement in groupsElement.EnumerateArray())
         {
             try
             {
                 // 1. 그룹 생성에 필요한 기본 정보 파싱
-                var groupId = Guid.Parse(groupElement.GetProperty("Id").GetString()!);
+                var groupIdStr = groupElement.GetProperty("Id").GetString() ?? Guid.NewGuid().ToString();
+                var groupId = Guid.Parse(groupIdStr);
                 var name = groupElement.GetProperty("Name").GetString() ?? "New Group";
-                var nodeIds = groupElement.GetProperty("NodeIds")
-                    .EnumerateArray()
-                    .Select(e => Guid.Parse(e.GetString()!))
-                    .ToList();
+                
+                var nodeIds = new List<Guid>();
+                if (groupElement.TryGetProperty("NodeIds", out var nodeIdsElement))
+                {
+                    nodeIds = nodeIdsElement.EnumerateArray()
+                        .Select(e => Guid.Parse(e.GetString() ?? Guid.Empty.ToString()))
+                        .Where(id => id != Guid.Empty)
+                        .ToList();
+                }
 
-                // 2. 노드 찾기
+                // 2. 노드 찾기 - 존재하는 노드만 포함
                 var nodes = nodeIds
                     .Where(nodesById.ContainsKey)
                     .Select(id => nodesById[id])
@@ -415,22 +522,19 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                 {
                     serializable.ReadJson(groupElement, _serializerOptions);
                 }
-                else
-                {
-                    throw new JsonException($"그룹 {group.Name}이(가) IJsonSerializable을 구현하지 않았습니다.");
-                }
             }
             catch (Exception ex)
             {
-                failedGroups.Add((groupElement, ex));
+                var groupId = groupElement.TryGetProperty("Id", out var idElement)
+                    ? idElement.GetString() ?? "알 수 없음" 
+                    : "알 수 없음";
+                var groupName = groupElement.TryGetProperty("Name", out var nameElement)
+                    ? nameElement.GetString() ?? "알 수 없음"
+                    : "알 수 없음";
+                
+                result.AddError("Group", groupId, $"그룹 '{groupName}' 복원 실패", ex.Message, ex);
+                // 이 그룹은 건너뛰고 다음 그룹으로 계속 진행
             }
-        }
-
-        if (failedGroups.Any())
-        {
-            var errors = string.Join("\n", failedGroups.Select(f => 
-                $"- 그룹 복원 실패: {f.Element.GetProperty("Name").GetString() ?? "알 수 없는 이름"}, 오류: {f.Error.Message}"));
-            throw new JsonException($"일부 그룹 복원 실패:\n{errors}");
         }
     }
 
