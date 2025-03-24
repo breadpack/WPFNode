@@ -15,8 +15,6 @@ namespace WPFNode.Plugins.Basic.Flow;
 [NodeDescription("조건이 참인 동안 반복 실행합니다.")]
 public class WhileNode : NodeBase
 {
-    private bool _initialized = false;
-    private bool _returnToLoop = false;
     private readonly int DEFAULT_MAX_ITERATIONS = 1000;
     
     /// <summary>
@@ -60,8 +58,8 @@ public class WhileNode : NodeBase
     [NodeFlowOut("Complete")]
     public FlowOutPort LoopComplete { get; private set; }
     
-    public WhileNode(INodeCanvas canvas, Guid id, ILogger? logger = null) 
-        : base(canvas, id, logger)
+    public WhileNode(INodeCanvas canvas, Guid id) 
+        : base(canvas, id)
     {
     }
     
@@ -71,63 +69,37 @@ public class WhileNode : NodeBase
     protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
         Logger?.LogDebug("Executing WhileNode");
         
-        // 첫 실행 또는 루프백 후 구분하여 처리
-        if (!_initialized)
-        {
-            // 초기화
-            InitializeLoop();
-        }
-        else if (_returnToLoop)
-        {
-            // 루프 본문 실행 후 돌아온 경우 상태 업데이트
-            UpdateLoopState();
-        }
+        // 초기화
+        InitializeLoop();
         
         // 현재 반복 횟수를 출력 포트에 설정
         Iterations.Value = CurrentIteration;
         
-        // 조건 확인 및 최대 반복 횟수 확인
-        bool conditionMet = Condition.GetValueOrDefault(false);
-        
-        if (conditionMet && CurrentIteration < MaxIterations)
+        // 표준 while 루프로 구현
+        while (Condition.GetValueOrDefault(false) && CurrentIteration < MaxIterations) 
         {
-            Logger?.LogDebug("WhileNode: Iteration {Iteration}, Condition = true", 
-                CurrentIteration);
+            Logger?.LogDebug("WhileNode: Iteration {Iteration}, Condition = true", CurrentIteration);
             
             // 루프 본문 실행
             yield return LoopBody;
             
-            // 다음 반복을 위해 플래그 설정
-            _returnToLoop = true;
+            // 반복 상태 업데이트
+            CurrentIteration++;
+            Iterations.Value = CurrentIteration;
             
-            // 다음 반복을 위해 자신을 다시 실행
-            yield return this.LoopBack();
+            // 취소 요청 확인
+            if (cancellationToken.IsCancellationRequested)
+                break;
         }
-        else
-        {
-            // 최대 반복 횟수 초과 시 경고 로그
-            if (CurrentIteration >= MaxIterations)
-            {
-                Logger?.LogWarning("WhileNode: Maximum iterations ({Max}) reached!", MaxIterations);
-            }
-            
-            Logger?.LogDebug("WhileNode: Loop completed after {Iterations} iterations", 
-                CurrentIteration);
-            
-            // 루프 완료, 상태 초기화
-            _initialized = false;
-            _returnToLoop = false;
-            
-            yield return LoopComplete;
+        
+        // 최대 반복 횟수 초과 시 경고 로그
+        if (CurrentIteration >= MaxIterations) {
+            Logger?.LogWarning("WhileNode: Maximum iterations ({Max}) reached!", MaxIterations);
         }
-    }
-    
-    /// <summary>
-    /// 루프가 계속 실행되어야 하는지 확인합니다.
-    /// </summary>
-    private bool ShouldContinueLoop()
-    {
-        return Condition.GetValueOrDefault(false) && (CurrentIteration < MaxIterations);
+        
+        Logger?.LogDebug("WhileNode: Loop completed after {Iterations} iterations", CurrentIteration);
+        
+        yield return LoopComplete;
     }
     
     /// <summary>
@@ -136,20 +108,9 @@ public class WhileNode : NodeBase
     private void InitializeLoop()
     {
         CurrentIteration = 0;
-        _initialized = true;
-        _returnToLoop = false;
         
         // 무한 루프 방지를 위한 기본값 설정
         if (MaxIterations <= 0)
             MaxIterations = DEFAULT_MAX_ITERATIONS;
-    }
-    
-    /// <summary>
-    /// 각 반복 후 상태를 업데이트합니다.
-    /// </summary>
-    private void UpdateLoopState()
-    {
-        CurrentIteration++;
-        _returnToLoop = false;
     }
 }

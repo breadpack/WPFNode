@@ -7,14 +7,70 @@ using WPFNode.Interfaces;
 namespace WPFNode.Models.Execution;
 
 /// <summary>
+/// 노드 실행 작업의 유형을 나타냅니다.
+/// </summary>
+public enum ExecutionTaskType
+{
+    /// <summary>실행 진입점 노드</summary>
+    EntryNode,
+    /// <summary>일반 노드</summary>
+    Node,
+    /// <summary>FlowOutPort</summary>
+    FlowOutPort,
+    /// <summary>입력 계산</summary>
+    CalculateInputs
+}
+
+/// <summary>
+/// 단일 실행 작업을 나타내는 클래스입니다.
+/// </summary>
+public class ExecutionTask
+{
+    /// <summary>작업 유형</summary>
+    public ExecutionTaskType TaskType { get; }
+    
+    /// <summary>실행할 노드</summary>
+    public NodeBase? Node { get; }
+    
+    /// <summary>실행할 출력 포트</summary>
+    public IFlowOutPort? FlowOutPort { get; }
+    
+    /// <summary>작업의 경로 깊이</summary>
+    public int PathLength { get; }
+    
+    public ExecutionTask(ExecutionTaskType taskType, NodeBase? node, IFlowOutPort? flowOutPort, int pathLength)
+    {
+        TaskType = taskType;
+        Node = node;
+        FlowOutPort = flowOutPort;
+        PathLength = pathLength;
+    }
+    
+    /// <summary>노드 식별자를 반환합니다.</summary>
+    public string GetId()
+    {
+        if (Node != null)
+            return $"{Node.GetType().Name}_{Node.Guid}";
+        else if (FlowOutPort != null)
+            return $"Port_{FlowOutPort.Name}";
+        else
+            return "Unknown";
+    }
+}
+
+/// <summary>
 /// IFlowEntry 노드를 시작점으로 하는 Flow 기반 실행 엔진
 /// </summary>
 public class FlowExecutionEngine {
     private readonly ILogger? _logger;
     private readonly bool     _enableParallelExecution;
 
+    // 실행 제한을 위한 설정
+    private readonly int _maxPathLength = 100;  // 최대 경로 길이 제한
+    private readonly HashSet<string> _visitedNodesInCurrentPath = new();  // 현재 실행 경로에서 방문한 노드들
+
     public FlowExecutionEngine(ILogger? logger = null, bool enableParallelExecution = true) {
-        _logger                  = logger;
+        _logger = logger;
         _enableParallelExecution = enableParallelExecution;
     }
 
@@ -27,6 +83,7 @@ public class FlowExecutionEngine {
         CancellationToken        cancellationToken = default
     ) {
         var context = new FlowExecutionContext(_logger);
+        _visitedNodesInCurrentPath.Clear();  // 경로 추적 초기화
 
         // 1. IFlowEntry 인터페이스를 구현하는 시작 노드들 찾기
         var entryNodes = nodes.Where(n => n is IFlowEntry).ToList();
@@ -41,204 +98,264 @@ public class FlowExecutionEngine {
         // 2. 각 시작 노드 실행
         if (_enableParallelExecution && entryNodes.Count > 1) {
             // 병렬 실행
-            var executionTasks = entryNodes.Select(node => ExecuteFlowEntryNodeAsync(node, context, cancellationToken));
+            var executionTasks = entryNodes.Select(node => ExecuteNodeGraphAsync(node, context, cancellationToken));
             await Task.WhenAll(executionTasks);
         }
         else {
             // 순차 실행
             foreach (var entryNode in entryNodes) {
-                await ExecuteFlowEntryNodeAsync(entryNode, context, cancellationToken);
+                await ExecuteNodeGraphAsync(entryNode, context, cancellationToken);
             }
         }
 
         _logger?.LogInformation("Flow execution completed");
+        _visitedNodesInCurrentPath.Clear();  // 정리
     }
 
     /// <summary>
-    /// 단일 FlowEntry 노드와 그 흐름을 실행합니다.
+    /// 노드 그래프를 반복적(iterative) 방식으로 실행합니다.
     /// </summary>
-    private async Task ExecuteFlowEntryNodeAsync(
+    private async Task ExecuteNodeGraphAsync(
         NodeBase             entryNode,
         FlowExecutionContext context,
         CancellationToken    cancellationToken
     ) {
-        _logger?.LogDebug("Executing flow entry node: {NodeType}", entryNode.GetType().Name);
-
-        // 노드가 이미 실행되었으면 중복 실행하지 않음
-        if (context.IsNodeExecuted(entryNode) && !context.GetNodeExecutionState(entryNode).ShouldReExecute) {
-            _logger?.LogDebug("Node {NodeType} already executed, skipping", entryNode.GetType().Name);
-            return;
-        }
-
-        try {
-            // 노드 실행
-            await ExecuteNodeAsync(entryNode, context, cancellationToken);
-        }
-        catch (Exception ex) {
-            _logger?.LogError(ex, "Error executing flow entry node {NodeType}", entryNode.GetType().Name);
-            throw new NodeExecutionException($"Flow 실행 중 오류 발생: {entryNode.GetType().Name}", ex, entryNode);
-        }
-    }
-
-    /// <summary>
-    /// FlowOutPort와 연결된 모든 노드들을 실행합니다.
-    /// </summary>
-    private async Task ExecuteFlowOutPortAsync(
-        IFlowOutPort         flowOutPort,
-        FlowExecutionContext context,
-        CancellationToken    cancellationToken
-    ) {
-        _logger?.LogDebug("Executing flow from out port: {PortName}", flowOutPort.Name);
-
-        // FlowOutPort에 연결된 모든 연결 가져오기
-        var connections = flowOutPort.Connections;
-
-        if (connections.Count == 0) {
-            _logger?.LogDebug("No connections from flow out port {PortName}", flowOutPort.Name);
-            return;
-        }
-
-        // FlowInPort로 연결된 노드들 찾기
-        var targetNodes = new HashSet<NodeBase>();
-
-        foreach (var connection in connections) {
-            if (connection.Target is IFlowInPort flowInPort && flowInPort.Node is NodeBase targetNode) {
-                targetNodes.Add(targetNode);
+        _logger?.LogDebug("Starting execution from entry node: {NodeType}", entryNode.GetType().Name);
+        
+        // 작업 큐 초기화
+        var taskQueue = new Queue<ExecutionTask>();
+        
+        // 시작 노드를 큐에 추가
+        taskQueue.Enqueue(new ExecutionTask(ExecutionTaskType.EntryNode, entryNode, null, 0));
+        
+        // 모든 작업이 처리될 때까지 반복
+        while (taskQueue.Count > 0 && !cancellationToken.IsCancellationRequested)
+        {
+            // 다음 작업 가져오기
+            var task = taskQueue.Dequeue();
+            
+            // 경로 길이 제한 확인
+            if (task.PathLength > _maxPathLength)
+            {
+                _logger?.LogError("Maximum path length exceeded at {Id}", task.GetId());
+                continue;
             }
-        }
-
-        if (targetNodes.Count == 0) {
-            _logger?.LogDebug("No valid target nodes from flow out port {PortName}", flowOutPort.Name);
-            return;
-        }
-
-        // 연결된 노드들 실행 (병렬 또는 순차적으로)
-        if (_enableParallelExecution && targetNodes.Count > 1) {
-            // 병렬 실행
-            var executionTasks = targetNodes.Select(node => ExecuteNodeFlowAsync(node, context, cancellationToken));
-            await Task.WhenAll(executionTasks);
-        }
-        else {
-            // 순차 실행
-            foreach (var targetNode in targetNodes) {
-                await ExecuteNodeFlowAsync(targetNode, context, cancellationToken);
+            
+            try
+            {
+                // 작업 유형에 따라 처리
+                switch (task.TaskType)
+                {
+                    case ExecutionTaskType.EntryNode:
+                    case ExecutionTaskType.Node:
+                        await ProcessNodeTask(task.Node!, context, task.PathLength, taskQueue, cancellationToken);
+                        break;
+                        
+                    case ExecutionTaskType.FlowOutPort:
+                        await ProcessFlowOutPortTask(task.FlowOutPort!, context, task.PathLength, taskQueue, cancellationToken);
+                        break;
+                        
+                    case ExecutionTaskType.CalculateInputs:
+                        await ProcessCalculateInputsTask(task.Node!, context, task.PathLength, taskQueue, cancellationToken);
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                if (task.Node != null)
+                {
+                    _logger?.LogError(ex, "Error executing task {TaskType} for {Id}", task.TaskType, task.GetId());
+                    throw new NodeExecutionException($"노드 실행 중 오류 발생: {task.Node.GetType().Name}", ex, task.Node);
+                }
+                else
+                {
+                    _logger?.LogError(ex, "Error executing task {TaskType}", task.TaskType);
+                    throw;
+                }
             }
         }
     }
-
+    
     /// <summary>
-    /// 노드와 그 노드의 FlowOutPort를 실행합니다.
+    /// 노드 실행 작업을 처리합니다.
     /// </summary>
-    private async Task ExecuteNodeFlowAsync(
+    private async Task ProcessNodeTask(
         NodeBase             node,
         FlowExecutionContext context,
+        int                  pathLength,
+        Queue<ExecutionTask> taskQueue,
         CancellationToken    cancellationToken
     ) {
-        // 노드가 이미 실행되었는지 확인 - 루프백 신호로 재실행이 요청된 경우는 제외
-        var nodeState = context.GetNodeExecutionState(node);
-        if (nodeState.IsExecuted && !nodeState.ShouldReExecute) {
-            _logger?.LogDebug("Node {NodeType} already executed, skipping", node.GetType().Name);
+        string nodeId = $"{node.GetType().Name}_{node.Guid}";
+        _logger?.LogDebug("Processing node: {NodeId} (path length: {PathLength})", nodeId, pathLength);
+        
+        // 중복 실행 체크를 제거하고 항상 실행합니다.
+        // 실행 여부는 상위 노드(예: ForNode)가 결정하도록 합니다.
+        
+        // 순환 감지 (이것은 무한 순환을 방지하기 위해 유지)
+        if (_visitedNodesInCurrentPath.Contains(nodeId))
+        {
+            _logger?.LogWarning("Cycle detected: Node {NodeId} is already in execution path", nodeId);
             return;
         }
-
-        // 재실행 플래그가 설정되어 있었다면 리셋
-        if (nodeState.ShouldReExecute) {
-            nodeState.ShouldReExecute = false;
-        }
-
-        // 노드 실행
-        await ExecuteNodeAsync(node, context, cancellationToken);
-    }
-
-    /// <summary>
-    /// 단일 노드를 실행하고 출력 값을 설정합니다.
-    /// </summary>
-    private async Task ExecuteNodeAsync(
-        NodeBase             node,
-        FlowExecutionContext context,
-        CancellationToken    cancellationToken
-    ) {
-        _logger?.LogDebug("Executing node: {NodeType}", node.GetType().Name);
-
-        try {
-            // 1. 우선 InputPort에 연결된 노드들 실행하여 입력값 계산
-            await CalculateInputsAsync(node, context, cancellationToken);
-
-            // 2. 노드 실행 및 FlowOutPort 순차 처리
+        
+        // 현재 경로에 노드 추가
+        _visitedNodesInCurrentPath.Add(nodeId);
+        
+        try
+        {
+            // 노드 실행 전에 먼저 입력 계산 작업을 즉시 처리 (큐에 추가하지 않고)
+            await ProcessCalculateInputsTask(node, context, pathLength + 1, taskQueue, cancellationToken);
+            
+            // 노드를 실행완료로 표시
+            context.MarkNodeExecuted(node);
+            _logger?.LogDebug("Executing node: {NodeId}", nodeId);
+            
+            // 노드 실행 및 FlowOutPort 즉시 처리
             await foreach (var flowOutPort in node.ExecuteAsyncFlow(cancellationToken).ConfigureAwait(false))
             {
                 if (cancellationToken.IsCancellationRequested)
                     break;
-
-                // 특수 제어 신호 처리 (루프백)
-                if (flowOutPort.IsLoopBackSignal())
-                {
-                    _logger?.LogDebug("Loop back signal detected for node {NodeType}", node.GetType().Name);
-                    
-                    // 노드 상태 조정 (재실행 준비)
-                    context.PrepareForReexecution(node);
-                    
-                    // 루프 반복 횟수 증가
-                    context.IncrementLoopIteration(node);
-                    
-                    // 현재 노드를 다시 실행 (재귀)
-                    await ExecuteNodeAsync(node, context, cancellationToken);
-                    return; // 중요: 재귀 호출 후 함수 종료
-                }
-                else
-                {
-                    // 일반 FlowOutPort 실행
-                    await ExecuteFlowOutPortAsync(flowOutPort, context, cancellationToken);
-                }
+                
+                _logger?.LogDebug("Node {NodeId} returned flow port: {PortName}", 
+                    nodeId, flowOutPort.Name);
+                
+                // 출력 포트 즉시 처리 - 큐에 추가하는 대신 바로 처리
+                await ProcessFlowOutPortImmediatelyAsync(flowOutPort, context, pathLength + 1, taskQueue, cancellationToken);
             }
         }
-        catch (Exception ex) {
-            _logger?.LogError(ex, "Error executing node {NodeType}", node.GetType().Name);
-            throw new NodeExecutionException($"노드 실행 중 오류 발생: {node.GetType().Name}", ex, node);
+        finally
+        {
+            // 경로에서 노드 제거
+            _visitedNodesInCurrentPath.Remove(nodeId);
         }
     }
-
+    
     /// <summary>
-    /// 노드의 입력 값을 계산하기 위해 InputPort에 연결된 노드들을 실행합니다.
+    /// FlowOutPort를 즉시 처리합니다.
     /// </summary>
-    private async Task CalculateInputsAsync(
-        NodeBase             node,
+    private async Task ProcessFlowOutPortImmediatelyAsync(
+        IFlowOutPort         flowOutPort,
         FlowExecutionContext context,
+        int                  pathLength,
+        Queue<ExecutionTask> taskQueue,
         CancellationToken    cancellationToken
     ) {
-        _logger?.LogDebug("Calculating inputs for node: {NodeType}", node.GetType().Name);
-
+        _logger?.LogDebug("Immediately processing flow out port: {PortName} (path length: {PathLength})", 
+            flowOutPort.Name, pathLength);
+        
+        // FlowOutPort에 연결된 모든 연결 가져오기
+        var connections = flowOutPort.Connections;
+        
+        if (connections.Count == 0)
+        {
+            _logger?.LogDebug("No connections from flow out port {PortName}", flowOutPort.Name);
+            return;
+        }
+        
+        // FlowInPort로 연결된 노드들 찾기 및 즉시 실행
+        var connectedNodes = new List<NodeBase>();
+        
+        foreach (var connection in connections)
+        {
+            if (connection.Target is IFlowInPort flowInPort && flowInPort.Node is NodeBase targetNode)
+            {
+                // 순환 감지를 위한 노드 ID 확인
+                string nodeId = $"{targetNode.GetType().Name}_{targetNode.Guid}";
+                
+                // 이미 현재 경로에서 실행 중인 노드인지 확인
+                if (_visitedNodesInCurrentPath.Contains(nodeId))
+                {
+                    _logger?.LogWarning("Cycle detected: Node {NodeId} is already in execution path", nodeId);
+                    continue; // 순환 감지 시 건너뛰기
+                }
+                
+                connectedNodes.Add(targetNode);
+            }
+        }
+        
+        if (connectedNodes.Count == 0)
+        {
+            _logger?.LogDebug("No valid target nodes from flow out port {PortName}", flowOutPort.Name);
+            return;
+        }
+        
+        // 연결된 노드들을 즉시 실행
+        foreach (var targetNode in connectedNodes)
+        {
+            // 각 노드를 직접 처리 (큐에 추가하지 않고)
+            await ProcessNodeTask(targetNode, context, pathLength + 1, taskQueue, cancellationToken);
+        }
+    }
+    
+    /// <summary>
+    /// FlowOutPort 작업을 처리합니다. (이전 큐 기반 방식)
+    /// </summary>
+    private async Task ProcessFlowOutPortTask(
+        IFlowOutPort         flowOutPort,
+        FlowExecutionContext context,
+        int                  pathLength,
+        Queue<ExecutionTask> taskQueue,
+        CancellationToken    cancellationToken
+    ) {
+        // 즉시 처리 방식으로 위임
+        await ProcessFlowOutPortImmediatelyAsync(flowOutPort, context, pathLength, taskQueue, cancellationToken);
+    }
+    
+    /// <summary>
+    /// 입력 계산 작업을 처리합니다.
+    /// </summary>
+    private async Task ProcessCalculateInputsTask(
+        NodeBase             node,
+        FlowExecutionContext context,
+        int                  pathLength,
+        Queue<ExecutionTask> taskQueue,
+        CancellationToken    cancellationToken
+    ) {
+        string nodeId = $"{node.GetType().Name}_{node.Guid}";
+        _logger?.LogDebug("Calculating inputs for node: {NodeId} (path length: {PathLength})", 
+            nodeId, pathLength);
+        
         // InputPort에 연결된 노드들 수집
-        var inputNodes = new HashSet<NodeBase>();
-
-        foreach (var inputPort in node.InputPorts) {
+        var inputNodes = new List<NodeBase>();
+        
+        foreach (var inputPort in node.InputPorts)
+        {
             // Flow 포트는 값 계산이 필요없으므로 제외
             if (inputPort is IFlowInPort) continue;
-
-            foreach (var connection in inputPort.Connections) {
-                if (connection.Source.Node is NodeBase sourceNode && 
-                    (!context.IsNodeExecuted(sourceNode) || context.GetNodeExecutionState(sourceNode).ShouldReExecute)) {
+            
+            foreach (var connection in inputPort.Connections)
+            {
+                if (connection.Source.Node is NodeBase sourceNode)
+                {
+                    // 현재 노드에 의존하는 순환 참조 감지
+                    string sourceNodeId = $"{sourceNode.GetType().Name}_{sourceNode.Guid}";
+                    
+                    if (_visitedNodesInCurrentPath.Contains(sourceNodeId))
+                    {
+                        _logger?.LogWarning("Circular dependency detected: Node {SourceNodeId} depends on {NodeId}", 
+                            sourceNodeId, nodeId);
+                        continue; // 순환 참조 시 건너뛰기
+                    }
+                    
+                    // 실행 여부와 관계없이 항상 소스 노드 재실행
+                    // 이전 실행 여부 체크를 제거하고 항상 입력 노드를 추가
                     inputNodes.Add(sourceNode);
                 }
             }
         }
-
-        if (inputNodes.Count == 0) {
-            _logger?.LogDebug("No input dependencies for node {NodeType}", node.GetType().Name);
+        
+        if (inputNodes.Count == 0)
+        {
+            _logger?.LogDebug("No input dependencies for node {NodeId}", nodeId);
             return;
         }
-
-        // 입력 노드들 실행
-        if (_enableParallelExecution && inputNodes.Count > 1) {
-            // 병렬 실행
-            var executionTasks = inputNodes.Select(n => ExecuteNodeAsync(n, context, cancellationToken));
-            await Task.WhenAll(executionTasks);
-        }
-        else {
-            // 순차 실행
-            foreach (var inputNode in inputNodes) {
-                await ExecuteNodeAsync(inputNode, context, cancellationToken);
-            }
+        
+        // 입력 노드들을 즉시 실행 (큐에 추가하지 않고 직접 실행)
+        foreach (var inputNode in inputNodes)
+        {
+            // 각 종속 노드를 직접 실행
+            await ProcessNodeTask(inputNode, context, pathLength, taskQueue, cancellationToken);
         }
     }
 }

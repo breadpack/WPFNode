@@ -31,9 +31,9 @@ public class FlowExecutionContext
     public void MarkNodeExecuted(INode node)
     {
         var state = GetNodeExecutionState(node);
-        state.MarkExecuted();
-        _logger?.LogDebug("Node {NodeType} marked as executed (Count: {Count})", 
-            node.GetType().Name, state.ExecutionCount);
+        state.IsExecuted = true;
+        _logger?.LogDebug("Node {NodeType} marked as executed", 
+            node.GetType().Name);
     }
     
     /// <summary>
@@ -49,18 +49,6 @@ public class FlowExecutionContext
         return state;
     }
     
-    /// <summary>
-    /// 노드가 다시 실행될 수 있도록 준비합니다 (루프 구현에 사용).
-    /// </summary>
-    public void PrepareForReexecution(INode node)
-    {
-        if (_nodeStates.TryGetValue(node, out var state))
-        {
-            state.Reset();
-            state.ShouldReExecute = true;
-        }
-    }
-
     /// <summary>
     /// 노드의 출력 포트 값을 설정합니다.
     /// </summary>
@@ -120,28 +108,11 @@ public class FlowExecutionContext
     }
 
     /// <summary>
-    /// 컨텍스트를 초기화합니다.
+    /// 실행 상태를 초기화합니다.
     /// </summary>
     public void Reset()
     {
         _nodeStates.Clear();
         _nodeOutputs.Clear();
-    }
-    
-    /// <summary>
-    /// 루프 반복 횟수를 증가시킵니다.
-    /// </summary>
-    public void IncrementLoopIteration(INode node)
-    {
-        var state = GetNodeExecutionState(node);
-        state.IncrementLoopIteration();
-    }
-    
-    /// <summary>
-    /// 노드의 루프 반복 횟수를 가져옵니다.
-    /// </summary>
-    public int GetLoopIteration(INode node)
-    {
-        return GetNodeExecutionState(node).LoopIteration;
     }
 }

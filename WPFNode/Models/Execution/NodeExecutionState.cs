@@ -13,7 +13,7 @@ public class NodeExecutionState
     /// <summary>
     /// 노드가 실행되었는지 여부
     /// </summary>
-    public bool IsExecuted { get; private set; }
+    public bool IsExecuted { get; set; }
     
     /// <summary>
     /// 노드 실행이 실패했는지 여부
