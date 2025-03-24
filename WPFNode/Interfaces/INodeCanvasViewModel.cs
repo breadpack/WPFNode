@@ -18,6 +18,7 @@ public interface INodeCanvasViewModel
     double OffsetY { get; set; }
 
     IWpfCommand AddNodeCommand { get; }
+    IWpfCommand AddNodeAtCommand { get; }
     IWpfCommand RemoveNodeCommand { get; }
     IWpfCommand ConnectCommand { get; }
     IWpfCommand DisconnectCommand { get; }

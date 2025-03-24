@@ -39,6 +39,7 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
     private double _offsetY;
 
     public IWpfCommand AddNodeCommand     { get; init; }
+    public IWpfCommand AddNodeAtCommand   { get; init; }
     public IWpfCommand RemoveNodeCommand  { get; init; }
     public IWpfCommand ConnectCommand     { get; init; }
     public IWpfCommand DisconnectCommand  { get; init; }
@@ -70,6 +71,7 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
 
         // 커맨드 초기화
         AddNodeCommand     = new RelayCommand<Type>(ExecuteAddNode);
+        AddNodeAtCommand   = new RelayCommand<(Type nodeType, double x, double y)>(ExecuteAddNodeAt);
         RemoveNodeCommand  = new RelayCommand<NodeViewModel>(ExecuteRemoveNode);
         ConnectCommand     = new RelayCommand<(NodePortViewModel, NodePortViewModel)>(ExecuteConnect);
         DisconnectCommand  = new RelayCommand<(NodePortViewModel, NodePortViewModel)>(ExecuteDisconnect);
@@ -276,6 +278,14 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
         if (nodeType == null) return;
 
         var command = new AddNodeCommand(_canvas, nodeType);
+        _commandManager.Execute(command);
+    }
+
+    private void ExecuteAddNodeAt((Type nodeType, double x, double y) args) {
+        if (args.nodeType == null) return;
+
+        // 기존 AddNodeCommand 사용
+        var command = new AddNodeCommand(_canvas, args.nodeType, args.x, args.y);
         _commandManager.Execute(command);
     }
 

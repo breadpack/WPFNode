@@ -42,6 +42,7 @@ public class NodeCanvasControl : Control
     
     private readonly NodeCanvasStateManager _stateManager;
     private bool _isUpdatingLayout;
+    private Point? _contextMenuPosition;
 
     #region Dependency Properties
 
@@ -433,6 +434,9 @@ public class NodeCanvasControl : Control
         ContextMenu.Items.Add(new Separator());
         ContextMenu.Items.Add(managePluginsMenuItem);
         
+        // ContextMenu를 열 때 위치 저장
+        ContextMenuOpening += OnContextMenuOpening;
+        
         // 마우스 이벤트 처리
         MouseDown += OnMouseButtonDown;
         MouseUp += OnMouseButtonUp;
@@ -792,9 +796,29 @@ public class NodeCanvasControl : Control
             var nodeType = dialog.SelectedNodeType;
             if (nodeType != null && ViewModel != null)
             {
-                ViewModel.AddNodeCommand.Execute(dialog.SelectedNodeType);
+                // 마우스 위치에 노드 생성
+                if (_contextMenuPosition.HasValue && _dragCanvas != null)
+                {
+                    // 캔버스의 중심을 고려하여 좌표 계산
+                    double x = _contextMenuPosition.Value.X - _dragCanvas.Width / 2;
+                    double y = _contextMenuPosition.Value.Y - _dragCanvas.Height / 2;
+                    
+                    // 위치 정보를 포함하여 AddNode 실행
+                    ViewModel.AddNodeAtCommand.Execute((nodeType, x, y));
+                }
+                else
+                {
+                    // 위치 정보가 없으면 기본 추가 명령 실행
+                    ViewModel.AddNodeCommand.Execute(dialog.SelectedNodeType);
+                }
             }
         }
+    }
+
+    private void OnContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        // 마우스 우클릭 위치 저장
+        _contextMenuPosition = Mouse.GetPosition(_dragCanvas);
     }
 
     internal Canvas? GetDragCanvas()
