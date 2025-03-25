@@ -51,45 +51,239 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
         _converters[typeof(TSource)] = obj => converter((TSource)obj);
     }
 
+    /// <summary>
+    /// 주어진 타입이 컬렉션 타입인지 확인하고, 요소 타입을 반환합니다.
+    /// </summary>
+    private bool IsCollectionType(Type type, out Type? elementType) {
+        elementType = null;
+        
+        // 배열 타입 처리
+        if (type.IsArray) {
+            elementType = type.GetElementType();
+            return true;
+        }
+        
+        // 자기 자신이 IEnumerable<T>인 경우 처리
+        if (type.IsGenericType && 
+            type.GetGenericTypeDefinition() == typeof(IEnumerable<>)) {
+            elementType = type.GetGenericArguments()[0];
+            return true;
+        }
+        
+        // 인터페이스 구현 체크 - IEnumerable<T>를 구현하는 모든 컬렉션 처리
+        foreach (var iface in type.GetInterfaces()) {
+            if (iface.IsGenericType && 
+                iface.GetGenericTypeDefinition() == typeof(IEnumerable<>)) {
+                elementType = iface.GetGenericArguments()[0];
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
     public bool CanAcceptType(Type sourceType) {
+        // 1. 직접 타입 체크
+        if (DirectTypeCheck(sourceType))
+            return true;
+        
+        // 2. 컬렉션 타입 호환성 체크
+        if (CollectionTypeCheck(sourceType))
+            return true;
+        
+        return false;
+    }
+    
+    /// <summary>
+    /// 기본 타입 호환성 검사를 수행합니다.
+    /// </summary>
+    private bool DirectTypeCheck(Type sourceType) {
         // 1. 컨버터가 등록되어 있으면 변환 가능
         if (_converters.ContainsKey(sourceType))
             return true;
 
-        // 2. 공통 타입 변환 검사 메서드 호출
-        return sourceType.CanConvertTo(typeof(T));
+        // 2. 동일한 타입인 경우
+        if (sourceType == typeof(T))
+            return true;
+
+        // 3. 기본 타입 변환 가능 여부 확인
+        if (sourceType.CanConvertTo(typeof(T)))
+            return true;
+            
+        return false;
+    }
+    
+    /// <summary>
+    /// 컬렉션 타입 호환성 검사를 수행합니다.
+    /// </summary>
+    private bool CollectionTypeCheck(Type sourceType) {
+        Type? sourceElementType = null;
+        Type? targetElementType = null;
+        
+        // 양쪽 모두 컬렉션인지 확인
+        bool sourceIsCollection = IsCollectionType(sourceType, out sourceElementType);
+        bool targetIsCollection = IsCollectionType(typeof(T), out targetElementType);
+        
+        // 양쪽 모두 컬렉션이고 요소 타입이 추출되었으면 요소 타입의 호환성 확인
+        if (sourceIsCollection && targetIsCollection && 
+            sourceElementType != null && targetElementType != null) {
+            return sourceElementType == targetElementType || 
+                   sourceElementType.CanConvertTo(targetElementType);
+        }
+        
+        return false;
     }
 
     public T? GetValueOrDefault(T? defaultValue = default) {
-        if (_connection?.Source is { } outputPort) {
-            var sourceValue = outputPort.Value;
-            if (sourceValue == null) return defaultValue;
-
-            try {
-                // 1. 등록된 커스텀 컨버터 시도
-                if (_converters.TryGetValue(sourceValue.GetType(), out var converter)) {
-                    return converter(sourceValue);
-                }
-                
-                // 2. 일반적인 타입 변환 시도
-                if (sourceValue.TryConvertTo(out T? convertedValue)) {
+        if (_connection?.Source is not { } outputPort || outputPort.Value == null)
+            return defaultValue;
+        
+        var sourceValue = outputPort.Value;
+        
+        try {
+            // 1. 등록된 컨버터 시도
+            if (TryUseRegisteredConverter(sourceValue, out var convertedByCustom))
+                return convertedByCustom;
+            
+            // 2. 직접 타입 변환 가능한 경우
+            if (sourceValue is T typedValue)
+                return typedValue;
+            
+            // 3. 컬렉션 변환 시도
+            if (TryCollectionConversion(sourceValue, out var convertedCollection))
+                return convertedCollection;
+            
+            // 4. 일반적인 타입 변환 시도
+            if (sourceValue.TryConvertTo(out T? convertedValue))
+                return convertedValue;
+            
+            // 5. 마지막으로 문자열 변환 시도 (대상 타입이 string이 아닌 경우에만)
+            if (typeof(T) != typeof(string) && sourceValue.ToString() is string stringValue) {
+                if (stringValue.TryConvertTo(out convertedValue)) {
                     return convertedValue;
                 }
+            }
+        }
+        catch (Exception ex) {
+            System.Diagnostics.Debug.WriteLine($"InputPort 값 변환 중 오류 발생: {ex.Message}");
+        }
+        
+        return defaultValue;
+    }
+    
+    /// <summary>
+    /// 등록된 커스텀 컨버터를 사용하여 값 변환을 시도합니다.
+    /// </summary>
+    private bool TryUseRegisteredConverter(object sourceValue, out T? result) {
+        result = default;
+        
+        if (_converters.TryGetValue(sourceValue.GetType(), out var converter)) {
+            result = converter(sourceValue);
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /// <summary>
+    /// 컬렉션 타입 변환을 시도합니다. IEnumerable<>을 기반으로 통합된 변환 로직입니다.
+    /// </summary>
+    private bool TryCollectionConversion(object sourceValue, out T? result) {
+        result = default;
+        
+        // 소스와 타겟의 요소 타입 확인
+        if (!IsCollectionType(typeof(T), out Type? targetElementType) || 
+            !IsCollectionType(sourceValue.GetType(), out Type? sourceElementType) ||
+            targetElementType == null || sourceElementType == null) {
+            return false;
+        }
+        
+        // 소스가 IEnumerable이 아니면 변환 불가
+        if (!(sourceValue is System.Collections.IEnumerable sourceCollection)) {
+            return false;
+        }
+        
+        try {
+            // 요소들을 변환
+            var convertedItems = ConvertCollectionItems(sourceCollection, targetElementType, sourceElementType);
+            
+            // 대상 타입에 따라 적절한 컬렉션으로 변환
+            if (typeof(T).IsArray) {
+                // 배열로 변환
+                var array = Array.CreateInstance(targetElementType, convertedItems.Count);
+                for (int i = 0; i < convertedItems.Count; i++) {
+                    array.SetValue(convertedItems[i], i);
+                }
+                result = (T)(object)array;
+            }
+            else if (typeof(T).IsGenericType) {
+                var genericTypeDef = typeof(T).GetGenericTypeDefinition();
                 
-                // 3. 마지막으로 문자열 변환 시도 (대상 타입이 string이 아닌 경우에만)
-                if (typeof(T) != typeof(string) && sourceValue.ToString() is string stringValue) {
-                    if (stringValue.TryConvertTo(out convertedValue)) {
-                        return convertedValue;
+                if (genericTypeDef == typeof(List<>) || 
+                    genericTypeDef == typeof(IList<>) ||
+                    genericTypeDef == typeof(IEnumerable<>) ||
+                    genericTypeDef == typeof(ICollection<>)) {
+                    // List 또는 List 기반 인터페이스로 변환
+                    var listType = typeof(List<>).MakeGenericType(targetElementType);
+                    var list = (System.Collections.IList)Activator.CreateInstance(listType)!;
+                    
+                    foreach (var item in convertedItems) {
+                        list.Add(item);
+                    }
+                    result = (T)(object)list;
+                }
+                else if (genericTypeDef == typeof(HashSet<>)) {
+                    // HashSet으로 변환
+                    var hashSetType = typeof(HashSet<>).MakeGenericType(targetElementType);
+                    var hashSet = Activator.CreateInstance(hashSetType)!;
+                    var addMethod = hashSetType.GetMethod("Add")!;
+                    
+                    foreach (var item in convertedItems) {
+                        addMethod.Invoke(hashSet, new[] { item });
+                    }
+                    result = (T)hashSet;
+                }
+                else {
+                    return false;
+                }
+            }
+            else {
+                return false;
+            }
+            
+            return true;
+        }
+        catch (Exception ex) {
+            System.Diagnostics.Debug.WriteLine($"컬렉션 변환 중 오류: {ex.Message}");
+            return false;
+        }
+    }
+    
+    /// <summary>
+    /// 컬렉션의 요소를 변환하여 새 리스트를 반환합니다.
+    /// </summary>
+    private List<object> ConvertCollectionItems(System.Collections.IEnumerable sourceCollection, Type targetElementType, Type sourceElementType) {
+        var result = new List<object>();
+        
+        foreach (var item in sourceCollection) {
+            if (item != null) {
+                // 요소 타입이 같으면 그대로 사용
+                if (targetElementType.IsAssignableFrom(item.GetType())) {
+                    result.Add(item);
+                }
+                // 요소 타입이 다르면 변환 시도
+                else {
+                    var convertedItem = item.TryConvertTo(targetElementType);
+                    if (convertedItem != null) {
+                        result.Add(convertedItem);
                     }
                 }
             }
-            catch (Exception ex) {
-                // 변환 중 오류가 발생하더라도 기본값을 반환
-                System.Diagnostics.Debug.WriteLine($"InputPort 값 변환 중 오류 발생: {ex.Message}");
-            }
         }
-        return defaultValue;
+        
+        return result;
     }
+    
 
     public void AddConnection(IConnection connection) {
         if (connection == null)
