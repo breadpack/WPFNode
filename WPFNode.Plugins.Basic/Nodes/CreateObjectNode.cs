@@ -49,12 +49,16 @@ namespace WPFNode.Plugins.Basic.Nodes {
             
             if (targetType == null || targetType == typeof(object)) return;
             
-            // 타겟 타입의 쓰기 가능한 속성들 가져오기
-            var targetProperties = targetType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            // 타겟 타입의 쓰기 가능한 속성과 필드들 가져오기
+            var targetProperties = targetType.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
                 .Where(p => p.CanWrite)
                 .ToList();
+                
+            var targetFields = targetType.GetFields(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+                .Where(f => !f.IsInitOnly)
+                .ToList();
             
-            if (targetProperties.Count == 0) return;
+            if (targetProperties.Count == 0 && targetFields.Count == 0) return;
             
             // 현재 프로퍼티 상태 저장
             var existingProps = Properties
@@ -73,13 +77,27 @@ namespace WPFNode.Plugins.Basic.Nodes {
                 INodeProperty nodeProperty;
                 
                 if(existingProps.TryGetValue(propName, out var existingProp)) {
-                    // 기존 프로퍼티가 있다면 복원
                     nodeProperty = builder.Property(propName, propName, prop.PropertyType, canConnectToPort: existingProp.CanConnectToPort);
                     nodeProperty.Value = existingProp.Value;
                 }
                 else {
-                    // 새 프로퍼티 생성
                     nodeProperty = builder.Property(propName, propName, prop.PropertyType, canConnectToPort: true);
+                }
+                
+                _propertyList.Add(nodeProperty);
+            }
+            
+            // 각 필드에 대한 NodeProperty 구성
+            foreach (var field in targetFields) {
+                string fieldName = field.Name;
+                INodeProperty nodeProperty;
+                
+                if(existingProps.TryGetValue(fieldName, out var existingProp)) {
+                    nodeProperty = builder.Property(fieldName, fieldName, field.FieldType, canConnectToPort: existingProp.CanConnectToPort);
+                    nodeProperty.Value = existingProp.Value;
+                }
+                else {
+                    nodeProperty = builder.Property(fieldName, fieldName, field.FieldType, canConnectToPort: true);
                 }
                 
                 _propertyList.Add(nodeProperty);
@@ -98,18 +116,34 @@ namespace WPFNode.Plugins.Basic.Nodes {
                 // 속성 설정
                 foreach (var prop in _propertyList) {
                     var targetProp = targetType.GetProperty(prop.Name);
-                    if (targetProp == null || !targetProp.CanWrite) continue;
+                    var targetField = targetType.GetField(prop.Name);
                     
-                    // ConnectedOnly 옵션에 따라 처리
-                    bool isConnected = prop is IInputPort inputPort && inputPort.IsConnected;
-                    if (!isConnected && ConnectedOnly.Value) continue;
-                    
-                    if (prop.Value != null) {
-                        try {
-                            targetProp.SetValue(newObject, Convert.ChangeType(prop.Value, targetProp.PropertyType));
+                    if (targetProp != null && targetProp.CanWrite) {
+                        // Property 처리
+                        bool isConnected = prop is IInputPort inputPort && inputPort.IsConnected;
+                        if (!isConnected && ConnectedOnly.Value) continue;
+                        
+                        if (prop.Value != null) {
+                            try {
+                                targetProp.SetValue(newObject, Convert.ChangeType(prop.Value, targetProp.PropertyType));
+                            }
+                            catch (Exception ex) {
+                                Console.WriteLine($"Property {prop.Name} 설정 중 오류: {ex.Message}");
+                            }
                         }
-                        catch (Exception ex) {
-                            Console.WriteLine($"Property {prop.Name} 설정 중 오류: {ex.Message}");
+                    }
+                    else if (targetField != null && !targetField.IsInitOnly) {
+                        // Field 처리
+                        bool isConnected = prop is IInputPort inputPort && inputPort.IsConnected;
+                        if (!isConnected && ConnectedOnly.Value) continue;
+                        
+                        if (prop.Value != null) {
+                            try {
+                                targetField.SetValue(newObject, Convert.ChangeType(prop.Value, targetField.FieldType));
+                            }
+                            catch (Exception ex) {
+                                Console.WriteLine($"Field {prop.Name} 설정 중 오류: {ex.Message}");
+                            }
                         }
                     }
                 }
