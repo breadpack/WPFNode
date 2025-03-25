@@ -1,0 +1,143 @@
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading;
+using WPFNode.Attributes;
+using WPFNode.Models;
+using WPFNode.Models.Properties;
+using WPFNode.Interfaces;
+
+namespace WPFNode.Plugins.Basic.Nodes {
+    [NodeName("객체 생성")]
+    [NodeDescription("지정된 타입의 객체를 생성합니다.")]
+    [NodeCategory("데이터 변환")]
+    public class CreateObjectNode : DynamicNode {
+        [NodeFlowIn]
+        public IFlowInPort FlowIn { get; set; }
+        
+        [NodeFlowOut]
+        public IFlowOutPort FlowOut { get; set; }
+        
+        [NodeProperty("Target Type", OnValueChanged = nameof(SelectedType_PropertyChanged))]
+        NodeProperty<Type> SelectedType { get; set; }
+
+        [NodeProperty("Connected Only")]
+        NodeProperty<bool> ConnectedOnly { get; set; }
+
+        private IOutputPort? _outputPort;
+        private readonly List<INodeProperty> _propertyList = [];
+        
+        [JsonConstructor]
+        public CreateObjectNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) {
+            Name = "객체 생성";
+            Description = "지정된 타입의 객체를 생성합니다.";
+        }
+
+        private void SelectedType_PropertyChanged() {
+            ReconfigurePorts();
+        }
+        
+        protected override void Configure(NodeBuilder builder) {
+            // 기존 프로퍼티 저장/복원 로직
+            _propertyList.Clear();
+            
+            // 타겟 타입 확인 및 출력 포트 구성
+            var targetType = SelectedType?.Value ?? typeof(object);
+            _outputPort = builder.Output("Object", targetType);
+            
+            if (targetType == null || targetType == typeof(object)) return;
+            
+            // 타겟 타입의 쓰기 가능한 속성들 가져오기
+            var targetProperties = targetType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                .Where(p => p.CanWrite)
+                .ToList();
+            
+            if (targetProperties.Count == 0) return;
+            
+            // 현재 프로퍼티 상태 저장
+            var existingProps = Properties
+                .Where(p => !p.Name.Equals("Target Type", StringComparison.OrdinalIgnoreCase) && 
+                           !p.Name.Equals("Connected Only", StringComparison.OrdinalIgnoreCase))
+                .ToDictionary(
+                    p => p.Name,
+                    p => new { 
+                        Value = p.Value,
+                        CanConnectToPort = p.CanConnectToPort
+                    });
+            
+            // 각 속성에 대한 NodeProperty 구성
+            foreach (var prop in targetProperties) {
+                string propName = prop.Name;
+                INodeProperty nodeProperty;
+                
+                if(existingProps.TryGetValue(propName, out var existingProp)) {
+                    // 기존 프로퍼티가 있다면 복원
+                    nodeProperty = builder.Property(propName, propName, prop.PropertyType, canConnectToPort: existingProp.CanConnectToPort);
+                    nodeProperty.Value = existingProp.Value;
+                }
+                else {
+                    // 새 프로퍼티 생성
+                    nodeProperty = builder.Property(propName, propName, prop.PropertyType, canConnectToPort: true);
+                }
+                
+                _propertyList.Add(nodeProperty);
+            }
+        }
+
+        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
+            var targetType = SelectedType.Value;
+            if (targetType == null) 
+                throw new InvalidOperationException("Target type is not selected.");
+            
+            try {
+                // 객체 생성
+                var newObject = Activator.CreateInstance(targetType);
+                
+                // 속성 설정
+                foreach (var prop in _propertyList) {
+                    var targetProp = targetType.GetProperty(prop.Name);
+                    if (targetProp == null || !targetProp.CanWrite) continue;
+                    
+                    // ConnectedOnly 옵션에 따라 처리
+                    bool isConnected = prop is IInputPort inputPort && inputPort.IsConnected;
+                    if (!isConnected && ConnectedOnly.Value) continue;
+                    
+                    if (prop.Value != null) {
+                        try {
+                            targetProp.SetValue(newObject, Convert.ChangeType(prop.Value, targetProp.PropertyType));
+                        }
+                        catch (Exception ex) {
+                            Console.WriteLine($"Property {prop.Name} 설정 중 오류: {ex.Message}");
+                        }
+                    }
+                }
+                
+                // 출력 설정
+                if (_outputPort != null) {
+                    _outputPort.Value = newObject;
+                }
+            }
+            catch (Exception ex) {
+                Console.WriteLine($"객체 생성 중 오류: {ex.Message}");
+                throw;
+            }
+            
+            yield return FlowOut;
+        }
+
+        public override void ReadJson(JsonElement element, JsonSerializerOptions options) {
+            // 기본 역직렬화 수행
+            base.ReadJson(element, options);
+            
+            // 포트와 프로퍼티 재구성
+            ReconfigurePorts();
+        }
+
+        public override string ToString() {
+            var targetType = SelectedType.Value;
+            return $"객체 생성 노드 ({(targetType?.Name ?? "Unknown")})";
+        }
+    }
+}
