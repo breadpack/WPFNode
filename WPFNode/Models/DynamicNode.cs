@@ -23,6 +23,11 @@ public class DynamicNode : NodeBase
     private bool                _isReconfiguring   = false;
     private List<IPort>         _dynamicPorts      = new();
     private List<INodeProperty> _dynamicProperties = new();
+    
+    /// <summary>
+    /// 현재 구성 중 사용된 포트와 프로퍼티를 추적합니다.
+    /// </summary>
+    private HashSet<object>     _usedObjects = new();
 
     /// <summary>
     /// 노드가 현재 재구성 중인지 여부를 나타냅니다.
@@ -42,6 +47,49 @@ public class DynamicNode : NodeBase
         internal NodeBuilder(DynamicNode node)
         {
             _node = node;
+            
+            // 재구성 중인 경우 사용된 객체 추적 초기화
+            if (_node._isReconfiguring)
+            {
+                _node._usedObjects.Clear();
+                MarkAttributeBasedElements();
+            }
+        }
+        
+        /// <summary>
+        /// 어트리뷰트로 정의된 포트와 프로퍼티를 사용된 것으로 표시합니다.
+        /// </summary>
+        private void MarkAttributeBasedElements()
+        {
+            var type = _node.GetType();
+            
+            foreach (var prop in type.GetProperties())
+            {
+                // 어트리뷰트로 정의된 프로퍼티 표시
+                if (prop.GetCustomAttribute<NodePropertyAttribute>() != null)
+                {
+                    var nodeProperty = _node.Properties.FirstOrDefault(p => p.Name == prop.Name);
+                    if (nodeProperty != null)
+                    {
+                        _node._usedObjects.Add(nodeProperty);
+                    }
+                }
+                
+                // 어트리뷰트로 정의된 포트 표시
+                var hasPortAttr = prop.GetCustomAttribute<NodeInputAttribute>() != null ||
+                                  prop.GetCustomAttribute<NodeOutputAttribute>() != null ||
+                                  prop.GetCustomAttribute<NodeFlowInAttribute>() != null ||
+                                  prop.GetCustomAttribute<NodeFlowOutAttribute>() != null;
+                               
+                if (hasPortAttr)
+                {
+                    var value = prop.GetValue(_node);
+                    if (value != null)
+                    {
+                        _node._usedObjects.Add(value);
+                    }
+                }
+            }
         }
         
         /// <summary>
@@ -49,7 +97,23 @@ public class DynamicNode : NodeBase
         /// </summary>
         public InputPort<T> Input<T>(string name)
         {
+            // 기존 포트 검색
+            var existingPort = _node.InputPorts.OfType<InputPort<T>>().FirstOrDefault(p => p.Name == name);
+            
+            if (existingPort != null)
+            {
+                // 기존 포트가 있으면 사용된 것으로 표시하고 반환
+                _node._usedObjects.Add(existingPort);
+                
+                if (!_addedPorts.Contains(existingPort))
+                    _addedPorts.Add(existingPort);
+                    
+                return existingPort;
+            }
+            
+            // 없으면 새로 생성하고 사용된 것으로 표시
             var port = _node.AddInputPort<T>(name);
+            _node._usedObjects.Add(port);
             _addedPorts.Add(port);
             return port;
         }
@@ -59,7 +123,23 @@ public class DynamicNode : NodeBase
         /// </summary>
         public IInputPort Input(string name, Type type)
         {
+            // 기존 포트 검색
+            var existingPort = _node.InputPorts.FirstOrDefault(p => p.Name == name && p.DataType == type);
+            
+            if (existingPort != null)
+            {
+                // 기존 포트가 있으면 사용된 것으로 표시하고 반환
+                _node._usedObjects.Add(existingPort);
+                
+                if (!_addedPorts.Contains(existingPort))
+                    _addedPorts.Add(existingPort);
+                    
+                return existingPort;
+            }
+            
+            // 없으면 새로 생성하고 사용된 것으로 표시
             var port = _node.AddInputPort(name, type);
+            _node._usedObjects.Add(port);
             _addedPorts.Add(port);
             return port;
         }
@@ -69,7 +149,23 @@ public class DynamicNode : NodeBase
         /// </summary>
         public OutputPort<T> Output<T>(string name)
         {
+            // 기존 포트 검색
+            var existingPort = _node.OutputPorts.OfType<OutputPort<T>>().FirstOrDefault(p => p.Name == name);
+            
+            if (existingPort != null)
+            {
+                // 기존 포트가 있으면 사용된 것으로 표시하고 반환
+                _node._usedObjects.Add(existingPort);
+                
+                if (!_addedPorts.Contains(existingPort))
+                    _addedPorts.Add(existingPort);
+                    
+                return existingPort;
+            }
+            
+            // 없으면 새로 생성하고 사용된 것으로 표시
             var port = _node.AddOutputPort<T>(name);
+            _node._usedObjects.Add(port);
             _addedPorts.Add(port);
             return port;
         }
@@ -79,7 +175,23 @@ public class DynamicNode : NodeBase
         /// </summary>
         public IOutputPort Output(string name, Type type)
         {
+            // 기존 포트 검색
+            var existingPort = _node.OutputPorts.FirstOrDefault(p => p.Name == name && p.DataType == type);
+            
+            if (existingPort != null)
+            {
+                // 기존 포트가 있으면 사용된 것으로 표시하고 반환
+                _node._usedObjects.Add(existingPort);
+                
+                if (!_addedPorts.Contains(existingPort))
+                    _addedPorts.Add(existingPort);
+                    
+                return existingPort;
+            }
+            
+            // 없으면 새로 생성하고 사용된 것으로 표시
             var port = _node.AddOutputPort(name, type);
+            _node._usedObjects.Add(port);
             _addedPorts.Add(port);
             return port;
         }
@@ -89,7 +201,23 @@ public class DynamicNode : NodeBase
         /// </summary>
         public FlowInPort FlowIn(string name)
         {
+            // 기존 포트 검색
+            var existingPort = _node.FlowInPorts.OfType<FlowInPort>().FirstOrDefault(p => p.Name == name);
+            
+            if (existingPort != null)
+            {
+                // 기존 포트가 있으면 사용된 것으로 표시하고 반환
+                _node._usedObjects.Add(existingPort);
+                
+                if (!_addedPorts.Contains(existingPort))
+                    _addedPorts.Add(existingPort);
+                    
+                return existingPort;
+            }
+            
+            // 없으면 새로 생성하고 사용된 것으로 표시
             var port = _node.AddFlowInPort(name);
+            _node._usedObjects.Add(port);
             _addedPorts.Add(port);
             return port;
         }
@@ -99,7 +227,23 @@ public class DynamicNode : NodeBase
         /// </summary>
         public FlowOutPort FlowOut(string name)
         {
+            // 기존 포트 검색
+            var existingPort = _node.FlowOutPorts.OfType<FlowOutPort>().FirstOrDefault(p => p.Name == name);
+            
+            if (existingPort != null)
+            {
+                // 기존 포트가 있으면 사용된 것으로 표시하고 반환
+                _node._usedObjects.Add(existingPort);
+                
+                if (!_addedPorts.Contains(existingPort))
+                    _addedPorts.Add(existingPort);
+                    
+                return existingPort;
+            }
+            
+            // 없으면 새로 생성하고 사용된 것으로 표시
             var port = _node.AddFlowOutPort(name);
+            _node._usedObjects.Add(port);
             _addedPorts.Add(port);
             return port;
         }
@@ -112,7 +256,43 @@ public class DynamicNode : NodeBase
                                           bool canConnectToPort = false,
                                           Action<T>? onValueChanged = null)
         {
+            // 기존 프로퍼티 검색
+            var existingProp = _node.Properties.OfType<NodeProperty<T>>().FirstOrDefault(p => p.Name == name);
+            
+            if (existingProp != null)
+            {
+                // 기존 프로퍼티의 값을 저장
+                var existingValue = existingProp.Value;
+                var existingCanConnectToPort = existingProp.CanConnectToPort;
+                
+                // 값 변경 이벤트 핸들러 업데이트
+                if (onValueChanged != null)
+                {
+                    // 기존 이벤트 핸들러 제거
+                    existingProp.PropertyChanged -= (s, e) => {
+                        if (e.PropertyName == nameof(NodeProperty<T>.Value) && !_node._isReconfiguring)
+                            onValueChanged(existingProp.Value);
+                    };
+                    
+                    // 새로운 이벤트 핸들러 추가
+                    existingProp.PropertyChanged += (s, e) => {
+                        if (e.PropertyName == nameof(NodeProperty<T>.Value) && !_node._isReconfiguring)
+                            onValueChanged(existingProp.Value);
+                    };
+                }
+                
+                // 기존 값을 복원
+                existingProp.Value = existingValue;
+                existingProp.CanConnectToPort = canConnectToPort;
+                
+                // 사용된 것으로 표시
+                _node._usedObjects.Add(existingProp);
+                return existingProp;
+            }
+            
+            // 새로 생성하고 사용된 것으로 표시
             var prop = _node.AddProperty<T>(name, displayName, format, canConnectToPort);
+            _node._usedObjects.Add(prop);
             
             // 값 변경 이벤트 연결 - 재구성 중이 아닐 때만 콜백 실행
             if (onValueChanged != null)
@@ -130,7 +310,20 @@ public class DynamicNode : NodeBase
                                           Type type, string? format = null, 
                                           bool canConnectToPort = false)
         {
-            return _node.AddProperty(name, displayName, type, format, canConnectToPort);
+            // 기존 프로퍼티 검색
+            var existingProp = _node.Properties.FirstOrDefault(p => p.Name == name && p.PropertyType == type);
+            
+            if (existingProp != null)
+            {
+                // 사용된 것으로 표시
+                _node._usedObjects.Add(existingProp);
+                return existingProp;
+            }
+            
+            // 새로 생성하고 사용된 것으로 표시
+            var prop = _node.AddProperty(name, displayName, type, format, canConnectToPort);
+            _node._usedObjects.Add(prop);
+            return prop;
         }
         
         /// <summary>
@@ -233,16 +426,88 @@ public class DynamicNode : NodeBase
         {
             _isReconfiguring = true;
             
-            // 동적으로 추가된 포트와 프로퍼티만 제거
-            ClearDynamicPorts();
+            // 노드 빌더를 통해 포트와 프로퍼티 구성
+            var builder = new NodeBuilder(this);
+            Configure(builder);
             
-            _isInitialized = false;  // 재초기화 플래그 설정
-            InitializeNode();        // 노드 초기화 다시 수행
+            // 사용되지 않은 포트와 프로퍼티 제거
+            CleanupUnusedElements();
+            
+            _isInitialized = true;
         }
         finally
         {
             _isReconfiguring = false;
         }
+    }
+    
+    /// <summary>
+    /// 사용되지 않은 포트와 프로퍼티를 제거합니다.
+    /// </summary>
+    private void CleanupUnusedElements()
+    {
+        // 제거할 동적 프로퍼티 목록 생성
+        var propsToRemove = _dynamicProperties
+            .Where(p => !_usedObjects.Contains(p))
+            .ToList();
+            
+        // 동적 프로퍼티 제거
+        foreach (var prop in propsToRemove)
+        {
+            RemoveProperty(prop);
+        }
+        
+        // 제거할 동적 입력 포트 목록 생성
+        var inputPortsToRemove = _dynamicPorts
+            .OfType<IInputPort>()
+            .Where(p => !_usedObjects.Contains(p))
+            .ToList();
+            
+        // 동적 입력 포트 제거
+        foreach (var port in inputPortsToRemove)
+        {
+            RemoveInputPort(port);
+        }
+        
+        // 제거할 동적 출력 포트 목록 생성
+        var outputPortsToRemove = _dynamicPorts
+            .OfType<IOutputPort>()
+            .Where(p => !_usedObjects.Contains(p))
+            .ToList();
+            
+        // 동적 출력 포트 제거
+        foreach (var port in outputPortsToRemove)
+        {
+            RemoveOutputPort(port);
+        }
+        
+        // 제거할 동적 FlowIn 포트 목록 생성
+        var flowInPortsToRemove = _dynamicPorts
+            .OfType<FlowInPort>()
+            .Where(p => !_usedObjects.Contains(p))
+            .ToList();
+            
+        // 동적 FlowIn 포트 제거
+        foreach (var port in flowInPortsToRemove)
+        {
+            RemoveFlowInPort(port);
+        }
+        
+        // 제거할 동적 FlowOut 포트 목록 생성
+        var flowOutPortsToRemove = _dynamicPorts
+            .OfType<FlowOutPort>()
+            .Where(p => !_usedObjects.Contains(p))
+            .ToList();
+            
+        // 동적 FlowOut 포트 제거
+        foreach (var port in flowOutPortsToRemove)
+        {
+            RemoveFlowOutPort(port);
+        }
+        
+        // 동적 포트 및 프로퍼티 목록 정리
+        _dynamicPorts.RemoveAll(p => !_usedObjects.Contains(p));
+        _dynamicProperties.RemoveAll(p => !_usedObjects.Contains(p));
     }
 
     public DynamicNode(

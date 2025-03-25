@@ -39,70 +39,49 @@ namespace WPFNode.Plugins.Basic.Nodes {
             ReconfigurePorts();
         }
         
-        protected override void Configure(NodeBuilder builder) {
-            // 기존 프로퍼티 저장/복원 로직
-            _propertyList.Clear();
+    protected override void Configure(NodeBuilder builder) {
+        // 프로퍼티 목록 초기화
+        _propertyList.Clear();
+        
+        // 타겟 타입 확인 및 출력 포트 구성
+        var targetType = SelectedType?.Value ?? typeof(object);
+        _outputPort = builder.Output("Object", targetType);
+        
+        if (targetType == null || targetType == typeof(object)) return;
+        
+        // 타겟 타입의 쓰기 가능한 속성과 필드들 가져오기
+        var targetProperties = targetType.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Where(p => p.CanWrite)
+            .ToList();
             
-            // 타겟 타입 확인 및 출력 포트 구성
-            var targetType = SelectedType?.Value ?? typeof(object);
-            _outputPort = builder.Output("Object", targetType);
+        var targetFields = targetType.GetFields(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Where(f => !f.IsInitOnly)
+            .ToList();
+        
+        if (targetProperties.Count == 0 && targetFields.Count == 0) return;
+        
+        // 각 속성에 대한 NodeProperty 구성
+        foreach (var prop in targetProperties) {
+            string propName = prop.Name;
             
-            if (targetType == null || targetType == typeof(object)) return;
+            // builder.Property가 내부적으로 기존 프로퍼티를 찾아 반환하므로 
+            // 별도의 existingProps Dictionary를 만들 필요가 없음
+            var nodeProperty = builder.Property(propName, propName, prop.PropertyType, canConnectToPort: true);
             
-            // 타겟 타입의 쓰기 가능한 속성과 필드들 가져오기
-            var targetProperties = targetType.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
-                .Where(p => p.CanWrite)
-                .ToList();
-                
-            var targetFields = targetType.GetFields(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
-                .Where(f => !f.IsInitOnly)
-                .ToList();
-            
-            if (targetProperties.Count == 0 && targetFields.Count == 0) return;
-            
-            // 현재 프로퍼티 상태 저장
-            var existingProps = Properties
-                .Where(p => !p.Name.Equals("Target Type", StringComparison.OrdinalIgnoreCase) && 
-                           !p.Name.Equals("Connected Only", StringComparison.OrdinalIgnoreCase))
-                .ToDictionary(
-                    p => p.Name,
-                    p => new { 
-                        Value = p.Value,
-                        CanConnectToPort = p.CanConnectToPort
-                    });
-            
-            // 각 속성에 대한 NodeProperty 구성
-            foreach (var prop in targetProperties) {
-                string propName = prop.Name;
-                INodeProperty nodeProperty;
-                
-                if(existingProps.TryGetValue(propName, out var existingProp)) {
-                    nodeProperty = builder.Property(propName, propName, prop.PropertyType, canConnectToPort: existingProp.CanConnectToPort);
-                    nodeProperty.Value = existingProp.Value;
-                }
-                else {
-                    nodeProperty = builder.Property(propName, propName, prop.PropertyType, canConnectToPort: true);
-                }
-                
-                _propertyList.Add(nodeProperty);
-            }
-            
-            // 각 필드에 대한 NodeProperty 구성
-            foreach (var field in targetFields) {
-                string fieldName = field.Name;
-                INodeProperty nodeProperty;
-                
-                if(existingProps.TryGetValue(fieldName, out var existingProp)) {
-                    nodeProperty = builder.Property(fieldName, fieldName, field.FieldType, canConnectToPort: existingProp.CanConnectToPort);
-                    nodeProperty.Value = existingProp.Value;
-                }
-                else {
-                    nodeProperty = builder.Property(fieldName, fieldName, field.FieldType, canConnectToPort: true);
-                }
-                
-                _propertyList.Add(nodeProperty);
-            }
+            _propertyList.Add(nodeProperty);
         }
+        
+        // 각 필드에 대한 NodeProperty 구성
+        foreach (var field in targetFields) {
+            string fieldName = field.Name;
+            
+            // builder.Property가 내부적으로 기존 프로퍼티를 찾아 반환하므로
+            // 별도의 existingProps Dictionary를 만들 필요가 없음
+            var nodeProperty = builder.Property(fieldName, fieldName, field.FieldType, canConnectToPort: true);
+            
+            _propertyList.Add(nodeProperty);
+        }
+    }
 
         protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
             var targetType = SelectedType.Value;
