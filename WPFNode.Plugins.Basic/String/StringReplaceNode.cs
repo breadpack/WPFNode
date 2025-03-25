@@ -16,11 +16,11 @@ public class StringReplaceNode : NodeBase
     [NodeInput("입력 문자열")]
     public InputPort<string> Input { get; set; }
     
-    [NodeInput("검색할 문자열")]
-    public InputPort<string> OldValue { get; set; }
+    [NodeProperty("검색할 문자열", CanConnectToPort = true)]
+    public NodeProperty<string> OldValue { get; set; }
     
-    [NodeInput("대체할 문자열")]
-    public InputPort<string> NewValue { get; set; }
+    [NodeProperty("대체할 문자열", CanConnectToPort = true)]
+    public NodeProperty<string> NewValue { get; set; }
     
     [NodeOutput("결과")]
     public OutputPort<string> Result { get; set; }
@@ -32,6 +32,8 @@ public class StringReplaceNode : NodeBase
     public FlowOutPort FlowOut { get; set; }
 
     public StringReplaceNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) {
+        OldValue.Value = "";
+        NewValue.Value = "";
     }
 
     protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
@@ -39,8 +41,8 @@ public class StringReplaceNode : NodeBase
     {
         // 입력 문자열 가져오기
         string input = Input?.GetValueOrDefault(string.Empty) ?? string.Empty;
-        string oldValue = OldValue?.GetValueOrDefault(string.Empty) ?? string.Empty;
-        string newValue = NewValue?.GetValueOrDefault(string.Empty) ?? string.Empty;
+        string oldValue = OldValue?.Value ?? string.Empty;
+        string newValue = NewValue?.Value ?? string.Empty;
         
         string result = input;
         

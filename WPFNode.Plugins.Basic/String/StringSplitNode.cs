@@ -17,8 +17,8 @@ public class StringSplitNode : NodeBase
     [NodeInput("입력 문자열")]
     public InputPort<string> Input { get; set; }
     
-    [NodeInput("구분자")]
-    public InputPort<string> Separator { get; set; }
+    [NodeProperty("구분자", CanConnectToPort = true)]
+    public NodeProperty<string> Separator { get; set; }
     
     [NodeOutput("결과 배열")]
     public OutputPort<string[]> ResultArray { get; set; }
@@ -50,6 +50,7 @@ public class StringSplitNode : NodeBase
     public StringSplitNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) {
         RemoveEmptyEntries.Value = false;
         UseStringSeparator.Value = true;
+        Separator.Value = ",";
     }
 
     protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
@@ -57,7 +58,7 @@ public class StringSplitNode : NodeBase
     {
         // 입력 문자열 가져오기
         string input = Input?.GetValueOrDefault(string.Empty) ?? string.Empty;
-        string separator = Separator?.GetValueOrDefault(",") ?? ",";
+        string separator = Separator?.Value ?? ",";
         
         // 빈 입력 검사
         if (string.IsNullOrEmpty(input))

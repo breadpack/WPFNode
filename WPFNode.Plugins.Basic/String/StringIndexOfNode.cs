@@ -16,11 +16,11 @@ public class StringIndexOfNode : NodeBase
     [NodeInput("입력 문자열")]
     public InputPort<string> Input { get; set; }
     
-    [NodeInput("검색할 문자열")]
-    public InputPort<string> Value { get; set; }
+    [NodeProperty("검색할 문자열", CanConnectToPort = true)]
+    public NodeProperty<string> Value { get; set; }
     
-    [NodeInput("시작 인덱스 (옵션)")]
-    public InputPort<int> StartIndex { get; set; }
+    [NodeProperty("시작 인덱스", CanConnectToPort = true)]
+    public NodeProperty<int> StartIndex { get; set; }
     
     [NodeOutput("인덱스")]
     public OutputPort<int> Result { get; set; }
@@ -43,6 +43,8 @@ public class StringIndexOfNode : NodeBase
     public StringIndexOfNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) {
         IgnoreCase.Value = false;
         UseStartIndex.Value = false;
+        Value.Value = "";
+        StartIndex.Value = 0;
     }
 
     protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
@@ -50,8 +52,8 @@ public class StringIndexOfNode : NodeBase
     {
         // 입력 문자열 가져오기
         string input = Input?.GetValueOrDefault(string.Empty) ?? string.Empty;
-        string value = Value?.GetValueOrDefault(string.Empty) ?? string.Empty;
-        int startIndex = UseStartIndex.Value ? (StartIndex?.GetValueOrDefault(0) ?? 0) : 0;
+        string value = Value?.Value ?? string.Empty;
+        int startIndex = UseStartIndex.Value ? (StartIndex?.Value ?? 0) : 0;
         
         // 잘못된 시작 인덱스 검사
         if (startIndex < 0)

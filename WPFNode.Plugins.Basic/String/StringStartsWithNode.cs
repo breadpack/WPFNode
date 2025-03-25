@@ -16,8 +16,8 @@ public class StringStartsWithNode : NodeBase
     [NodeInput("입력 문자열")]
     public InputPort<string> Input { get; set; }
     
-    [NodeInput("시작 문자열")]
-    public InputPort<string> Value { get; set; }
+    [NodeProperty("시작 문자열", CanConnectToPort = true)]
+    public NodeProperty<string> Value { get; set; }
     
     [NodeOutput("결과")]
     public OutputPort<bool> Result { get; set; }
@@ -33,6 +33,7 @@ public class StringStartsWithNode : NodeBase
 
     public StringStartsWithNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) {
         IgnoreCase.Value = false;
+        Value.Value = "";
     }
 
     protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
@@ -40,7 +41,7 @@ public class StringStartsWithNode : NodeBase
     {
         // 입력 문자열 가져오기
         string input = Input?.GetValueOrDefault(string.Empty) ?? string.Empty;
-        string value = Value?.GetValueOrDefault(string.Empty) ?? string.Empty;
+        string value = Value?.Value ?? string.Empty;
         
         bool result = false;
         

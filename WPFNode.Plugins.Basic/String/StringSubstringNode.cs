@@ -17,11 +17,11 @@ public class StringSubstringNode : NodeBase
     [NodeInput("입력 문자열")]
     public InputPort<string> Input { get; set; }
     
-    [NodeInput("시작 인덱스")]
-    public InputPort<int> StartIndex { get; set; }
+    [NodeProperty("시작 인덱스", CanConnectToPort = true)]
+    public NodeProperty<int> StartIndex { get; set; }
     
-    [NodeInput("길이 (옵션)")]
-    public InputPort<int> Length { get; set; }
+    [NodeProperty("길이", CanConnectToPort = true)]
+    public NodeProperty<int> Length { get; set; }
     
     [NodeOutput("결과")]
     public OutputPort<string> Result { get; set; }
@@ -37,6 +37,8 @@ public class StringSubstringNode : NodeBase
 
     public StringSubstringNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) {
         UseLengthOption.Value = false;
+        StartIndex.Value = 0;
+        Length.Value = 0;
     }
 
     protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
@@ -46,7 +48,7 @@ public class StringSubstringNode : NodeBase
         
         // 입력 문자열 가져오기
         string input = Input?.GetValueOrDefault(string.Empty) ?? string.Empty;
-        int startIndex = StartIndex?.GetValueOrDefault(0) ?? 0;
+        int startIndex = StartIndex?.Value ?? 0;
         
         // 빈 문자열 또는 유효하지 않은 인덱스 체크
         if (!string.IsNullOrEmpty(input) && startIndex < input.Length)
@@ -56,7 +58,7 @@ public class StringSubstringNode : NodeBase
                 // 길이 옵션 사용 여부에 따라 Substring 호출 방식 결정
                 if (UseLengthOption.Value)
                 {
-                    int length = Length?.GetValueOrDefault(input.Length - startIndex) ?? (input.Length - startIndex);
+                    int length = Length?.Value ?? (input.Length - startIndex);
                     
                     // 유효한 범위 확인
                     if (startIndex + length > input.Length)
