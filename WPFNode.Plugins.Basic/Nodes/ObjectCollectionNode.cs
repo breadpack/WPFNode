@@ -6,7 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Threading.Tasks;
+using System.Threading;
 using WPFNode.Attributes;
 using WPFNode.Models;
 using WPFNode.Models.Properties;
@@ -36,72 +36,47 @@ namespace WPFNode.Plugins.Basic.Nodes {
         public ObjectCollectionNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) {
             Name        = "Object Collection";
             Description = "다양한 타입의 객체 리스트를 생성합니다.";
-
-            ConfigureOutputPort();
-            ConfigureItemProperties();
         }
 
         private void SelectedType_PropertyChanged() {
-            ConfigureOutputPort();
-            ConfigureItemProperties();
-        }
-
-        private void ConfigureOutputPort() {
-            foreach (var port in OutputPorts.ToArray()) {
-                Remove(port);
-            }
-
-            var targetType = SelectedType.Value ?? typeof(object);
-            var listType   = typeof(List<>).MakeGenericType(targetType);
-            _outputPort = AddOutputPort("Collection", listType);
+            ReconfigurePorts();
         }
 
         private void ItemCount_PropertyChanged() {
-            ConfigureItemProperties();
+            ReconfigurePorts();
         }
-
-        private void ConfigureItemProperties() {
-            var targetType = SelectedType.Value;
-            var itemCount = ItemCount.Value;
-            if (targetType == null) return;
-            if (itemCount <= 0) return;
-
+        
+        protected override void Configure(NodeBuilder builder) {
+            // 기존 항목 프로퍼티 목록 초기화
+            _itemProperties.Clear();
+            
+            // 입력/출력 포트 구성
+            var targetType = SelectedType?.Value ?? typeof(object);
+            var itemCount = ItemCount?.Value ?? 0;
+            
+            // 리스트 타입의 출력 포트 구성
+            var listType = typeof(List<>).MakeGenericType(targetType);
+            _outputPort = builder.Output("Collection", listType);
+            
+            if (targetType == null || itemCount <= 0) return;
+            
             // 타겟 타입의 쓰기 가능한 속성들 가져오기
             var targetProperties = targetType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                                           .Where(p => p.CanWrite)
-                                           .ToList();
+                                          .Where(p => p.CanWrite)
+                                          .ToList();
 
             if (targetProperties.Count == 0) return;
-
-            // 현재 필요한 프로퍼티 이름 집합 생성
-            var requiredProperties = new HashSet<string>();
-            for (int i = 0; i < itemCount; i++) {
-                int index = i + 1;
-                string itemKey = $"Item{index}_";
-                foreach (var prop in targetProperties) {
-                    requiredProperties.Add($"{itemKey}{prop.Name}");
-                }
-            }
-
-            // 더 이상 필요하지 않은 프로퍼티 제거
-            var propertiesToRemove = _itemProperties
-                .Where(p => !requiredProperties.Contains(p.Name))
-                .ToList();
-
-            foreach (var prop in propertiesToRemove) {
-                Remove(prop);
-                _itemProperties.Remove(prop);
-            }
-
-            // 기존 프로퍼티의 설정 저장
-            var existingPropertySettings = _itemProperties
+            
+            // 현재 프로퍼티 상태 저장
+            var existingProps = Properties
+                .Where(p => p.Name.StartsWith("Item_"))
                 .ToDictionary(
                     p => p.Name,
                     p => new { 
                         Value = p.Value,
                         CanConnectToPort = p.CanConnectToPort
                     });
-
+            
             // 각 항목에 대해 프로퍼티 구성
             for (int i = 0; i < itemCount; i++) {
                 int index = i + 1;
@@ -112,33 +87,19 @@ namespace WPFNode.Plugins.Basic.Nodes {
                     string propName = $"{itemKey}{prop.Name}";
                     string displayName = $"항목 {index} - {prop.Name}";
 
-                    // 기존 프로퍼티가 있는지 확인
-                    var existingProperty = _itemProperties.FirstOrDefault(p => p.Name == propName);
-                    
-                    if (existingProperty == null) {
-                        // 새 프로퍼티 추가
-                        var nodeProperty = AddProperty(propName, displayName, prop.PropertyType);
-
-                        // 이전 설정이 있다면 복원
-                        if (existingPropertySettings.TryGetValue(propName, out var settings))
-                        {
-                            nodeProperty.Value = settings.Value;
-                            nodeProperty.CanConnectToPort = settings.CanConnectToPort;
-                        }
-                        else
-                        {
-                            // 기본값 설정
-                            if (prop.PropertyType == typeof(string)) {
-                                nodeProperty.Value = $"Item {index}";
-                            }
-                            else if (prop.PropertyType == typeof(int)) {
-                                nodeProperty.Value = i * 10;
-                            }
-                        }
-
-                        // 항목 프로퍼티 리스트에 추가
-                        _itemProperties.Add(nodeProperty);
+                    INodeProperty nodeProperty;
+                    if(existingProps.TryGetValue(propName, out var existingProp)) {
+                        // 기존 프로퍼티가 있다면 복원
+                        nodeProperty = builder.Property(propName, displayName, prop.PropertyType, canConnectToPort: existingProp.CanConnectToPort);
+                        nodeProperty.Value = existingProp.Value;
                     }
+                    else {
+                        // 새 프로퍼티 생성
+                        nodeProperty = builder.Property(propName, displayName, prop.PropertyType, canConnectToPort: true);
+                    }
+
+                    // 항목 프로퍼티 리스트에 추가
+                    _itemProperties.Add(nodeProperty);
                 }
             }
         }
@@ -222,9 +183,9 @@ namespace WPFNode.Plugins.Basic.Nodes {
         public override void ReadJson(JsonElement element, JsonSerializerOptions options) {
             // 기본 역직렬화 수행
             base.ReadJson(element, options);
-
-            // 항목 프로퍼티 구성
-            ConfigureItemProperties();
+            
+            // 포트와 프로퍼티 재구성
+            ReconfigurePorts();
         }
 
         public override string ToString() {

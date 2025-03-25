@@ -126,6 +126,13 @@ public class DynamicNode : NodeBase
             return prop;
         }
         
+        public INodeProperty Property(string name, string displayName, 
+                                          Type type, string? format = null, 
+                                          bool canConnectToPort = false)
+        {
+            return _node.AddProperty(name, displayName, type, format, canConnectToPort);
+        }
+        
         /// <summary>
         /// 프로퍼티를 가져옵니다.
         /// </summary>
