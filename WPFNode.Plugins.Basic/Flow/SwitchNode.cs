@@ -1,100 +1,162 @@
-using System.Runtime.CompilerServices;
+using System.ComponentModel;
 using Microsoft.Extensions.Logging;
 using WPFNode.Attributes;
 using WPFNode.Interfaces;
 using WPFNode.Models;
+using WPFNode.Models.Properties;
 
 namespace WPFNode.Plugins.Basic.Flow;
 
 /// <summary>
 /// 입력 값에 따라 실행 경로를 분기하는 Switch 노드입니다.
+/// 입력 타입과 케이스 수를 설정할 수 있으며, 동적으로 케이스 포트가 생성됩니다.
 /// </summary>
 [NodeCategory("Flow Control")]
 [NodeName("Switch")]
 [NodeDescription("입력 값에 따라 실행 경로를 분기합니다.")]
-public class SwitchNode : DynamicNode
-{
-    private readonly Dictionary<string, FlowOutPort> _casePorts = new();
-    
-    /// <summary>
-    /// 스위치 값 (입력)
-    /// </summary>
-    [NodeInput("Value")]
-    public InputPort<object> InputValue { get; private set; }
-    
-    /// <summary>
-    /// Switch 노드 진입 Flow 포트
-    /// </summary>
+public class SwitchNode : DynamicNode {
+    // 동적 포트 관리 필드
+    private IInputPort _inputValuePort;
+    private Dictionary<string, FlowOutPort> _flowOutPorts = new();
+
+    // 기본 속성 정의
+    [NodeProperty("입력 타입", CanConnectToPort = false, OnValueChanged = nameof(OnTypeChanged))]
+    public NodeProperty<Type> ValueType { get; private set; }
+
+    [NodeProperty("케이스 수", Format = "N0", CanConnectToPort = false, OnValueChanged = nameof(OnCaseCountChanged))]
+    public NodeProperty<int> CaseCount { get; private set; }
+
+    // 기본 포트 정의
     [NodeFlowIn("Enter")]
     public FlowInPort FlowIn { get; private set; }
-    
-    /// <summary>
-    /// 어떤 케이스도 일치하지 않을 때 실행 Flow 포트
-    /// </summary>
+
     [NodeFlowOut("Default")]
     public FlowOutPort DefaultPort { get; private set; }
 
-    // 기존 NodeBase에서는 protected로 정의되어 있는 Logger를 여기서는 새로 정의
-    private ILogger? _logger;
-    protected ILogger? Logger => _logger;
-    
-    public SwitchNode(INodeCanvas canvas, Guid id, ILogger? logger = null) 
-        : base(canvas, id)
-    {
-        _logger = logger;
-        
-        // 생성자에서 기본 케이스 포트 추가
-        AddCasePort("0");
-        AddCasePort("1");
-        AddCasePort("2");
-    }
-    
     /// <summary>
-    /// 새로운 케이스 포트 추가
+    /// Switch 조건으로 사용될 입력 값 포트
     /// </summary>
-    public FlowOutPort AddCasePort(string caseValue)
-    {
-        if (_casePorts.TryGetValue(caseValue, out var existingPort))
-        {
-            return existingPort;
-        }
-        
-        var casePort = AddFlowOutPort($"Case: {caseValue}");
-        _casePorts[caseValue] = casePort;
-        return casePort;
-    }
-    
+    public IInputPort InputValue => _inputValuePort;
+
     /// <summary>
-    /// 케이스 포트 제거
+    /// 인덱스를 통해 케이스 프로퍼티에 접근할 수 있는 인덱서
     /// </summary>
-    public void RemoveCasePort(string caseValue)
-    {
-        if (_casePorts.TryGetValue(caseValue, out var port))
-        {
-            RemoveFlowOutPort(port);
-            _casePorts.Remove(caseValue);
+    /// <param name="index">케이스 인덱스 (0-based)</param>
+    /// <returns>케이스 프로퍼티</returns>
+    /// <exception cref="IndexOutOfRangeException">해당 인덱스의 케이스가 존재하지 않는 경우</exception>
+    public INodeProperty this[int index] {
+        get {
+            var prop = Properties.FirstOrDefault(p => p.Name == $"Case_{index}");
+            if (prop == null) {
+                throw new IndexOutOfRangeException($"Case_{index} not found. Ensure CaseCount is set appropriately.");
+            }
+            return prop;
         }
     }
-    
+
+    public SwitchNode(INodeCanvas canvas, Guid id)
+        : base(canvas, id) { }
+
+    // 속성 변경 핸들러 - 단순화
+    private void OnTypeChanged() => ReconfigurePorts();
+
+    private void OnCaseCountChanged() => ReconfigurePorts();
+
     /// <summary>
     /// 노드의 처리 로직을 구현합니다.
     /// </summary>
     protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
         // 입력 값 가져오기
-        var inputValue = InputValue.GetValueOrDefault()?.ToString() ?? string.Empty;
-        
-        Logger?.LogDebug("SwitchNode: Input value = '{Value}'", inputValue);
-        
-        // 일치하는 케이스 찾기
-        if (_casePorts.TryGetValue(inputValue, out var matchedPort))
-        {
-            Logger?.LogDebug("SwitchNode: Matched case '{Case}'", inputValue);
-            yield return matchedPort;
+        object inputValue = null;
+
+        if (_inputValuePort != null) {
+            try {
+                dynamic dynamicPort = _inputValuePort;
+                inputValue = dynamicPort.GetValueOrDefault();
+            }
+            catch {
+                Logger?.LogWarning("SwitchNode: Failed to get input value");
+            }
         }
-        else
-        {
-            Logger?.LogDebug("SwitchNode: No matching case, using default");
-            yield return DefaultPort;
+
+        Logger?.LogDebug($"SwitchNode: Input value = '{inputValue}'");
+
+        // 케이스 프로퍼티들을 순회하며 일치하는 값 찾기
+        if (inputValue != null) {
+            var caseProps = Properties.Where(p => p.Name.StartsWith("Case_"));
+            foreach (var prop in caseProps) {
+                if (prop.Value?.Equals(inputValue) ?? false) {
+                    var portName = $"Case: {prop.Value}";
+                    if (_flowOutPorts.TryGetValue(prop.Name, out var matchedPort)) {
+                        Logger?.LogDebug($"SwitchNode: Matched case for value '{inputValue}'");
+                        yield return matchedPort;
+                        yield break;
+                    }
+                }
+            }
         }
+
+        // 일치하는 케이스를 찾지 못한 경우
+        Logger?.LogDebug("SwitchNode: No matching case, using default");
+        yield return DefaultPort;
+    }
+
+    // 기존 OnConfigureDynamicPorts 대신 빌더 패턴을 사용하는 Configure 메서드를 구현
+    protected override void Configure(NodeBuilder builder) {
+        // 1. 입력 포트 구성
+        var type = ValueType?.Value ?? typeof(object);
+        _inputValuePort = builder.Input("Value", type);
+
+        // 2. 케이스 프로퍼티 구성
+        var targetCount = Math.Max(1, CaseCount?.Value ?? 3);
+
+        // 기존 Case 프로퍼티 수집
+        var existingProps = Properties
+                            .Where(p => p.Name.StartsWith("Case_"))
+                            .OrderBy(p => {
+                                // Case_0, Case_1 등으로 정렬하기 위한 인덱스 추출
+                                string indexStr = p.Name.Substring("Case_".Length);
+                                if (int.TryParse(indexStr, out int index))
+                                    return index;
+                                return int.MaxValue;
+                            })
+                            .ToList();
+
+        // 필요한 수만큼 케이스 프로퍼티 생성/수정
+        for (int i = 0; i < targetCount; i++) {
+            // 기존 프로퍼티 사용 또는 새로 생성
+            var prop = i < existingProps.Count
+                           ? existingProps[i]
+                           : builder.Property<object>($"Case_{i}", $"케이스 {i}");
+
+            // 비어있으면 기본값 설정
+            if (prop.Value == null) {
+                try {
+                    prop.Value = Convert.ChangeType(i.ToString(), type);
+                }
+                catch {
+                    prop.Value = null;
+                }
+            }
+
+            // 출력 포트 생성
+            if (prop.Value != null) {
+                var portName = $"Case: {prop.Value}";
+                _flowOutPorts[prop.Name] = builder.FlowOut(portName);
+            }
+        }
+
+        // 초과 프로퍼티 제거
+        for (int i = targetCount; i < existingProps.Count; i++) {
+            Remove(existingProps[i]);
+        }
+    }
+
+    public IFlowOutPort CaseFlowOut(int i) {
+        // 케이스 인덱스에 해당하는 FlowOutPort를 반환
+        if (_flowOutPorts.TryGetValue($"Case_{i}", out var port)) {
+            return port;
+        }
+        throw new IndexOutOfRangeException($"Case_{i} not found. Ensure CaseCount is set appropriately.");
     }
 }

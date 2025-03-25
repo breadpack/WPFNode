@@ -415,4 +415,57 @@ public class ExecutionTests
         Assert.Single(loopComplete.ReceivedValues);
         Assert.Equal(999, loopComplete.ReceivedValues[0]);
     }
+
+    [Fact]
+    public async Task SwitchNode_Basic() {
+        var canvas = NodeCanvas.Create();
+        
+        var startNode = canvas.AddNode<StartNode>(0, 0);
+        var switchNode = canvas.AddNode<SwitchNode>(100, 50);
+        var case1Node = canvas.AddNode<TrackingNode>(200, 0);
+        var case2Node = canvas.AddNode<TrackingNode>(200, 100);
+        var defaultNode = canvas.AddNode<TrackingNode>(200, 200);
+        
+        // 3. 노드 설정
+        switchNode.ValueType.Value = typeof(string);
+        switchNode.CaseCount.Value = 2; // 두 개의 케이스 설정
+        
+        // 인덱서를 사용하여 케이스 값 설정
+        switchNode[0].Value = "A";
+        switchNode[1].Value = "B";
+
+        switchNode.CaseFlowOut(0).Connect(case1Node.FlowIn);
+        switchNode.CaseFlowOut(1).Connect(case2Node.FlowIn);
+        switchNode.DefaultPort.Connect(defaultNode.FlowIn);
+        
+        // 입력 값 설정
+        var inputValue = canvas.AddNode<ConstantNode<string>>(50, 100);
+        inputValue.Value.Value = "A"; // Case A 선택
+        
+        // 노드 연결
+        startNode.FlowOut.Connect(switchNode.FlowIn);
+        inputValue.Result.Connect(switchNode.InputValue);
+        
+        // 트래킹 노드에 값 설정 (실행 경로 확인용)
+        var value1 = canvas.AddNode<ConstantNode<int>>(150, 0);
+        var value2 = canvas.AddNode<ConstantNode<int>>(150, 100);
+        var valueDefault = canvas.AddNode<ConstantNode<int>>(150, 200);
+        
+        value1.Value.Value = 1;
+        value2.Value.Value = 2;
+        valueDefault.Value.Value = 999;
+        
+        value1.Result.Connect(case1Node.InputValue);
+        value2.Result.Connect(case2Node.InputValue);
+        valueDefault.Result.Connect(defaultNode.InputValue);
+        
+        // 실행
+        await canvas.ExecuteAsync();
+        
+        // 결과 확인 - Case A가 선택되어야 함
+        Assert.Single(case1Node.ReceivedValues);
+        Assert.Equal(1, case1Node.ReceivedValues[0]);
+        Assert.Empty(case2Node.ReceivedValues);
+        Assert.Empty(defaultNode.ReceivedValues);
+    }
 }
