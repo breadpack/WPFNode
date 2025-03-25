@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Title>WPFNode AI Documentation</Title>
+    <Version>1.0.0</Version>
+    <Authors>WPFNode Team</Authors>
+    <Description>AI를 이용한 WPFNode 커스텀 노드 개발을 위한 문서 및 가이드</Description>
+    <PackageTags>wpfnode;node;ai;documentation</PackageTags>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="**\*.md" Pack="true" PackagePath="content\AIDocumentation" />
+  </ItemGroup>
+
+</Project>

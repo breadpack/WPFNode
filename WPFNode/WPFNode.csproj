@@ -23,7 +23,7 @@
         <RepositoryType>git</RepositoryType>
         <PackageReleaseNotes>Initial release</PackageReleaseNotes>
     </PropertyGroup>
-    
+
   <PropertyGroup>
     <DefaultWpfTheme>Generic</DefaultWpfTheme>
     <ThemeInherited>true</ThemeInherited>
@@ -34,6 +34,10 @@
         <None Include="..\LICENSE" Pack="true" PackagePath="\" />
     </ItemGroup>
 
+    <!-- AI 문서 포함 -->
+    <ItemGroup>
+        <None Include="..\WPFNode.AIDocumentation\**\*.md" Pack="true" PackagePath="content\AIDocumentation" />
+    </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
