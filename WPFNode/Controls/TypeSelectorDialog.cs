@@ -1,12 +1,18 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Media;
-using System.Reflection;
+using System.Windows.Threading;
+using WPFNode.Interfaces;
 using WPFNode.Services;
 using WPFNode.ViewModels.Nodes;
-using System.Windows.Controls.Primitives;
-using WPFNode.Interfaces;
 
 namespace WPFNode.Controls;
 
@@ -16,7 +22,12 @@ public class TypeSelectorDialog : Window
     private readonly TextBox _searchBox;
     private readonly TreeView _namespaceTree;
     private Type? _selectedType;
-    private IEnumerable<NamespaceTypeNode>? _allNodes;  // 이미 최상위 노드들만 포함
+    private readonly CancellationTokenSource _searchCts = new();
+    private readonly DispatcherTimer _searchDebounceTimer;
+    
+    // 로딩 인디케이터
+    private readonly ProgressBar _loadingIndicator;
+    private readonly Grid _mainGrid;
 
     public Type? SelectedType => _selectedType;
 
@@ -30,19 +41,23 @@ public class TypeSelectorDialog : Window
         ResizeMode = ResizeMode.CanResize;
         SizeToContent = SizeToContent.Manual;
 
-        // 전체 데이터 미리 로드
-        LoadAllTypes();
+        // 검색 딜레이 타이머
+        _searchDebounceTimer = new DispatcherTimer {
+            Interval = TimeSpan.FromMilliseconds(300)
+        };
+        _searchDebounceTimer.Tick += OnSearchTimerTick;
 
-        var grid = new Grid();
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        _mainGrid = new Grid();
+        _mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        _mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        _mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
         // 검색 박스
         _searchBox = new TextBox
         {
             Margin = new Thickness(5),
-            Height = 23
+            Height = 23,
+            IsEnabled = false // 초기에는 비활성화 (타입 로딩 때문에)
         };
         _searchBox.Text = "검색어를 입력하세요...";  // PlaceholderText 대신 일반 Text 사용
         _searchBox.GotFocus += (s, e) => 
@@ -56,7 +71,7 @@ public class TypeSelectorDialog : Window
                 _searchBox.Text = "검색어를 입력하세요...";
         };
         _searchBox.TextChanged += OnSearchTextChanged;
-        grid.Children.Add(_searchBox);
+        _mainGrid.Children.Add(_searchBox);
         Grid.SetRow(_searchBox, 0);
 
         // 네임스페이스 트리
@@ -95,7 +110,7 @@ public class TypeSelectorDialog : Window
         _namespaceTree.ItemTemplate = namespaceTemplate;
 
         _namespaceTree.SelectedItemChanged += OnTreeViewSelectedItemChanged;
-        grid.Children.Add(_namespaceTree);
+        _mainGrid.Children.Add(_namespaceTree);
         Grid.SetRow(_namespaceTree, 1);
 
         // 버튼 패널
@@ -132,149 +147,143 @@ public class TypeSelectorDialog : Window
 
         buttonPanel.Children.Add(okButton);
         buttonPanel.Children.Add(cancelButton);
-        grid.Children.Add(buttonPanel);
+        _mainGrid.Children.Add(buttonPanel);
         Grid.SetRow(buttonPanel, 2);
 
-        Content = grid;
+        // 로딩 인디케이터
+        _loadingIndicator = new ProgressBar
+        {
+            IsIndeterminate = true,
+            Height = 5,
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(5, 0, 5, 0)
+        };
+        _mainGrid.Children.Add(_loadingIndicator);
+        Grid.SetRow(_loadingIndicator, 0);
+
+        Content = _mainGrid;
 
         Loaded += OnDialogLoaded;
+        Closing += (s, e) => _searchCts.Cancel();
     }
 
-    private void OnDialogLoaded(object sender, RoutedEventArgs e)
+    private async void OnDialogLoaded(object sender, RoutedEventArgs e)
     {
-        InitializeNamespaceTree();
-        _searchBox.Focus();
-    }
+        try
+        {
+            // TypeRegistry 초기화
+            await TypeRegistry.Instance.InitializeAsync();
+            
+            // UI 업데이트
+            _loadingIndicator.Visibility = Visibility.Collapsed;
+            _searchBox.IsEnabled = true;
 
-    private void LoadAllTypes()
-    {
-        var allTypes = _pluginOnly ? 
-            NodeServices.PluginService.NodeTypes : 
-            AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(a =>
-                {
-                    try
-                    {
-                        return a.GetTypes();
-                    }
-                    catch (ReflectionTypeLoadException)
-                    {
-                        return Array.Empty<Type>();
-                    }
-                })
-                .Where(t => !t.IsAbstract && !t.IsGenericTypeDefinition && !t.IsInterface);
-
-        // 네임스페이스별로 그룹화하여 노드 생성 (이미 최상위 노드만 반환)
-        _allNodes = CreateNamespaceNodes(allTypes).ToList();
+            // 네임스페이스 트리 초기화
+            InitializeNamespaceTree();
+            _searchBox.Focus();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"타입 정보를 로드하는 중 오류가 발생했습니다: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void InitializeNamespaceTree()
     {
-        // 기존 노드를 그대로 사용
-        _namespaceTree.ItemsSource = _allNodes;
+        try
+        {
+            // TypeRegistry에서 네임스페이스 트리 가져오기
+            var nodes = _pluginOnly 
+                ? TypeRegistry.Instance.GetPluginNamespaceNodes()
+                : TypeRegistry.Instance.GetNamespaceNodes();
+                
+            _namespaceTree.ItemsSource = nodes;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"네임스페이스 트리 초기화 중 오류 발생: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void OnSearchTextChanged(object sender, TextChangedEventArgs e)
     {
-        if (_searchBox.Text == "검색어를 입력하세요..." || string.IsNullOrWhiteSpace(_searchBox.Text))
+        // 타이머 재설정 (디바운싱)
+        _searchDebounceTimer.Stop();
+        _searchDebounceTimer.Start();
+    }
+
+    private void OnSearchTimerTick(object? sender, EventArgs e)
+    {
+        _searchDebounceTimer.Stop();
+        
+        // 이전 검색 취소
+        _searchCts.Cancel();
+        
+        // 새 검색 시작
+        var newCts = new CancellationTokenSource();
+        var token = newCts.Token;
+        
+        PerformSearchAsync(_searchBox.Text, token);
+    }
+
+    private async void PerformSearchAsync(string searchText, CancellationToken token)
+    {
+        if (searchText == "검색어를 입력하세요..." || string.IsNullOrWhiteSpace(searchText))
         {
-            // 검색이 없을 때는 필터를 제거
-            foreach (var node in _allNodes!)
-            {
-                node.SetFilteredTypes(null);
-            }
-            _namespaceTree.ItemsSource = _allNodes;
+            // 검색이 없을 때는 전체 트리 표시
+            InitializeNamespaceTree();
             return;
         }
 
-        var searchText = _searchBox.Text.ToLower();
-        var terms = searchText.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-
-        // 검색 조건에 맞는 타입들을 찾음
-        var matchedTypes = _allNodes!
-            .SelectMany(n => n.GetAllTypesInHierarchy())
-            .Where(t => IsFuzzyMatch(t, terms))
-            .ToList();
-
-        // 최상위 네임스페이스 노드들에만 필터링된 타입 설정
-        foreach (var node in _allNodes!)
+        try
         {
-            node.SetFilteredTypes(matchedTypes);
-        }
-
-        // 매칭된 타입이 있는 노드만 표시
-        var filteredNodes = _allNodes!
-            .Where(n => n.HasMatchedTypes())
-            .OrderBy(n => n.Name);
-
-        _namespaceTree.ItemsSource = filteredNodes;
-    }
-
-    private bool IsFuzzyMatch(Type type, string[] searchTerms)
-    {
-        var typeName = type.Name;
-        var namespaceName = type.Namespace ?? "(No Namespace)";
-        
-        return searchTerms.All(term =>
-        {
-            term = term.ToLower();
+            // TypeRegistry의 최적화된 검색 사용
+            var matchedTypes = await Task.Run(() => 
+                TypeRegistry.Instance.SearchTypes(searchText, _pluginOnly), token);
+                
+            if (token.IsCancellationRequested) return;
             
-            // 1. 정확한 단어 매칭 (대소문자 구분 없이)
-            if (typeName.Equals(term, StringComparison.OrdinalIgnoreCase))
-                return true;
-
-            // 2. 타입 이름이 검색어로 시작하는 경우
-            if (typeName.StartsWith(term, StringComparison.OrdinalIgnoreCase))
-                return true;
-
-            // 3. 파스칼 케이스 단어 매칭
-            var words = SplitPascalCase(typeName);
-            if (words.Any(w => w.Equals(term, StringComparison.OrdinalIgnoreCase)))
-                return true;
-
-            // 4. 약어 매칭 (대문자로만 구성된 검색어의 경우)
-            if (term.All(char.IsUpper) && term.Length >= 2)
-            {
-                var acronym = string.Concat(words.Select(w => w.FirstOrDefault()));
-                if (acronym.Contains(term, StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-
-            // 5. 네임스페이스 매칭 (전체 또는 마지막 부분)
-            var nsWords = namespaceName.Split('.');
-            var lastNs = nsWords.LastOrDefault() ?? "";
-            return lastNs.Equals(term, StringComparison.OrdinalIgnoreCase) ||
-                   namespaceName.Equals(term, StringComparison.OrdinalIgnoreCase);
-        });
-    }
-
-    private static IEnumerable<string> SplitPascalCase(string input)
-    {
-        if (string.IsNullOrEmpty(input))
-            yield break;
-
-        var currentWord = new System.Text.StringBuilder(input[0].ToString());
-        
-        for (int i = 1; i < input.Length; i++)
-        {
-            if (char.IsUpper(input[i]) && 
-                (char.IsLower(input[i - 1]) || 
-                 (i + 1 < input.Length && char.IsLower(input[i + 1]))))
-            {
-                yield return currentWord.ToString();
-                currentWord.Clear();
-            }
-            currentWord.Append(input[i]);
+            // UI 스레드에서 트리 업데이트
+            await Dispatcher.InvokeAsync(() => {
+                UpdateTreeWithSearchResults(matchedTypes);
+            });
         }
-        
-        if (currentWord.Length > 0)
-            yield return currentWord.ToString();
+        catch (OperationCanceledException)
+        {
+            // 검색 취소됨 - 무시
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"검색 중 오류가 발생했습니다: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
-    private string? GetParentNamespace(string fullNamespace)
+    private void UpdateTreeWithSearchResults(List<Type> matchedTypes)
     {
-        var lastDotIndex = fullNamespace.LastIndexOf('.');
-        return lastDotIndex > 0 ? fullNamespace.Substring(0, lastDotIndex) : null;
+        try
+        {
+            // TypeRegistry에서 네임스페이스 트리 가져오기
+            var nodes = _pluginOnly 
+                ? TypeRegistry.Instance.GetPluginNamespaceNodes()
+                : TypeRegistry.Instance.GetNamespaceNodes();
+                
+            // 검색 결과로 트리 업데이트
+            foreach (var node in nodes)
+            {
+                node.SetFilteredTypes(matchedTypes);
+            }
+            
+            // 매칭된 타입이 있는 노드만 표시
+            var filteredNodes = nodes
+                .Where(n => n.HasMatchedTypes())
+                .OrderBy(n => n.Name);
+                
+            _namespaceTree.ItemsSource = filteredNodes;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"검색 결과 업데이트 중 오류 발생: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void OnTreeViewSelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
@@ -284,47 +293,4 @@ public class TypeSelectorDialog : Window
             _selectedType = type;
         }
     }
-
-    private IEnumerable<NamespaceTypeNode> CreateNamespaceNodes(IEnumerable<Type> types)
-    {
-        var namespaceGroups = types.GroupBy(t => t.Namespace ?? "(No Namespace)");
-        var nodes = new Dictionary<string, NamespaceTypeNode>();
-
-        foreach (var group in namespaceGroups)
-        {
-            var ns = group.Key;
-            var parts = ns.Split('.');
-            var currentNs = "";
-
-            for (int i = 0; i < parts.Length; i++)
-            {
-                var part = parts[i];
-                var fullNs = i == 0 ? part : $"{currentNs}.{part}";
-
-                if (!nodes.ContainsKey(fullNs))
-                {
-                    var node = new NamespaceTypeNode(fullNs, _pluginOnly);
-                    nodes[fullNs] = node;
-
-                    if (i > 0 && nodes.TryGetValue(currentNs, out var parentNode))
-                    {
-                        parentNode.AddChild(node);
-                    }
-                }
-
-                if (i == parts.Length - 1)
-                {
-                    foreach (var type in group.OrderBy(t => t.Name))
-                    {
-                        nodes[fullNs].Types.Add(type);
-                    }
-                }
-
-                currentNs = fullNs;
-            }
-        }
-
-        // 최상위 노드만 반환 (부모가 없는 노드들)
-        return nodes.Values.Where(n => !n.FullNamespace.Contains('.'));
-    }
-} 
+}

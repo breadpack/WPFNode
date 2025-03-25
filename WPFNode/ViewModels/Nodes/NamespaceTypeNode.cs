@@ -68,8 +68,22 @@ public class NamespaceTypeNode : ObservableObject
         _isUpdating = true;
         try
         {
-            // 전체 트리의 필터와 캐시를 초기화
-            SetFilteredTypesInternal(types);
+            // 병렬 처리로 전체 트리의 필터와 캐시를 초기화
+            // ConcurrentBag은 스레드 안전한 컬렉션
+            var typesCollection = types != null ? new HashSet<Type>(types) : null;
+            
+            // 필터 설정
+            _filteredTypes = typesCollection;
+            _hasMatchedTypesCache = null;
+            
+            // 모든 하위 네임스페이스에 대해 병렬로 필터 초기화
+            if (_childNamespaces.Count > 0)
+            {
+                Parallel.ForEach(_childNamespaces, childNs =>
+                {
+                    childNs.SetFilteredTypesInternal(typesCollection);
+                });
+            }
 
             // 하위에서 상위로 HasMatchedTypes 결과를 계산
             UpdateMatchedTypesCache();
@@ -370,4 +384,4 @@ public class NamespaceTypeNode : ObservableObject
             Application.Current.Dispatcher.BeginInvoke(new Action(UpdateUIHierarchy), DispatcherPriority.Background);
         }
     }
-} 
+}
