@@ -21,6 +21,7 @@ public class TypeSelectorDialog : Window
     private readonly bool _pluginOnly;
     private readonly TextBox _searchBox;
     private readonly TreeView _namespaceTree;
+    private readonly ListView _resultListView; // 검색 결과 표시용 ListView 추가
     private Type? _selectedType;
     private CancellationTokenSource _searchCts = new();
     private readonly DispatcherTimer _searchDebounceTimer;
@@ -82,18 +83,65 @@ public class TypeSelectorDialog : Window
         ScrollViewer.SetCanContentScroll(_namespaceTree, true);
         VirtualizingPanel.SetIsVirtualizing(_namespaceTree, true);
         VirtualizingPanel.SetVirtualizationMode(_namespaceTree, VirtualizationMode.Recycling);
+        
+        // 검색 결과 리스트뷰
+        _resultListView = new ListView
+        {
+            Margin = new Thickness(5),
+            Visibility = Visibility.Collapsed // 초기에는 숨김 상태
+        };
+        ScrollViewer.SetCanContentScroll(_resultListView, true);
+        VirtualizingPanel.SetIsVirtualizing(_resultListView, true);
+        VirtualizingPanel.SetVirtualizationMode(_resultListView, VirtualizationMode.Recycling);
+        
+        // 리스트뷰 타입 템플릿 설정
+        var resultTemplate = new DataTemplate(typeof(Type));
+        var typeStackPanel = new FrameworkElementFactory(typeof(StackPanel));
+        typeStackPanel.SetValue(StackPanel.OrientationProperty, Orientation.Vertical);
+        
+        var nameTextBlock = new FrameworkElementFactory(typeof(TextBlock));
+        nameTextBlock.SetBinding(TextBlock.TextProperty, new Binding("Name") { Mode = BindingMode.OneTime });
+        nameTextBlock.SetValue(TextBlock.FontWeightProperty, FontWeights.Bold);
+        
+        var namespaceTextBlock = new FrameworkElementFactory(typeof(TextBlock));
+        namespaceTextBlock.SetBinding(TextBlock.TextProperty, new Binding("Namespace") { Mode = BindingMode.OneTime });
+        namespaceTextBlock.SetValue(TextBlock.FontSizeProperty, 11.0);
+        namespaceTextBlock.SetValue(TextBlock.ForegroundProperty, new SolidColorBrush(Colors.Gray));
+        
+        typeStackPanel.AppendChild(nameTextBlock);
+        typeStackPanel.AppendChild(namespaceTextBlock);
+        
+        resultTemplate.VisualTree = typeStackPanel;
+        _resultListView.ItemTemplate = resultTemplate;
+        
+        // 리스트뷰 선택 이벤트 연결
+        _resultListView.SelectionChanged += (s, e) => {
+            if (_resultListView.SelectedItem is Type type)
+            {
+                _selectedType = type;
+            }
+        };
+        
+        // 더블 클릭으로 바로 선택 완료
+        _resultListView.MouseDoubleClick += (s, e) => {
+            if (_selectedType != null)
+            {
+                DialogResult = true;
+                Close();
+            }
+        };
 
         // TreeView 데이터 템플릿 설정
-        var typeTemplate = new DataTemplate(typeof(Type));
-        var typeTextBlock = new FrameworkElementFactory(typeof(TextBlock));
-        typeTextBlock.SetBinding(TextBlock.TextProperty, new Binding("Name"));
-        typeTemplate.VisualTree = typeTextBlock;
+        var treeTypeTemplate = new DataTemplate(typeof(Type));
+        var treeTypeTextBlock = new FrameworkElementFactory(typeof(TextBlock));
+        treeTypeTextBlock.SetBinding(TextBlock.TextProperty, new Binding("Name"));
+        treeTypeTemplate.VisualTree = treeTypeTextBlock;
 
         var namespaceTemplate = new HierarchicalDataTemplate(typeof(NamespaceTypeNode));
-        var namespaceTextBlock = new FrameworkElementFactory(typeof(TextBlock));
-        namespaceTextBlock.SetBinding(TextBlock.TextProperty, new Binding("Name"));
-        namespaceTextBlock.SetValue(TextBlock.FontWeightProperty, FontWeights.Bold);
-        namespaceTemplate.VisualTree = namespaceTextBlock;
+        var treeNamespaceTextBlock = new FrameworkElementFactory(typeof(TextBlock));
+        treeNamespaceTextBlock.SetBinding(TextBlock.TextProperty, new Binding("Name"));
+        treeNamespaceTextBlock.SetValue(TextBlock.FontWeightProperty, FontWeights.Bold);
+        namespaceTemplate.VisualTree = treeNamespaceTextBlock;
         
         // Children (하위 네임스페이스)에 대한 바인딩
         namespaceTemplate.ItemsSource = new Binding("Children");
@@ -104,7 +152,7 @@ public class TypeSelectorDialog : Window
         typesTextBlock.SetBinding(TextBlock.TextProperty, new Binding("Name"));
         typesTemplate.VisualTree = typesTextBlock;
 
-        _namespaceTree.Resources.Add(typeof(Type), typesTemplate);
+        _namespaceTree.Resources.Add(typeof(Type), treeTypeTemplate);
         _namespaceTree.Resources.Add(typeof(NamespaceTypeNode), namespaceTemplate);
         
         _namespaceTree.ItemTemplate = namespaceTemplate;
@@ -112,6 +160,10 @@ public class TypeSelectorDialog : Window
         _namespaceTree.SelectedItemChanged += OnTreeViewSelectedItemChanged;
         _mainGrid.Children.Add(_namespaceTree);
         Grid.SetRow(_namespaceTree, 1);
+        
+        // 리스트뷰를 그리드에 추가
+        _mainGrid.Children.Add(_resultListView);
+        Grid.SetRow(_resultListView, 1);
 
         // 버튼 패널
         var buttonPanel = new StackPanel
@@ -277,7 +329,11 @@ public class TypeSelectorDialog : Window
     {
         if (searchText == "검색어를 입력하세요..." || string.IsNullOrWhiteSpace(searchText))
         {
-            // 검색이 없을 때는 전체 트리 표시
+            // 검색이 없을 때는 TreeView 표시, ListView 숨김
+            _namespaceTree.Visibility = Visibility.Visible;
+            _resultListView.Visibility = Visibility.Collapsed;
+            
+            // 전체 트리 표시
             InitializeNamespaceTree();
             return;
         }
@@ -288,9 +344,26 @@ public class TypeSelectorDialog : Window
             var matchedTypes = TypeRegistry.Instance.SearchTypes(searchText, _pluginOnly);
             
             if (token.IsCancellationRequested) return;
-            
-            // UI 스레드에서 트리 즉시 업데이트
-            UpdateTreeWithSearchResults(matchedTypes);
+
+            // 검색 결과가 있으면 ListView 사용, 없으면 TreeView 사용
+            if (matchedTypes.Count > 0)
+            {
+                // ListView 표시 및 TreeView 숨김
+                _namespaceTree.Visibility = Visibility.Collapsed;
+                _resultListView.Visibility = Visibility.Visible;
+                
+                // 검색 결과를 ListView에 바인딩 (정렬하여 표시)
+                _resultListView.ItemsSource = matchedTypes.OrderBy(t => t.Name);
+            }
+            else
+            {
+                // 결과가 없으면 TreeView 표시, ListView 숨김
+                _namespaceTree.Visibility = Visibility.Visible;
+                _resultListView.Visibility = Visibility.Collapsed;
+                
+                // 트리 초기화 (결과 없음 메시지 표시를 여기서 할 수도 있음)
+                InitializeNamespaceTree();
+            }
         }
         catch (OperationCanceledException)
         {
@@ -302,78 +375,7 @@ public class TypeSelectorDialog : Window
         }
     }
 
-    private void UpdateTreeWithSearchResults(List<Type> matchedTypes)
-    {
-        try
-        {
-            // 이미 완전히 초기화된 트리가 없으면 초기화
-            if (_allNodes == null || _allNodes.Count == 0)
-            {
-                InitializeNamespaceTree();
-                
-                // 검색 결과가 없으면 종료
-                if (matchedTypes.Count == 0)
-                {
-                    return;
-                }
-            }
-            
-            // 네임스페이스 트리에서 루트 노드 가져오기
-            var rootNodes = _allNodes!.Where(n => !n.FullNamespace.Contains('.')).ToList();
-            
-            // 검색 결과가 없는 경우 전체 트리 표시
-            if (matchedTypes.Count == 0)
-            {
-                _namespaceTree.ItemsSource = rootNodes;
-                return;
-            }
-            
-            // 타입 집합 생성 - 성능 최적화를 위해 HashSet 사용
-            var typesSet = new HashSet<Type>(matchedTypes);
-            
-            // 모든 루트 노드에 대해 필터 적용
-            foreach (var node in rootNodes)
-            {
-                // SetFilteredTypes는 재귀적으로 모든 자식 노드에 필터 적용
-                node.SetFilteredTypes(typesSet);
-            }
-            
-            // 검색 결과가 있는 루트 노드만 표시
-            var filteredRootNodes = rootNodes
-                .Where(n => n.HasMatchedTypes())
-                .OrderBy(n => n.Name)
-                .ToList();
-            
-            // UI에 바인딩
-            _namespaceTree.ItemsSource = filteredRootNodes;
-            
-            // 모든 매치된 노드 자동 확장 및 깊은 레벨의 노드도 확장
-            foreach (var node in filteredRootNodes)
-            {
-                ExpandMatchedNodes(node, typesSet);
-            }
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"검색 결과 업데이트 중 오류 발생: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
-    
-    // 매치된 노드와 그 부모 노드들을 재귀적으로 확장
-    private void ExpandMatchedNodes(NamespaceTypeNode node, HashSet<Type> matchedTypes)
-    {
-        // 현재 노드가 매치된 타입을 포함하거나 매치된 자식 노드를 포함하면 확장
-        if (node.HasMatchedTypes())
-        {
-            node.IsExpanded = true;
-            
-            // 자식 노드들도 재귀적으로 확인
-            foreach (var child in node.Children.OfType<NamespaceTypeNode>())
-            {
-                ExpandMatchedNodes(child, matchedTypes);
-            }
-        }
-    }
+    // UpdateTreeWithSearchResults 메서드는 ListView 방식으로 대체되어 제거됨
 
     private void OnTreeViewSelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
