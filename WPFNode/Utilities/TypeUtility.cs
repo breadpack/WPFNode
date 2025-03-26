@@ -137,10 +137,36 @@ public static class TypeExtensions
     /// </summary>
     public static Type? GetElementType(this Type type)
     {
-        if (type.IsGenericType && typeof(IEnumerable<>).IsAssignableFrom(type.GetGenericTypeDefinition()))
+        // 1. null 체크
+        if (type == null) return null;
+        
+        // 2. 배열 타입 처리
+        if (type.IsArray)
         {
-            return type.GetGenericArguments()[0];
+            return type.GetElementType();
         }
+        
+        // 3. 타입이 IEnumerable를 구현하는지 확인
+        if (typeof(System.Collections.IEnumerable).IsAssignableFrom(type))
+        {
+            // 제네릭 타입인 경우
+            if (type.IsGenericType)
+            {
+                // 첫 번째 제네릭 인자를 요소 타입으로 간주
+                return type.GetGenericArguments()[0];
+            }
+            
+            // 타입의 인터페이스 중에서 IEnumerable<T>를 찾기
+            foreach (var iface in type.GetInterfaces())
+            {
+                if (iface.IsGenericType && 
+                    iface.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                {
+                    return iface.GetGenericArguments()[0];
+                }
+            }
+        }
+        
         return null;
     }
 }

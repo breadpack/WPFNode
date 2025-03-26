@@ -59,10 +59,6 @@ public class Connection : IConnection
         set => _isEnabled = value;
     }
 
-    [JsonPropertyName("isValid")]
-    public bool IsValid => Source != null && Target != null && 
-                          Target.DataType.IsAssignableFrom(Source.DataType);
-
     public void Disconnect()
     {
         // 양쪽 포트에서 연결 제거

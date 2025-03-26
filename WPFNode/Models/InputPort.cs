@@ -55,31 +55,9 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
     /// 주어진 타입이 컬렉션 타입인지 확인하고, 요소 타입을 반환합니다.
     /// </summary>
     private bool IsCollectionType(Type type, out Type? elementType) {
-        elementType = null;
-        
-        // 배열 타입 처리
-        if (type.IsArray) {
-            elementType = type.GetElementType();
-            return true;
-        }
-        
-        // 자기 자신이 IEnumerable<T>인 경우 처리
-        if (type.IsGenericType && 
-            type.GetGenericTypeDefinition() == typeof(IEnumerable<>)) {
-            elementType = type.GetGenericArguments()[0];
-            return true;
-        }
-        
-        // 인터페이스 구현 체크 - IEnumerable<T>를 구현하는 모든 컬렉션 처리
-        foreach (var iface in type.GetInterfaces()) {
-            if (iface.IsGenericType && 
-                iface.GetGenericTypeDefinition() == typeof(IEnumerable<>)) {
-                elementType = iface.GetGenericArguments()[0];
-                return true;
-            }
-        }
-        
-        return false;
+        // TypeUtility의 GetElementType 메서드 활용
+        elementType = WPFNode.Utilities.TypeExtensions.GetElementType(type);
+        return elementType != null;
     }
     
     public bool CanAcceptType(Type sourceType) {

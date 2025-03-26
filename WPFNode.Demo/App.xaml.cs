@@ -42,6 +42,7 @@ public partial class App : Application
         pluginService.RegisterNodeType(typeof(StringToEmployeeNode));
         pluginService.RegisterNodeType(typeof(EmployeeInfoNode));
         pluginService.RegisterNodeType(typeof(EmployeeToStringNode));
+        pluginService.RegisterNodeType(typeof(EmployeeArrayElementNode));
         
         // 변수 노드
         pluginService.RegisterNodeType(typeof(EmployeeVariableNode));
