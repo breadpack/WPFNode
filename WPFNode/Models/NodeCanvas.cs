@@ -13,7 +13,7 @@ using WPFNode.Services;
 
 namespace WPFNode.Models;
 
-public class NodeCanvas : INodeCanvas, INotifyPropertyChanged
+public partial class NodeCanvas : INodeCanvas, INotifyPropertyChanged
 {
     private readonly List<NodeBase> _nodes;
     private readonly List<IConnection> _connections;

@@ -705,6 +705,11 @@ public class NodeCanvasControl : Control
                     PasteNodes();
                     e.Handled = true;
                     break;
+                    
+                case Key.D:
+                    DuplicateSelectedNodes();
+                    e.Handled = true;
+                    break;
 
                 case Key.A:
                     SelectAllItems();
@@ -745,6 +750,12 @@ public class NodeCanvasControl : Control
     {
         if (ViewModel == null) return;
         ViewModel.PasteCommand.Execute(null);
+    }
+    
+    private void DuplicateSelectedNodes()
+    {
+        if (ViewModel == null) return;
+        ViewModel.DuplicateCommand.Execute(null);
     }
 
     private void DeleteSelectedItems()

@@ -10,6 +10,7 @@ using CommandManager = WPFNode.Commands.CommandManager;
 using IWpfCommand = System.Windows.Input.ICommand;
 using System.Windows.Data;
 using System.ComponentModel;
+using WPFNode.Utilities;
 
 namespace WPFNode.ViewModels.Nodes;
 
@@ -50,10 +51,14 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
     public IWpfCommand ExecuteCommand     { get; init; }
     public IWpfCommand CopyCommand        { get; init; }
     public IWpfCommand PasteCommand       { get; init; }
+    public IWpfCommand DuplicateCommand   { get; init; }
     public IWpfCommand SaveCommand        { get; init; }
     public IWpfCommand LoadCommand        { get; init; }
 
     public NodeCanvasViewModel() : this(new()) { }
+
+    // 클립보드 형식 상수 정의
+    private const string ClipboardFormat = "WPFNode.NodeData";
 
     public NodeCanvasViewModel(NodeCanvas canvas) {
         ArgumentNullException.ThrowIfNull(canvas);
@@ -82,6 +87,7 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
         ExecuteCommand     = new RelayCommand(ExecuteNodes);
         CopyCommand        = new RelayCommand(CopySelectedNodes);
         PasteCommand       = new RelayCommand(PasteNodes);
+        DuplicateCommand   = new RelayCommand(DuplicateSelectedNodes);
         SaveCommand        = new RelayCommand(SaveCanvas);
         LoadCommand        = new RelayCommand(LoadCanvas);
 
@@ -417,23 +423,101 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
 
     private void CopySelectedNodes() {
         var selectedNodes = Nodes.Where(n => n.IsSelected).ToList();
-        if (selectedNodes.Any()) {
-            var nodeDataList = selectedNodes.Select(n => ((NodeBase)n.Model).CreateCopy()).ToList();
-            System.Windows.Clipboard.SetDataObject(nodeDataList);
+        if (!selectedNodes.Any()) return;
+        
+        try {
+            // 선택된 노드들을 JSON으로 직렬화
+            var jsonArray = selectedNodes.Select(vm => vm.Model).NodesToJson();
+            
+            // 클립보드에 JSON 저장 (사용자 정의 형식 + 텍스트 형식 모두 지원)
+            var dataObject = new DataObject();
+            dataObject.SetData(ClipboardFormat, jsonArray);
+            dataObject.SetText(jsonArray);
+            System.Windows.Clipboard.SetDataObject(dataObject);
+        }
+        catch (Exception ex) {
+            System.Diagnostics.Debug.WriteLine($"노드 복사 중 오류: {ex.Message}");
         }
     }
 
     private void PasteNodes() {
-        var dataObject = System.Windows.Clipboard.GetDataObject();
-        if (dataObject?.GetData(typeof(List<NodeBase>)) is List<NodeBase> nodeDataList) {
-            foreach (var node in nodeDataList) {
-                var newNode = _canvas.CreateNode(node.GetType(), node.X + 20, node.Y + 20);
-                // 필요한 속성들을 복사
-                if (newNode is NodeBase nodeBase) {
-                    nodeBase.Name = node.Name;
+        try {
+            // 클립보드에서 데이터 가져오기 (사용자 정의 형식 우선, 없으면 텍스트 형식)
+            var dataObject = System.Windows.Clipboard.GetDataObject();
+            string? jsonArray = null;
+            
+            if (dataObject?.GetDataPresent(ClipboardFormat) == true) {
+                jsonArray = dataObject.GetData(ClipboardFormat) as string;
+            }
+            else if (dataObject?.GetDataPresent(DataFormats.Text) == true) {
+                jsonArray = dataObject.GetData(DataFormats.Text) as string;
+            }
+            
+            if (string.IsNullOrEmpty(jsonArray)) return;
+            
+            // 모든 노드의 선택 해제
+            ClearSelection();
+            
+            // 오프셋 계산 - 붙여넣기는 고정된 오프셋 대신 점진적으로 증가
+            var pasteOffsetX = 40;
+            var pasteOffsetY = 40;
+            
+            // JSON에서 노드 생성
+            var addedNodes = _canvas.CreateNodesFromJson(jsonArray, pasteOffsetX, pasteOffsetY);
+            var addedNodeViewModels = new List<NodeViewModel>();
+            
+            // 생성된 노드의 ViewModel 찾기
+            foreach (var node in addedNodes) {
+                var nodeVM = Nodes.FirstOrDefault(vm => vm.Id == node.Guid);
+                if (nodeVM != null) {
+                    addedNodeViewModels.Add(nodeVM);
                 }
             }
-            // SynchronizeWithModel();
+            
+            // 추가된 노드들 선택
+            foreach (var nodeVM in addedNodeViewModels) {
+                SelectItem(nodeVM, false);
+            }
+        }
+        catch (Exception ex) {
+            System.Diagnostics.Debug.WriteLine($"노드 붙여넣기 중 오류: {ex.Message}");
+        }
+    }
+    
+    private void DuplicateSelectedNodes() {
+        var selectedNodes = GetSelectedItemsOfType<NodeViewModel>().ToList();
+        if (!selectedNodes.Any()) return;
+        
+        // 선택 해제
+        ClearSelection();
+        
+        var addedNodeViewModels = new List<NodeViewModel>();
+        
+        // 복제 오프셋 - 복제는 원래 위치에서 좀 더 가까운 거리에 배치
+        var duplicateOffsetX = 30;
+        var duplicateOffsetY = 30;
+        
+        // 각 노드를 복제
+        foreach (var nodeVM in selectedNodes) {
+            try {
+                // 노드를 JSON으로 직렬화 후 새 노드 생성
+                var nodeJson = nodeVM.Model.ToJson();
+                var newNode = _canvas.CreateNodeFromJson(nodeJson, duplicateOffsetX, duplicateOffsetY);
+                if (newNode != null) {
+                    var newNodeVM = Nodes.FirstOrDefault(vm => vm.Id == newNode.Guid);
+                    if (newNodeVM != null) {
+                        addedNodeViewModels.Add(newNodeVM);
+                    }
+                }
+            }
+            catch (Exception ex) {
+                System.Diagnostics.Debug.WriteLine($"노드 복제 중 오류: {ex.Message}");
+            }
+        }
+        
+        // 복제된 노드들 선택
+        foreach (var nodeVM in addedNodeViewModels) {
+            SelectItem(nodeVM, false);
         }
     }
 

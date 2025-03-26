@@ -146,41 +146,80 @@ public class NodeControl : ContentControl, INodeControl
         var pasteMenuItem = new MenuItem { Header = "붙여넣기" };
         pasteMenuItem.Click += (s, e) => PasteNodes();
         
+        var duplicateMenuItem = new MenuItem { Header = "복제" };
+        duplicateMenuItem.Click += (s, e) => DuplicateSelectedNodes();
+        
         var deleteMenuItem = new MenuItem { Header = "삭제" };
         deleteMenuItem.Click += (s, e) => DeleteSelectedNodes();
 
         _contextMenu.Items.Add(copyMenuItem);
         _contextMenu.Items.Add(pasteMenuItem);
+        _contextMenu.Items.Add(duplicateMenuItem);
         _contextMenu.Items.Add(new Separator());
         _contextMenu.Items.Add(deleteMenuItem);
 
         ContextMenu = _contextMenu;
+        
+        // 키보드 이벤트 핸들러 추가
+        PreviewKeyDown += OnNodeKeyDown;
+        Focusable = true; // 키 이벤트를 받기 위해 필요
+    }
+    
+    private void OnNodeKeyDown(object sender, KeyEventArgs e)
+    {
+        if (Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            var canvasViewModel = GetCanvasViewModel();
+            if (canvasViewModel == null) return;
+            
+            switch (e.Key)
+            {
+                case Key.C:
+                    canvasViewModel.CopyCommand.Execute(null);
+                    e.Handled = true;
+                    break;
+                case Key.V:
+                    canvasViewModel.PasteCommand.Execute(null);
+                    e.Handled = true;
+                    break;
+                case Key.D:
+                    canvasViewModel.DuplicateCommand.Execute(null);
+                    e.Handled = true;
+                    break;
+            }
+        }
+    }
+    
+    private INodeCanvasViewModel? GetCanvasViewModel()
+    {
+        var canvas = this.GetParentOfType<NodeCanvasControl>();
+        return canvas?.ViewModel;
     }
 
     private void CopySelectedNodes()
     {
-        var canvas = this.GetParentOfType<NodeCanvasControl>();
-        if (canvas?.ViewModel == null) return;
-
-        var selectedNodes = canvas.ViewModel.GetSelectedItemsOfType<NodeViewModel>().ToList();
-        if (selectedNodes.Any())
+        var canvasViewModel = GetCanvasViewModel();
+        if (canvasViewModel != null)
         {
-            var nodeDataList = selectedNodes.Select(n => ((NodeBase)n.Model).CreateCopy()).ToList();
-            Clipboard.SetData("NodeEditorNodes", nodeDataList);
+            canvasViewModel.CopyCommand.Execute(null);
         }
     }
 
     private void PasteNodes()
     {
-        var canvas = this.GetParentOfType<NodeCanvasControl>();
-        if (canvas?.ViewModel == null) return;
-
-        if (Clipboard.GetData("NodeEditorNodes") is List<NodeBase> nodeDataList)
+        var canvasViewModel = GetCanvasViewModel();
+        if (canvasViewModel != null)
         {
-            foreach (var node in nodeDataList)
-            {
-                canvas.ViewModel.AddNodeCommand.Execute(node);
-            }
+            canvasViewModel.PasteCommand.Execute(null);
+        }
+    }
+    
+    private void DuplicateSelectedNodes()
+    {
+        var canvasViewModel = GetCanvasViewModel();
+        if (canvasViewModel != null)
+        {
+            canvasViewModel.DuplicateCommand.Execute(null);
         }
     }
 
@@ -386,4 +425,4 @@ public class NodeControl : ContentControl, INodeControl
                 yield return childOfChild;
         }
     }
-} 
+}

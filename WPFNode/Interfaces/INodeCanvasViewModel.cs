@@ -29,6 +29,7 @@ public interface INodeCanvasViewModel
     IWpfCommand ExecuteCommand { get; }
     IWpfCommand CopyCommand { get; }
     IWpfCommand PasteCommand { get; }
+    IWpfCommand DuplicateCommand { get; }
     IWpfCommand SaveCommand { get; }
     IWpfCommand LoadCommand { get; }
 
@@ -122,4 +123,4 @@ public interface INodeCanvasViewModel
     /// <param name="nodeType">찾을 노드의 타입</param>
     /// <returns>찾은 노드들의 ViewModel 목록</returns>
     IEnumerable<NodeViewModel> FindNodesByType(Type nodeType);
-} 
+}
