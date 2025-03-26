@@ -86,7 +86,6 @@ public class SwitchNode : DynamicNode {
             var caseProps = Properties.Where(p => p.Name.StartsWith("Case_"));
             foreach (var prop in caseProps) {
                 if (prop.Value?.Equals(inputValue) ?? false) {
-                    var portName = $"Case: {prop.Value}";
                     if (_flowOutPorts.TryGetValue(prop.Name, out var matchedPort)) {
                         Logger?.LogDebug($"SwitchNode: Matched case for value '{inputValue}'");
                         yield return matchedPort;
@@ -141,7 +140,7 @@ public class SwitchNode : DynamicNode {
 
             // 출력 포트 생성
             if (prop.Value != null) {
-                var portName = $"Case: {prop.Value}";
+                var portName = $"Case {prop.Value}";
                 _flowOutPorts[prop.Name] = builder.FlowOut(portName);
             }
         }
