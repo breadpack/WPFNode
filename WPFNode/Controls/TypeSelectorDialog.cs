@@ -23,8 +23,8 @@ public class TypeSelectorDialog : Window
     private readonly TreeView _namespaceTree;
     private readonly ListView _resultListView; // 검색 결과 표시용 ListView 추가
     private Type? _selectedType;
-    private CancellationTokenSource _searchCts = new();
-    private readonly DispatcherTimer _searchDebounceTimer;
+    private CancellationTokenSource? _searchCts;
+    private readonly System.Timers.Timer _searchDebounceTimer;
     
     // 로딩 인디케이터
     private readonly ProgressBar _loadingIndicator;
@@ -42,11 +42,11 @@ public class TypeSelectorDialog : Window
         ResizeMode = ResizeMode.CanResize;
         SizeToContent = SizeToContent.Manual;
 
-        // 검색 딜레이 타이머
-        _searchDebounceTimer = new DispatcherTimer {
-            Interval = TimeSpan.FromMilliseconds(300)
-        };
-        _searchDebounceTimer.Tick += OnSearchTimerTick;
+        // System.Timers.Timer로 변경
+        _searchDebounceTimer = new System.Timers.Timer(300);
+        _searchDebounceTimer.Elapsed += OnSearchTimerElapsed;
+        _searchDebounceTimer.AutoReset = false; // 한 번만 실행
+        _searchDebounceTimer.Start();
 
         _mainGrid = new Grid();
         _mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -217,10 +217,19 @@ public class TypeSelectorDialog : Window
         Content = _mainGrid;
 
         // UI가 준비되면 타입 초기화 시작
+        Loaded += OnDialogLoaded;
+        Closing += OnDialogClosing;
+
+        // 비동기 초기화 시작
+        InitializeAsync();
+    }
+
+    private async void InitializeAsync()
+    {
         try
         {
-            // TypeRegistry 동기식 초기화 - GetAwaiter().GetResult()를 사용하여 동기적으로 기다림
-            TypeRegistry.Instance.InitializeAsync().GetAwaiter().GetResult();
+            // TypeRegistry 비동기 초기화
+            await TypeRegistry.Instance.InitializeAsync();
             
             // 초기화 완료 후 로딩 표시 숨김
             _loadingIndicator.Visibility = Visibility.Collapsed;
@@ -233,14 +242,11 @@ public class TypeSelectorDialog : Window
             MessageBox.Show($"타입 정보를 로드하는 중 오류가 발생했습니다: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
             Close(); // 초기화 실패 시 다이얼로그 닫기
         }
-
-        Loaded += OnDialogLoaded;
-        Closing += (s, e) => _searchCts.Cancel();
     }
 
     private void OnDialogLoaded(object sender, RoutedEventArgs e)
     {
-        // 생성자에서 이미 초기화가 완료되었으므로 포커스만 설정
+        // 포커스 설정
         _searchBox.Focus();
     }
 
@@ -302,67 +308,105 @@ public class TypeSelectorDialog : Window
 
     private void OnSearchTextChanged(object sender, TextChangedEventArgs e)
     {
-        // 타이머 재설정 (디바운싱)
+        // 타이머 재설정
         _searchDebounceTimer.Stop();
         _searchDebounceTimer.Start();
     }
 
-    private void OnSearchTimerTick(object? sender, EventArgs e)
+    private void OnSearchTimerElapsed(object? sender, System.Timers.ElapsedEventArgs e)
     {
-        _searchDebounceTimer.Stop();
-        
-        // 이전 검색 취소 및 리소스 정리
-        if (_searchCts != null)
-        {
-            _searchCts.Cancel();
-            _searchCts.Dispose();
-        }
-        
-        // 새 검색 CancellationTokenSource 생성 및 할당
-        _searchCts = new CancellationTokenSource();
-        
-        // 새 토큰으로 검색 수행
-        PerformSearchAsync(_searchBox.Text, _searchCts.Token);
+        // UI 스레드에서 검색 수행
+        Application.Current.Dispatcher.Invoke(() => {
+            try
+            {
+                // 이전 검색 취소 및 리소스 정리
+                if (_searchCts != null)
+                {
+                    _searchCts.Cancel();
+                    _searchCts.Dispose();
+                }
+                
+                // 새 검색 CancellationTokenSource 생성 및 할당
+                _searchCts = new CancellationTokenSource();
+                
+                // 새 토큰으로 검색 수행
+                PerformSearchAsync(_searchBox.Text, _searchCts.Token);
+            }
+            catch (ObjectDisposedException)
+            {
+                // 이미 해제된 경우 무시
+            }
+        });
     }
 
-    private void PerformSearchAsync(string searchText, CancellationToken token)
+    private async void PerformSearchAsync(string searchText, CancellationToken token)
     {
-        if (searchText == "검색어를 입력하세요..." || string.IsNullOrWhiteSpace(searchText))
-        {
-            // 검색이 없을 때는 TreeView 표시, ListView 숨김
-            _namespaceTree.Visibility = Visibility.Visible;
-            _resultListView.Visibility = Visibility.Collapsed;
-            
-            // 전체 트리 표시
-            InitializeNamespaceTree();
-            return;
-        }
-
         try
         {
-            // 동기식으로 직접 검색 수행
-            var matchedTypes = TypeRegistry.Instance.SearchTypes(searchText, _pluginOnly);
+            // 로딩 표시 활성화
+            _loadingIndicator.Visibility = Visibility.Visible;
+            
+            if (searchText == "검색어를 입력하세요..." || string.IsNullOrWhiteSpace(searchText))
+            {
+                // 검색이 없을 때는 TreeView만 표시
+                _namespaceTree.Visibility = Visibility.Visible;
+                _resultListView.Visibility = Visibility.Collapsed;
+                
+                // 필터 제거 (모든 노드 표시)
+                if (_allNodes != null && _allNodes.Count > 0)
+                {
+                    // 루트 노드 찾기 - UI 스레드에서 바로 업데이트
+                    var rootNodes = _allNodes
+                        .Where(n => !n.FullNamespace.Contains('.') || GetParentNamespace(n.FullNamespace) == null)
+                        .ToList();
+                    
+                    // UI에 바인딩
+                    _namespaceTree.ItemsSource = rootNodes;
+                }
+                
+                // 로딩 표시 비활성화
+                _loadingIndicator.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            // 백그라운드 스레드에서 검색 수행
+            var matchedTypes = await Task.Run(() => {
+                // 검색 수행
+                return TypeRegistry.Instance.SearchTypes(searchText, _pluginOnly);
+            }, token);
             
             if (token.IsCancellationRequested) return;
 
-            // 검색 결과가 있으면 ListView 사용, 없으면 TreeView 사용
+            // 검색 결과가 있으면 ListView로 표시 (TreeView 필터링 제거)
             if (matchedTypes.Count > 0)
             {
-                // ListView 표시 및 TreeView 숨김
+                // TreeView 숨기고 ListView만 표시
                 _namespaceTree.Visibility = Visibility.Collapsed;
                 _resultListView.Visibility = Visibility.Visible;
                 
-                // 검색 결과를 ListView에 바인딩 (정렬하여 표시)
+                // ListView에 바로 결과 바인딩 (정렬만 수행)
                 _resultListView.ItemsSource = matchedTypes.OrderBy(t => t.Name);
             }
             else
             {
-                // 결과가 없으면 TreeView 표시, ListView 숨김
+                // 결과가 없을 때는 TreeView 표시 (전체 트리)
                 _namespaceTree.Visibility = Visibility.Visible;
                 _resultListView.Visibility = Visibility.Collapsed;
                 
-                // 트리 초기화 (결과 없음 메시지 표시를 여기서 할 수도 있음)
-                InitializeNamespaceTree();
+                // 결과 없음을 표시하는 메시지를 보여줄 수도 있음
+                MessageBox.Show($"'{searchText}' 검색 결과가 없습니다.", "검색 결과", MessageBoxButton.OK, MessageBoxImage.Information);
+                
+                // TreeView 초기 상태로 복원
+                if (_allNodes != null && _allNodes.Count > 0)
+                {
+                    // 루트 노드 찾기
+                    var rootNodes = _allNodes
+                        .Where(n => !n.FullNamespace.Contains('.') || GetParentNamespace(n.FullNamespace) == null)
+                        .ToList();
+                    
+                    // UI에 바인딩
+                    _namespaceTree.ItemsSource = rootNodes;
+                }
             }
         }
         catch (OperationCanceledException)
@@ -373,15 +417,47 @@ public class TypeSelectorDialog : Window
         {
             MessageBox.Show($"검색 중 오류가 발생했습니다: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+        finally
+        {
+            // 로딩 표시 비활성화
+            _loadingIndicator.Visibility = Visibility.Collapsed;
+        }
     }
-
-    // UpdateTreeWithSearchResults 메서드는 ListView 방식으로 대체되어 제거됨
 
     private void OnTreeViewSelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
         if (e.NewValue is Type type)
         {
             _selectedType = type;
+        }
+    }
+
+    private void OnDialogClosing(object sender, System.ComponentModel.CancelEventArgs e)
+    {
+        try
+        {
+            _searchCts?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // 이미 해제된 경우 무시
+        }
+    }
+
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        try
+        {
+            _searchDebounceTimer?.Dispose();
+            _searchCts?.Dispose();
+        }
+        catch (ObjectDisposedException)
+        {
+            // 이미 해제된 경우 무시
+        }
+        finally
+        {
+            base.OnClosing(e);
         }
     }
 }

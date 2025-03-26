@@ -68,48 +68,138 @@ public class NamespaceTypeNode : ObservableObject
         _isUpdating = true;
         try
         {
-            // 필터링된 타입을 HashSet으로 변환하여 효율적인 Contains 연산 가능
-            var typesCollection = types != null ? new HashSet<Type>(types) : null;
-            
-            // 필터 설정
-            _filteredTypes = typesCollection;
-            _hasMatchedTypesCache = null;
-            
-            // 재귀적 필터 초기화 최소화 - 최상위 노드만 처리
-            if (_childNamespaces.Count > 0)
+            // 필터가 없으면 빠르게 모든 타입 표시
+            if (types == null)
             {
+                _filteredTypes = null;
+                _hasMatchedTypesCache = true;
+                
+                // 모든 자식 노드에 대해서도 동일하게 설정
                 foreach (var childNs in _childNamespaces)
                 {
-                    if (typesCollection == null || 
-                        childNs.Types.Any(t => typesCollection.Contains(t)) ||
-                        childNs._childNamespaces.Count > 0)
+                    childNs._filteredTypes = null;
+                    childNs._hasMatchedTypesCache = true;
+                }
+                
+                // UI 업데이트는 필요한 경우만 수행
+                if (Application.Current != null)
+                {
+                    Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                     {
-                        childNs.SetFilteredTypesInternal(typesCollection);
-                    }
-                    else
+                        try
+                        {
+                            // 전체 트리 표시
+                            if (_children != null)
+                            {
+                                _children.Clear();
+                                PopulateChildrenWithoutFiltering();
+                            }
+                        }
+                        finally
+                        {
+                            _isUpdating = false;
+                        }
+                    }), DispatcherPriority.Background);
+                }
+                else
+                {
+                    _isUpdating = false;
+                }
+                
+                return;
+            }
+            
+            // 효율적인 검색을 위해 HashSet으로 변환
+            var typesSet = new HashSet<Type>(types);
+            _filteredTypes = typesSet;
+            _hasMatchedTypesCache = null;
+            
+            // 최적화된 필터링: 타입이 있는 노드만 재귀 처리, 직접 매칭 우선 확인
+            bool hasDirectMatches = false;
+            foreach (var type in Types)
+            {
+                if (typesSet.Contains(type))
+                {
+                    hasDirectMatches = true;
+                    break; // 하나라도 매치되면 중단
+                }
+            }
+            
+            // 자식 노드 필터링 최적화
+            bool hasMatchingChildren = false;
+            
+            if (_childNamespaces.Count > 0)
+            {
+                // 병렬 처리로 성능 향상 (노드가 많을 경우)
+                if (_childNamespaces.Count > 10)
+                {
+                    Parallel.ForEach(_childNamespaces, childNs =>
                     {
-                        // 타입이 없는 경우 빠르게 처리
-                        childNs._filteredTypes = typesCollection;
-                        childNs._hasMatchedTypesCache = false;
+                        // 자식이 많거나 직접 매치되는 타입이 있는 경우만 재귀 호출
+                        if (childNs._childNamespaces.Count > 0 || 
+                            childNs.Types.Any(t => typesSet.Contains(t)))
+                        {
+                            childNs.SetFilteredTypesInternal(typesSet);
+                            
+                            // 스레드 안전한 방식으로 결과 확인
+                            if (childNs._hasMatchedTypesCache == true)
+                            {
+                                // bool 대신 int 플래그 사용
+                                int flag = 1; // true를 의미
+                                Interlocked.Exchange(ref flag, 1);
+                                hasMatchingChildren = true;
+                            }
+                        }
+                        else
+                        {
+                            // 타입이 없는 경우 빠르게 처리
+                            childNs._filteredTypes = typesSet;
+                            childNs._hasMatchedTypesCache = false;
+                        }
+                    });
+                }
+                else
+                {
+                    // 노드가 적은 경우 일반 루프 사용
+                    foreach (var childNs in _childNamespaces)
+                    {
+                        // 자식이 많거나 직접 매치되는 타입이 있는 경우만 재귀 호출
+                        if (childNs._childNamespaces.Count > 0 || 
+                            childNs.Types.Any(t => typesSet.Contains(t)))
+                        {
+                            childNs.SetFilteredTypesInternal(typesSet);
+                            
+                            // 일치하는 자식이 있으면 플래그 설정
+                            if (childNs._hasMatchedTypesCache == true)
+                            {
+                                hasMatchingChildren = true;
+                            }
+                        }
+                        else
+                        {
+                            // 타입이 없는 경우 빠르게 처리
+                            childNs._filteredTypes = typesSet;
+                            childNs._hasMatchedTypesCache = false;
+                        }
                     }
                 }
             }
-
-            // 필터 결과 캐시 업데이트
-            UpdateMatchedTypesCache();
+            
+            // 결과 캐시 직접 설정 (UpdateMatchedTypesCache 호출 생략)
+            _hasMatchedTypesCache = hasDirectMatches || hasMatchingChildren;
 
             // 검색 중이고 매칭되는 타입이 있는 경우에만 확장
-            IsExpanded = _filteredTypes != null && _hasMatchedTypesCache == true;
+            IsExpanded = _hasMatchedTypesCache == true;
 
-            // UI 업데이트 수행 - 단일 Dispatcher 호출
+            // UI 업데이트는 별도 Dispatcher에서 배치 처리
             if (Application.Current != null)
             {
                 Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                 {
                     try
                     {
-                        // 단일 노드 업데이트
-                        UpdateUIHierarchy();
+                        // 성능 최적화된 UI 업데이트
+                        OptimizedUIUpdate(typesSet);
                     }
                     finally
                     {
@@ -127,6 +217,65 @@ public class NamespaceTypeNode : ObservableObject
             _isUpdating = false;
             throw;
         }
+    }
+    
+    // 필터가 없을 때 모든 자식 추가 (최적화)
+    private void PopulateChildrenWithoutFiltering()
+    {
+        if (_children == null)
+            _children = new ObservableCollection<object>();
+            
+        // 타입 추가
+        foreach (var type in Types)
+        {
+            _children.Add(type);
+        }
+        
+        // 네임스페이스 추가
+        foreach (var ns in _childNamespaces)
+        {
+            _children.Add(ns);
+        }
+    }
+    
+    // UI 업데이트 최적화 버전
+    private void OptimizedUIUpdate(HashSet<Type> typesSet)
+    {
+        if (_children == null)
+            _children = new ObservableCollection<object>();
+        
+        // 배치 업데이트를 위해 새 컬렉션 준비
+        var newItems = new List<object>();
+        
+        // 필터링된 타입 추가
+        foreach (var type in Types)
+        {
+            if (typesSet.Contains(type))
+            {
+                newItems.Add(type);
+            }
+        }
+        
+        // 매치된 네임스페이스 추가
+        foreach (var ns in _childNamespaces)
+        {
+            if (ns._hasMatchedTypesCache == true)
+            {
+                newItems.Add(ns);
+            }
+        }
+        
+        // Children 컬렉션을 한 번에 업데이트
+        using (new DeferredCollectionChange(_children))
+        {
+            _children.Clear();
+            foreach (var item in newItems)
+            {
+                _children.Add(item);
+            }
+        }
+        
+        _isLoaded = true;
     }
 
     private void SetFilteredTypesInternal(IEnumerable<Type>? types)
