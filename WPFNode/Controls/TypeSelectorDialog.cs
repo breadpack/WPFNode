@@ -22,7 +22,7 @@ public class TypeSelectorDialog : Window
     private readonly TextBox _searchBox;
     private readonly TreeView _namespaceTree;
     private Type? _selectedType;
-    private readonly CancellationTokenSource _searchCts = new();
+    private CancellationTokenSource _searchCts = new();
     private readonly DispatcherTimer _searchDebounceTimer;
     
     // 로딩 인디케이터
@@ -57,7 +57,7 @@ public class TypeSelectorDialog : Window
         {
             Margin = new Thickness(5),
             Height = 23,
-            IsEnabled = false // 초기에는 비활성화 (타입 로딩 때문에)
+            IsEnabled = true // 초기화 완료 상태로 시작
         };
         _searchBox.Text = "검색어를 입력하세요...";  // PlaceholderText 대신 일반 Text 사용
         _searchBox.GotFocus += (s, e) => 
@@ -156,37 +156,44 @@ public class TypeSelectorDialog : Window
             IsIndeterminate = true,
             Height = 5,
             VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Thickness(5, 0, 5, 0)
+            Margin = new Thickness(5, 0, 5, 0),
+            Visibility = Visibility.Visible // 초기화 시작 시 표시
         };
         _mainGrid.Children.Add(_loadingIndicator);
         Grid.SetRow(_loadingIndicator, 0);
 
         Content = _mainGrid;
 
-        Loaded += OnDialogLoaded;
-        Closing += (s, e) => _searchCts.Cancel();
-    }
-
-    private async void OnDialogLoaded(object sender, RoutedEventArgs e)
-    {
+        // UI가 준비되면 타입 초기화 시작
         try
         {
-            // TypeRegistry 초기화
-            await TypeRegistry.Instance.InitializeAsync();
+            // TypeRegistry 동기식 초기화 - GetAwaiter().GetResult()를 사용하여 동기적으로 기다림
+            TypeRegistry.Instance.InitializeAsync().GetAwaiter().GetResult();
             
-            // UI 업데이트
+            // 초기화 완료 후 로딩 표시 숨김
             _loadingIndicator.Visibility = Visibility.Collapsed;
-            _searchBox.IsEnabled = true;
-
+            
             // 네임스페이스 트리 초기화
             InitializeNamespaceTree();
-            _searchBox.Focus();
         }
         catch (Exception ex)
         {
             MessageBox.Show($"타입 정보를 로드하는 중 오류가 발생했습니다: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            Close(); // 초기화 실패 시 다이얼로그 닫기
         }
+
+        Loaded += OnDialogLoaded;
+        Closing += (s, e) => _searchCts.Cancel();
     }
+
+    private void OnDialogLoaded(object sender, RoutedEventArgs e)
+    {
+        // 생성자에서 이미 초기화가 완료되었으므로 포커스만 설정
+        _searchBox.Focus();
+    }
+
+    // 네임스페이스 노드 캐시를 저장하기 위한 필드 추가
+    private List<NamespaceTypeNode>? _allNodes;
 
     private void InitializeNamespaceTree()
     {
@@ -196,13 +203,87 @@ public class TypeSelectorDialog : Window
             var nodes = _pluginOnly 
                 ? TypeRegistry.Instance.GetPluginNamespaceNodes()
                 : TypeRegistry.Instance.GetNamespaceNodes();
-                
-            _namespaceTree.ItemsSource = nodes;
+            
+            // 노드 캐시 저장
+            _allNodes = nodes.ToList();
+            
+            // 네임스페이스 트리 구조 구축
+            var namespaceDict = new Dictionary<string, NamespaceTypeNode>();
+            
+            // 1단계: 모든 노드를 사전에 등록
+            foreach (var node in _allNodes)
+            {
+                namespaceDict[node.FullNamespace] = node;
+            }
+            
+            // 2단계: 자식-부모 관계 설정
+            foreach (var node in _allNodes)
+            {
+                var parentNamespace = GetParentNamespace(node.FullNamespace);
+                if (!string.IsNullOrEmpty(parentNamespace) && namespaceDict.TryGetValue(parentNamespace, out var parentNode))
+                {
+                    // 부모-자식 관계 설정
+                    parentNode.AddChild(node);
+                }
+            }
+            
+            // 3단계: 최상위 노드만 필터링 (부모가 없는 노드)
+            var rootNodes = _allNodes
+                .Where(n => !n.FullNamespace.Contains('.') || GetParentNamespace(n.FullNamespace) == null)
+                .ToList();
+            
+            // UI 트리뷰에 최상위 노드 바인딩 - 자식 노드들은 이미 설정됨
+            _namespaceTree.ItemsSource = rootNodes;
+            
+            // 모든 노드 UI 업데이트 확인
+            foreach (var node in rootNodes)
+            {
+                EnsureNodeInitialized(node);
+            }
         }
         catch (Exception ex)
         {
             MessageBox.Show($"네임스페이스 트리 초기화 중 오류 발생: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+    
+    // 노드와 그 하위 노드가 모두 초기화되었는지 확인
+    private void EnsureNodeInitialized(NamespaceTypeNode node)
+    {
+        // IsExpanded 속성 확인 및 설정 - 트리뷰 아이템 초기화 강제
+        if (node.Children.Count > 0)
+        {
+            // 노드의 타입을 처리 (SetFilteredTypes는 내부적으로 UI 업데이트 수행)
+            // null을 전달하면 모든 타입을 표시
+            node.SetFilteredTypes(null);
+            
+            // 초기 상태에서는 최상위 노드를 시각적으로 표시
+            if (node.FullNamespace.Split('.').Length <= 2)
+            {
+                // 처음 2단계 깊이까지는 확장
+                node.IsExpanded = true;
+            }
+            else if (string.IsNullOrWhiteSpace(_searchBox.Text) || _searchBox.Text == "검색어를 입력하세요...")
+            {
+                // 더 깊은 레벨은 접기
+                node.IsExpanded = false;
+            }
+            
+            // 자식 노드들도 재귀적으로 초기화
+            foreach (var child in node.Children.OfType<NamespaceTypeNode>())
+            {
+                EnsureNodeInitialized(child);
+            }
+        }
+    }
+    
+    // 이 메소드는 초기화 로직 개선으로 제거됨 (InitializeNamespaceTree에서 직접 처리)
+    
+    // 부모 네임스페이스 이름 가져오기
+    private string? GetParentNamespace(string fullNamespace)
+    {
+        var lastDotIndex = fullNamespace.LastIndexOf('.');
+        return lastDotIndex > 0 ? fullNamespace.Substring(0, lastDotIndex) : null;
     }
 
     private void OnSearchTextChanged(object sender, TextChangedEventArgs e)
@@ -216,17 +297,21 @@ public class TypeSelectorDialog : Window
     {
         _searchDebounceTimer.Stop();
         
-        // 이전 검색 취소
-        _searchCts.Cancel();
+        // 이전 검색 취소 및 리소스 정리
+        if (_searchCts != null)
+        {
+            _searchCts.Cancel();
+            _searchCts.Dispose();
+        }
         
-        // 새 검색 시작
-        var newCts = new CancellationTokenSource();
-        var token = newCts.Token;
+        // 새 검색 CancellationTokenSource 생성 및 할당
+        _searchCts = new CancellationTokenSource();
         
-        PerformSearchAsync(_searchBox.Text, token);
+        // 새 토큰으로 검색 수행
+        PerformSearchAsync(_searchBox.Text, _searchCts.Token);
     }
 
-    private async void PerformSearchAsync(string searchText, CancellationToken token)
+    private void PerformSearchAsync(string searchText, CancellationToken token)
     {
         if (searchText == "검색어를 입력하세요..." || string.IsNullOrWhiteSpace(searchText))
         {
@@ -237,16 +322,13 @@ public class TypeSelectorDialog : Window
 
         try
         {
-            // TypeRegistry의 최적화된 검색 사용
-            var matchedTypes = await Task.Run(() => 
-                TypeRegistry.Instance.SearchTypes(searchText, _pluginOnly), token);
-                
+            // 동기식으로 직접 검색 수행
+            var matchedTypes = TypeRegistry.Instance.SearchTypes(searchText, _pluginOnly);
+            
             if (token.IsCancellationRequested) return;
             
-            // UI 스레드에서 트리 업데이트
-            await Dispatcher.InvokeAsync(() => {
-                UpdateTreeWithSearchResults(matchedTypes);
-            });
+            // UI 스레드에서 트리 즉시 업데이트
+            UpdateTreeWithSearchResults(matchedTypes);
         }
         catch (OperationCanceledException)
         {
@@ -262,27 +344,72 @@ public class TypeSelectorDialog : Window
     {
         try
         {
-            // TypeRegistry에서 네임스페이스 트리 가져오기
-            var nodes = _pluginOnly 
-                ? TypeRegistry.Instance.GetPluginNamespaceNodes()
-                : TypeRegistry.Instance.GetNamespaceNodes();
-                
-            // 검색 결과로 트리 업데이트
-            foreach (var node in nodes)
+            // 이미 완전히 초기화된 트리가 없으면 초기화
+            if (_allNodes == null || _allNodes.Count == 0)
             {
-                node.SetFilteredTypes(matchedTypes);
+                InitializeNamespaceTree();
+                
+                // 검색 결과가 없으면 종료
+                if (matchedTypes.Count == 0)
+                {
+                    return;
+                }
             }
             
-            // 매칭된 타입이 있는 노드만 표시
-            var filteredNodes = nodes
+            // 네임스페이스 트리에서 루트 노드 가져오기
+            var rootNodes = _allNodes!.Where(n => !n.FullNamespace.Contains('.')).ToList();
+            
+            // 검색 결과가 없는 경우 전체 트리 표시
+            if (matchedTypes.Count == 0)
+            {
+                _namespaceTree.ItemsSource = rootNodes;
+                return;
+            }
+            
+            // 타입 집합 생성 - 성능 최적화를 위해 HashSet 사용
+            var typesSet = new HashSet<Type>(matchedTypes);
+            
+            // 모든 루트 노드에 대해 필터 적용
+            foreach (var node in rootNodes)
+            {
+                // SetFilteredTypes는 재귀적으로 모든 자식 노드에 필터 적용
+                node.SetFilteredTypes(typesSet);
+            }
+            
+            // 검색 결과가 있는 루트 노드만 표시
+            var filteredRootNodes = rootNodes
                 .Where(n => n.HasMatchedTypes())
-                .OrderBy(n => n.Name);
-                
-            _namespaceTree.ItemsSource = filteredNodes;
+                .OrderBy(n => n.Name)
+                .ToList();
+            
+            // UI에 바인딩
+            _namespaceTree.ItemsSource = filteredRootNodes;
+            
+            // 모든 매치된 노드 자동 확장 및 깊은 레벨의 노드도 확장
+            foreach (var node in filteredRootNodes)
+            {
+                ExpandMatchedNodes(node, typesSet);
+            }
         }
         catch (Exception ex)
         {
             MessageBox.Show($"검색 결과 업데이트 중 오류 발생: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+    
+    // 매치된 노드와 그 부모 노드들을 재귀적으로 확장
+    private void ExpandMatchedNodes(NamespaceTypeNode node, HashSet<Type> matchedTypes)
+    {
+        // 현재 노드가 매치된 타입을 포함하거나 매치된 자식 노드를 포함하면 확장
+        if (node.HasMatchedTypes())
+        {
+            node.IsExpanded = true;
+            
+            // 자식 노드들도 재귀적으로 확인
+            foreach (var child in node.Children.OfType<NamespaceTypeNode>())
+            {
+                ExpandMatchedNodes(child, matchedTypes);
+            }
         }
     }
 

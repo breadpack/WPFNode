@@ -68,41 +68,59 @@ public class NamespaceTypeNode : ObservableObject
         _isUpdating = true;
         try
         {
-            // 병렬 처리로 전체 트리의 필터와 캐시를 초기화
-            // ConcurrentBag은 스레드 안전한 컬렉션
+            // 필터링된 타입을 HashSet으로 변환하여 효율적인 Contains 연산 가능
             var typesCollection = types != null ? new HashSet<Type>(types) : null;
             
             // 필터 설정
             _filteredTypes = typesCollection;
             _hasMatchedTypesCache = null;
             
-            // 모든 하위 네임스페이스에 대해 병렬로 필터 초기화
+            // 재귀적 필터 초기화 최소화 - 최상위 노드만 처리
             if (_childNamespaces.Count > 0)
             {
-                Parallel.ForEach(_childNamespaces, childNs =>
+                foreach (var childNs in _childNamespaces)
                 {
-                    childNs.SetFilteredTypesInternal(typesCollection);
-                });
+                    if (typesCollection == null || 
+                        childNs.Types.Any(t => typesCollection.Contains(t)) ||
+                        childNs._childNamespaces.Count > 0)
+                    {
+                        childNs.SetFilteredTypesInternal(typesCollection);
+                    }
+                    else
+                    {
+                        // 타입이 없는 경우 빠르게 처리
+                        childNs._filteredTypes = typesCollection;
+                        childNs._hasMatchedTypesCache = false;
+                    }
+                }
             }
 
-            // 하위에서 상위로 HasMatchedTypes 결과를 계산
+            // 필터 결과 캐시 업데이트
             UpdateMatchedTypesCache();
 
             // 검색 중이고 매칭되는 타입이 있는 경우에만 확장
             IsExpanded = _filteredTypes != null && _hasMatchedTypesCache == true;
 
-            // UI 업데이트 수행
-            Application.Current?.Dispatcher.BeginInvoke(new Action(() =>
+            // UI 업데이트 수행 - 단일 Dispatcher 호출
+            if (Application.Current != null)
             {
-                try
+                Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    UpdateUIHierarchy();
-                }
-                finally
-                {
-                    _isUpdating = false;
-                }
-            }), DispatcherPriority.Background);
+                    try
+                    {
+                        // 단일 노드 업데이트
+                        UpdateUIHierarchy();
+                    }
+                    finally
+                    {
+                        _isUpdating = false;
+                    }
+                }), DispatcherPriority.Background);
+            }
+            else
+            {
+                _isUpdating = false;
+            }
         }
         catch
         {
@@ -113,13 +131,31 @@ public class NamespaceTypeNode : ObservableObject
 
     private void SetFilteredTypesInternal(IEnumerable<Type>? types)
     {
-        _filteredTypes = types?.ToList();
+        _filteredTypes = types;
         _hasMatchedTypesCache = null;
 
-        // 하위 네임스페이스의 필터와 캐시 초기화
+        // 항상 모든 자식 노드에 대해 재귀적으로 처리
         foreach (var childNs in _childNamespaces)
         {
             childNs.SetFilteredTypesInternal(types);
+        }
+        
+        // 필터링 결과 캐시 업데이트
+        // 현재 네임스페이스의 타입들과 필터링된 타입의 교집합 존재 여부 확인
+        if (types != null && Types.Count > 0)
+        {
+            var typesSet = types as HashSet<Type> ?? new HashSet<Type>(types);
+            var hasMatches = Types.Any(t => typesSet.Contains(t));
+            
+            // 자식 노드들의 매칭 결과도 고려
+            var hasMatchingChildren = _childNamespaces.Any(childNs => childNs.HasMatchedTypes());
+            
+            _hasMatchedTypesCache = hasMatches || hasMatchingChildren;
+        }
+        else
+        {
+            // 필터링 없을 때는 모든 노드 표시
+            _hasMatchedTypesCache = true;
         }
     }
 
@@ -180,140 +216,138 @@ public class NamespaceTypeNode : ObservableObject
         return lastDotIndex > 0 ? fullNamespace.Substring(0, lastDotIndex) : null;
     }
 
+    // 부모 노드 참조 추가 - 트리 탐색 최적화
+    private NamespaceTypeNode? _parent;
+    
+    // 네임스페이스 캐시 - 빠른 조회를 위한 정적 사전
+    private static readonly Dictionary<string, NamespaceTypeNode> _namespaceCache = new();
+    
     private NamespaceTypeNode? FindParentNode(string parentNamespace)
     {
-        // 루트 노드들에서 부모 네임스페이스 찾기
-        var rootNodes = GetRootNodes();
-        foreach (var node in rootNodes)
+        // 부모 참조가 이미 있으면 사용
+        if (_parent != null) return _parent;
+        
+        // 캐시에서 찾기
+        if (_namespaceCache.TryGetValue(parentNamespace, out var node))
         {
-            if (node.FullNamespace == parentNamespace)
-            {
-                return node;
-            }
-
-            var found = FindParentNodeRecursive(node, parentNamespace);
-            if (found != null)
-            {
-                return found;
-            }
+            return node;
         }
+        
+        // 캐시에 없으면 null 반환
         return null;
     }
-
-    private NamespaceTypeNode? FindParentNodeRecursive(NamespaceTypeNode current, string targetNamespace)
-    {
-        if (current.FullNamespace == targetNamespace)
-        {
-            return current;
-        }
-
-        foreach (var child in current._childNamespaces)
-        {
-            var found = FindParentNodeRecursive(child, targetNamespace);
-            if (found != null)
-            {
-                return found;
-            }
-        }
-
-        return null;
-    }
-
+    
+    // 불필요한 재귀 호출 제거
     private IEnumerable<NamespaceTypeNode> GetRootNodes()
     {
-        // 현재 노드가 속한 루트 노드들 찾기
-        var current = this;
-        while (true)
+        // 루트 노드이거나 부모가 없으면 자신을 포함한 같은 레벨의 루트 노드들 반환
+        if (_parent == null)
         {
-            var parent = FindParentNode(GetParentNamespace(current.FullNamespace) ?? "");
-            if (parent == null)
+            // 캐시에서 최상위 노드들 찾기
+            var roots = _namespaceCache.Values.Where(n => !n.FullNamespace.Contains('.'));
+            
+            if (roots.Any())
             {
-                // 현재 노드가 속한 트리의 모든 루트 노드 반환
-                return GetAllRootNodes();
+                return roots;
             }
-            current = parent;
+            else
+            {
+                return new[] { this }; // 캐시가 비어있으면 자신만 반환
+            }
         }
+        
+        // 부모가 있으면 부모의 루트 노드 반환
+        var current = this;
+        while (current._parent != null)
+        {
+            current = current._parent;
+        }
+        
+        return new[] { current };
     }
-
+    
+    // Reflection 사용 제거
     private IEnumerable<NamespaceTypeNode> GetAllRootNodes()
     {
-        // TypeSelectorDialog에서 설정한 _allNodes를 찾아서 반환
-        var field = typeof(TypeSelectorDialog).GetField("_allNodes", 
-            System.Reflection.BindingFlags.NonPublic | 
-            System.Reflection.BindingFlags.Instance);
-
-        if (field != null)
+        // 캐시에서 모든 루트 노드 반환
+        var roots = _namespaceCache.Values.Where(n => !n.FullNamespace.Contains('.'));
+        if (roots.Any())
         {
-            var dialog = Application.Current.Windows.OfType<TypeSelectorDialog>().FirstOrDefault();
-            if (dialog != null)
-            {
-                return (field.GetValue(dialog) as IEnumerable<NamespaceTypeNode>) ?? [];
-            }
+            return roots;
         }
-        return [];
-    }
-
-    private void CollectUIUpdates(NamespaceTypeNode node, List<(NamespaceTypeNode Node, List<object> NewItems)> updates, HashSet<NamespaceTypeNode>? visited = null)
-    {
-        visited ??= new HashSet<NamespaceTypeNode>();
         
-        // 순환 참조 체크
-        if (!visited.Add(node)) return;
+        // 캐시가 비어있으면 자신만 반환
+        return new[] { this };
+    }
 
-        var newItems = new List<object>();
+private void CollectUIUpdates(NamespaceTypeNode node, List<(NamespaceTypeNode Node, List<object> NewItems)> updates, HashSet<NamespaceTypeNode>? visited = null)
+{
+    visited ??= new HashSet<NamespaceTypeNode>();
+    
+    // 순환 참조 체크
+    if (!visited.Add(node)) return;
 
-        // 현재 네임스페이스의 타입들 필터링
-        var typesToShow = node._filteredTypes != null 
-            ? node.Types.Where(t => node._filteredTypes.Contains(t))
-            : node.Types;
+    // 현재 노드의 아이템 처리
+    var newItems = new List<object>();
+
+    // 현재 네임스페이스의 타입들 필터링 - 효율적인 필터링
+    var typesToShow = node._filteredTypes != null 
+        ? node.Types.Intersect(node._filteredTypes).ToList() // HashSet.Intersect 사용
+        : node.Types.ToList();
+    
+    if (typesToShow.Count > 0)
+    {
         newItems.AddRange(typesToShow);
+    }
 
-        // 하위 네임스페이스 처리
-        foreach (var childNs in node._childNamespaces)
+    // 하위 네임스페이스 처리 - 재귀 호출 복원
+    foreach (var childNs in node._childNamespaces)
+    {
+        // 하위 네임스페이스가 매칭된 항목을 가지고 있는 경우에만 추가
+        if (childNs.HasMatchedTypes())
         {
-            // 하위 네임스페이스가 매칭된 항목을 가지고 있는 경우에만 추가
-            if (childNs.HasMatchedTypes())
-            {
-                newItems.Add(childNs);
-                CollectUIUpdates(childNs, updates, visited);
-            }
-        }
-
-        // 매칭된 항목이 있는 경우에만 업데이트 목록에 추가
-        if (newItems.Any())
-        {
-            updates.Add((node, newItems));
-            node._isLoaded = true;
+            newItems.Add(childNs);
+            
+            // 하위 노드도 재귀적으로 처리 - 깊은 레벨의 노드도 처리하기 위함
+            CollectUIUpdates(childNs, updates, visited);
         }
     }
 
-    private void UpdateUIHierarchy()
+    // 매칭된 항목이 있는 경우에만 업데이트 목록에 추가
+    if (newItems.Count > 0)
     {
-        if (_children == null) return;
+        updates.Add((node, newItems));
+        node._isLoaded = true;
+    }
+}
 
-        // 모든 업데이트를 한 번에 수집
-        var allUpdates = new List<(NamespaceTypeNode Node, List<object> NewItems)>();
-        CollectUIUpdates(this, allUpdates);
+private void UpdateUIHierarchy()
+{
+    if (_children == null) return;
 
-        // UI 스레드에서 한 번에 모든 업데이트 적용
+    // 전체 트리를 재귀적으로 처리
+    var allUpdates = new List<(NamespaceTypeNode Node, List<object> NewItems)>();
+    
+    // 재귀 호출로 전체 트리 구조 처리
+    CollectUIUpdates(this, allUpdates);
+    
+    // UI 스레드에서 한 번에 모든 업데이트 적용 - 배치 업데이트
+    if (allUpdates.Count > 0 && Application.Current != null)
+    {
         Application.Current.Dispatcher.BeginInvoke(new Action(() =>
         {
             try
             {
-                foreach (var (node, newItems) in allUpdates)
+                foreach (var (node, items) in allUpdates)
                 {
-                    // 기존 아이템과 새 아이템이 다른 경우에만 업데이트
-                    if (!ItemsEqual(node.Children, newItems))
+                    // 로컬 변수 사용으로 불필요한 속성 접근 최소화
+                    var children = node.Children;
+                    
+                    // 복사 없이 직접 업데이트
+                    children.Clear();
+                    foreach (var item in items)
                     {
-                        var children = node.Children;
-                        var tempList = newItems.ToList(); // 새 아이템의 복사본 생성
-
-                        // 한 번의 Clear와 AddRange로 처리
-                        children.Clear();
-                        foreach (var item in tempList)
-                        {
-                            children.Add(item);
-                        }
+                        children.Add(item);
                     }
                 }
             }
@@ -324,6 +358,7 @@ public class NamespaceTypeNode : ObservableObject
             }
         }), DispatcherPriority.Background);
     }
+}
 
     private bool ItemsEqual(ObservableCollection<object> existing, List<object> newItems)
     {
@@ -373,6 +408,12 @@ public class NamespaceTypeNode : ObservableObject
     {
         _childNamespaces.Add(childNode);
         
+        // 부모-자식 관계 설정 (최적화된 트리 탐색을 위함)
+        childNode._parent = this;
+        
+        // 네임스페이스 캐시에 추가 (빠른 조회를 위함)
+        _namespaceCache[childNode.FullNamespace] = childNode;
+        
         if (_children == null)
         {
             _children = new ObservableCollection<object>();
@@ -381,7 +422,24 @@ public class NamespaceTypeNode : ObservableObject
         // 이미 로드된 상태라면 UI 업데이트
         if (_isLoaded && Application.Current != null)
         {
-            Application.Current.Dispatcher.BeginInvoke(new Action(UpdateUIHierarchy), DispatcherPriority.Background);
+            // UI 업데이트 최적화: 전체 트리 대신 현재 노드만 업데이트
+            Application.Current.Dispatcher.BeginInvoke(new Action(() => {
+                if (_isExpanded)
+                {
+                    // 자식이 추가되었을 때 확장된 상태라면 자식 노드 표시
+                    if (!_children.Contains(childNode))
+                    {
+                        _children.Add(childNode);
+                    }
+                }
+            }), DispatcherPriority.Background);
         }
+    }
+    
+    // 초기화 시 캐시에 자기 자신 등록
+    static NamespaceTypeNode()
+    {
+        // 클래스 초기화 시 캐시 초기화
+        _namespaceCache.Clear();
     }
 }

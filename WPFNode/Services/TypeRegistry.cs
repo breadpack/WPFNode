@@ -81,30 +81,23 @@ public class TypeRegistry
             if (_isInitialized || _initializationCompletionSource.Task.Status == TaskStatus.RanToCompletion) 
                 return _initializationCompletionSource.Task;
             
-            _cts = new CancellationTokenSource();
-            var token = _cts.Token;
-            
-            // 백그라운드 스레드에서 초기화 작업 수행
-            Task.Run(() => InitializeInternal(token), token)
-                .ContinueWith(t => {
-                    if (t.IsFaulted)
-                    {
-                        if (t.Exception?.InnerExceptions != null)
-                            _initializationCompletionSource.TrySetException(t.Exception.InnerExceptions);
-                        else
-                            _initializationCompletionSource.TrySetException(new Exception("TypeRegistry 초기화 실패"));
-                    }
-                    else if (t.IsCanceled)
-                    {
-                        _initializationCompletionSource.TrySetCanceled();
-                    }
-                    else
-                    {
-                        _isInitialized = true;
-                        _initializationCompletionSource.TrySetResult(true);
-                    }
-                });
+            try
+            {
+                // 동기식으로 직접 호출
+                InitializeInternal(CancellationToken.None);
+                _isInitialized = true;
+                _initializationCompletionSource.TrySetResult(true);
+            }
+            catch (Exception ex)
+            {
+                if (ex is OperationCanceledException)
+                    _initializationCompletionSource.TrySetCanceled();
+                else
+                    _initializationCompletionSource.TrySetException(ex);
                 
+                throw;
+            }
+                    
             return _initializationCompletionSource.Task;
         }
     }
@@ -178,13 +171,17 @@ public class TypeRegistry
     {
         try
         {
-            // 1. 타입 로딩
+            // 1. 타입 로딩 - 순차적 실행
             LoadAllTypes(token);
             
-            // 2. 네임스페이스 트리 구성
+            if (token.IsCancellationRequested) return;
+            
+            // 2. 네임스페이스 트리 구성 - 순차적 실행
             BuildNamespaceTree(token);
             
-            // 3. 검색 인덱스 구축
+            if (token.IsCancellationRequested) return;
+            
+            // 3. 검색 인덱스 구축 - 순차적 실행
             BuildSearchIndices(token);
         }
         catch (OperationCanceledException)
@@ -210,15 +207,9 @@ public class TypeRegistry
             "mscorlib", "System", "System.Core", "WindowsBase", "PresentationCore", "PresentationFramework"
         };
         
-        // 병렬 처리용 옵션 추가: MaxDegreeOfParallelism 설정
-        var options = new ParallelOptions
-        {
-            CancellationToken = token,
-            MaxDegreeOfParallelism = Environment.ProcessorCount // 코어 수에 맞춰 조정
-        };
-        
+        // 필요한 어셈블리만 필터링
         var assemblies = AppDomain.CurrentDomain.GetAssemblies()
-            .Where(a => !a.IsDynamic)
+            .Where(a => !a.IsDynamic && !systemAssemblies.Contains(a.GetName().Name))
             .ToList();
             
         // 플러그인 타입과 어셈블리
@@ -228,33 +219,36 @@ public class TypeRegistry
             .Distinct()
             .ToHashSet();
         
-        // 타입 로딩 - 스레드 안전한 컬렉션 사용
-        var allTypesList = new ConcurrentBag<Type>();
-        var pluginTypesList = new ConcurrentBag<Type>();
+        // 결과 저장용 컬렉션
+        var allTypes = new List<Type>();
+        var pluginTypesList = new List<Type>();
         
-        // 병렬 옵션 적용
-        Parallel.ForEach(assemblies, options, assembly => {
-            if (token.IsCancellationRequested) return;
+        // 순차적으로 어셈블리별 처리
+        foreach (var assembly in assemblies)
+        {
+            if (token.IsCancellationRequested) break;
             
-            try {
+            try
+            {
+                // GetTypes() 호출 - 각 어셈블리에 대해 한 번만 수행
                 var types = assembly.GetTypes()
                     .Where(t => !t.IsAbstract && !t.IsGenericTypeDefinition && !t.IsInterface)
                     .ToList();
-                    
-                foreach (var type in types)
+                
+                // 타입 정보 추가
+                allTypes.AddRange(types);
+                
+                // 플러그인 타입 구분
+                if (pluginAssemblies.Contains(assembly))
                 {
-                    allTypesList.Add(type);
-                    
-                    // 플러그인 타입 구분
-                    if (pluginAssemblies.Contains(assembly))
-                        pluginTypesList.Add(type);
+                    pluginTypesList.AddRange(types);
                 }
             }
             catch (ReflectionTypeLoadException) { }
-        });
+        }
         
-        // 결과 정렬 - 병렬 처리 후 결과가 일관되도록
-        _allTypes = allTypesList.OrderBy(t => t.FullName).ToList();
+        // 결과 정렬
+        _allTypes = allTypes.OrderBy(t => t.FullName).ToList();
         _pluginTypes = pluginTypesList.OrderBy(t => t.FullName).ToList();
     }
 
@@ -263,22 +257,20 @@ public class TypeRegistry
     /// </summary>
     private void BuildNamespaceTree(CancellationToken token)
     {
-        // 네임스페이스별로 타입을 그룹화하는 작업을 병렬로 수행
+        // 네임스페이스별로 타입을 그룹화하는 작업을 순차적으로 수행
         var allNamespaceGroups = _allTypes
-            .AsParallel()
-            .WithCancellation(token)
-            .WithDegreeOfParallelism(Environment.ProcessorCount)
             .GroupBy(t => t.Namespace ?? "(No Namespace)")
             .ToDictionary(g => g.Key, g => g.ToList());
             
+        if (token.IsCancellationRequested) return;
+        
         var pluginNamespaceGroups = _pluginTypes
-            .AsParallel()
-            .WithCancellation(token)
-            .WithDegreeOfParallelism(Environment.ProcessorCount)
             .GroupBy(t => t.Namespace ?? "(No Namespace)")
             .ToDictionary(g => g.Key, g => g.ToList());
         
-        // 네임스페이스 트리 생성 - 병렬 처리로 변경
+        if (token.IsCancellationRequested) return;
+        
+        // 네임스페이스 트리 생성 - 순차적으로 처리
         _rootNamespaceNodes = CreateNamespaceNodes(_allTypes, token).ToList();
         _pluginNamespaceNodes = CreateNamespaceNodes(_pluginTypes, token).ToList();
     }
@@ -288,80 +280,88 @@ public class TypeRegistry
     /// </summary>
     private void BuildSearchIndices(CancellationToken token)
     {
-        // 병렬 처리용 옵션
-        var options = new ParallelOptions
+        // 각 인덱스를 위한 딕셔너리 직접 생성
+        var wordIndex = new Dictionary<string, HashSet<Type>>(StringComparer.OrdinalIgnoreCase);
+        var prefixIndex = new Dictionary<string, HashSet<Type>>(StringComparer.OrdinalIgnoreCase);
+        var acronymIndex = new Dictionary<string, HashSet<Type>>(StringComparer.OrdinalIgnoreCase);
+        var namespaceIndex = new Dictionary<string, HashSet<Type>>(StringComparer.OrdinalIgnoreCase);
+        
+        // 타입별 순차 처리
+        foreach (var type in _allTypes)
         {
-            CancellationToken = token,
-            MaxDegreeOfParallelism = Environment.ProcessorCount
-        };
-        
-        // 스레드 안전한 임시 인덱스 컬렉션
-        var wordIndex = new ConcurrentDictionary<string, ConcurrentBag<Type>>(StringComparer.OrdinalIgnoreCase);
-        var prefixIndex = new ConcurrentDictionary<string, ConcurrentBag<Type>>(StringComparer.OrdinalIgnoreCase);
-        var acronymIndex = new ConcurrentDictionary<string, ConcurrentBag<Type>>(StringComparer.OrdinalIgnoreCase);
-        var namespaceIndex = new ConcurrentDictionary<string, ConcurrentBag<Type>>(StringComparer.OrdinalIgnoreCase);
-        
-        // 타입별 병렬 처리
-        Parallel.ForEach(
-            Partitioner.Create(0, _allTypes.Count),
-            options,
-            (range, state) => {
-                if (token.IsCancellationRequested) state.Break();
-                
-                // 각 파티션 내에서 타입 처리
-                for (int i = range.Item1; i < range.Item2; i++)
-                {
-                    var type = _allTypes[i];
-                    
-                    // 1. 타입 이름 분석
-                    string typeName = type.Name;
-                    string namespaceName = type.Namespace ?? "";
-                    
-                    // 2. 단어 추출 및 인덱싱
-                    // 파스칼 케이스 단어 분리
-                    var words = SplitPascalCase(typeName);
-                    foreach (var word in words)
-                    {
-                        if (word.Length <= 1) continue; // 단일 문자 단어는 제외
-                        
-                        var lowerWord = word.ToLowerInvariant();
-                        AddToConcurrentIndex(wordIndex, lowerWord, type);
-                    }
-                    
-                    // 접두사 인덱싱 (성능을 위해 일부만 인덱싱)
-                    for (int prefixLen = 1; prefixLen <= Math.Min(typeName.Length, 4); prefixLen++)
-                    {
-                        var prefix = typeName.Substring(0, prefixLen).ToLowerInvariant();
-                        AddToConcurrentIndex(prefixIndex, prefix, type);
-                    }
-                    
-                    // 약어 생성 및 인덱싱
-                    string acronym = string.Concat(words.Select(w => w.FirstOrDefault()));
-                    if (acronym.Length > 1)
-                    {
-                        var lowerAcronym = acronym.ToLowerInvariant();
-                        AddToConcurrentIndex(acronymIndex, lowerAcronym, type);
-                    }
-                    
-                    // 네임스페이스 인덱싱
-                    var nsParts = namespaceName.Split('.');
-                    foreach (var part in nsParts)
-                    {
-                        if (string.IsNullOrEmpty(part)) continue;
-                        
-                        var lowerPart = part.ToLowerInvariant();
-                        AddToConcurrentIndex(namespaceIndex, lowerPart, type);
-                    }
-                }
-            });
+            if (token.IsCancellationRequested) break;
             
-        // 스레드 안전한 인덱스에서 최종 인덱스로 변환
-        if (!token.IsCancellationRequested)
+            // 1. 타입 이름 분석
+            string typeName = type.Name;
+            string namespaceName = type.Namespace ?? "";
+            
+            // 2. 단어 추출 및 인덱싱
+            var words = SplitPascalCase(typeName);
+            foreach (var word in words)
+            {
+                if (word.Length <= 1) continue; // 단일 문자 단어는 제외
+                
+                var lowerWord = word.ToLowerInvariant();
+                AddToIndex(wordIndex, lowerWord, type);
+            }
+            
+            // 접두사 인덱싱
+            for (int prefixLen = 2; prefixLen <= Math.Min(typeName.Length, 4); prefixLen++)
+            {
+                var prefix = typeName.Substring(0, prefixLen).ToLowerInvariant();
+                AddToIndex(prefixIndex, prefix, type);
+            }
+            
+            // 약어 생성 및 인덱싱
+            string acronym = string.Concat(words.Select(w => w.FirstOrDefault()));
+            if (acronym.Length > 1)
+            {
+                var lowerAcronym = acronym.ToLowerInvariant();
+                AddToIndex(acronymIndex, lowerAcronym, type);
+            }
+            
+            // 네임스페이스 인덱싱
+            var nsParts = namespaceName.Split('.');
+            foreach (var part in nsParts)
+            {
+                if (string.IsNullOrEmpty(part)) continue;
+                
+                var lowerPart = part.ToLowerInvariant();
+                AddToIndex(namespaceIndex, lowerPart, type);
+            }
+        }
+        
+        // 최종 인덱스 할당
+        _wordToTypesIndex = wordIndex;
+        _prefixToTypesIndex = prefixIndex;
+        _acronymToTypesIndex = acronymIndex;
+        _namespaceToTypesIndex = namespaceIndex;
+    }
+    
+    // 로컬 인덱스에 항목을 추가하는 헬퍼 메소드
+    private void AddToLocalIndex(Dictionary<string, HashSet<Type>> index, string key, Type type)
+    {
+        if (!index.TryGetValue(key, out var typeSet))
         {
-            _wordToTypesIndex = ConvertToDictionary(wordIndex);
-            _prefixToTypesIndex = ConvertToDictionary(prefixIndex);
-            _acronymToTypesIndex = ConvertToDictionary(acronymIndex);
-            _namespaceToTypesIndex = ConvertToDictionary(namespaceIndex);
+            typeSet = new HashSet<Type>();
+            index[key] = typeSet;
+        }
+        typeSet.Add(type);
+    }
+    
+    // 인덱스 병합을 위한 헬퍼 메소드
+    private void MergeIndices(Dictionary<string, HashSet<Type>> target, Dictionary<string, HashSet<Type>> source)
+    {
+        foreach (var pair in source)
+        {
+            if (!target.TryGetValue(pair.Key, out var targetSet))
+            {
+                target[pair.Key] = new HashSet<Type>(pair.Value);
+            }
+            else
+            {
+                targetSet.UnionWith(pair.Value);
+            }
         }
     }
 
