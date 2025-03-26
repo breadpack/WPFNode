@@ -70,8 +70,11 @@ public class PropertySerializationData
     public bool CanConnectToPort { get; set; }
 }
 
-public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
+public partial class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
 {
+    [System.Text.RegularExpressions.GeneratedRegex(@"^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})(?::(in|out)\[(.+?)\]|\|\|\|(in|out)\|\|\|(.+?)\|\|\|(\d+))$")]
+    private static partial System.Text.RegularExpressions.Regex MyRegex();
+    
     private static JsonSerializerOptions _serializerOptions = new()
     {
         WriteIndented = true,
@@ -378,32 +381,38 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                     var sourcePortIdStr = sourcePortIdElement.GetString() ?? string.Empty;
                     var targetPortIdStr = targetPortIdElement.GetString() ?? string.Empty;
 
-                    // 포트 ID 문자열 파싱
-                    var sourcePortIdParts = sourcePortIdStr.Split(new[] { ':', '[', ']' }, StringSplitOptions.None);
-                    var targetPortIdParts = targetPortIdStr.Split(new[] { ':', '[', ']' }, StringSplitOptions.None);
+                    // 포트 ID 정규식 패턴
+                    var          sourceMatch   = MyRegex().Match(sourcePortIdStr);
+                    var          targetMatch   = MyRegex().Match(targetPortIdStr);
 
-                    if (sourcePortIdParts.Length < 4 || targetPortIdParts.Length < 4)
+                    if (!sourceMatch.Success || !targetMatch.Success)
                     {
                         throw new JsonException($"잘못된 포트 ID 형식입니다. 소스: {sourcePortIdStr}, 타겟: {targetPortIdStr}");
                     }
 
-                    var sourceNodeIdStr = sourcePortIdParts[0];
+                    // 소스 포트 정보 추출
+                    var sourceNodeIdStr = sourceMatch.Groups[1].Value;
                     if (!Guid.TryParse(sourceNodeIdStr, out var sourceNodeId))
                     {
                         throw new JsonException($"잘못된 소스 노드 ID 형식: {sourceNodeIdStr}");
                     }
 
-                    var targetNodeIdStr = targetPortIdParts[0];
+                    // 기존 패턴과 새로운 패턴 구분
+                    var sourceIsInput = sourceMatch.Groups[2].Success ? sourceMatch.Groups[2].Value == "in" : sourceMatch.Groups[4].Value == "in";
+                    var sourcePortName = sourceMatch.Groups[2].Success ? sourceMatch.Groups[3].Value : sourceMatch.Groups[5].Value;
+                    var sourcePortIndex = sourceMatch.Groups[2].Success ? 0 : int.Parse(sourceMatch.Groups[6].Value);
+
+                    // 타겟 포트 정보 추출
+                    var targetNodeIdStr = targetMatch.Groups[1].Value;
                     if (!Guid.TryParse(targetNodeIdStr, out var targetNodeId))
                     {
                         throw new JsonException($"잘못된 타겟 노드 ID 형식: {targetNodeIdStr}");
                     }
 
-                    var sourceIsInput = sourcePortIdParts[1] == "in";
-                    var sourceIndexOrName = sourcePortIdParts[2]; // 인덱스 또는 이름일 수 있음
-
-                    var targetIsInput = targetPortIdParts[1] == "in";
-                    var targetIndexOrName = targetPortIdParts[2]; // 인덱스 또는 이름일 수 있음
+                    // 기존 패턴과 새로운 패턴 구분
+                    var targetIsInput = targetMatch.Groups[2].Success ? targetMatch.Groups[2].Value == "in" : targetMatch.Groups[4].Value == "in";
+                    var targetPortName = targetMatch.Groups[2].Success ? targetMatch.Groups[3].Value : targetMatch.Groups[5].Value;
+                    var targetPortIndex = targetMatch.Groups[2].Success ? 0 : int.Parse(targetMatch.Groups[6].Value);
 
                     // 소스 노드와 타겟 노드 찾기
                     if (!nodesById.TryGetValue(sourceNodeId, out var sourceNode))
@@ -422,10 +431,10 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                         // 먼저 이름으로 찾기 시도
                         sourcePort = sourceNode.OutputPorts
                                                .Concat(sourceNode.FlowOutPorts)
-                                               .FirstOrDefault(p => p.Name == sourceIndexOrName) as IOutputPort;
+                                               .FirstOrDefault(p => p.Name == sourcePortName) as IOutputPort;
                         
                         // 이름으로 찾지 못한 경우, 인덱스로 시도 (이전 버전 호환성)
-                        if (sourcePort == null && int.TryParse(sourceIndexOrName, out var sourceIndex))
+                        if (sourcePort == null && int.TryParse(sourcePortName, out var sourceIndex))
                         {
                             sourcePort = sourceNode.OutputPorts
                                                    .Concat(sourceNode.FlowOutPorts)
@@ -439,10 +448,10 @@ public class NodeCanvasJsonConverter : JsonConverter<NodeCanvas>
                         // 먼저 이름으로 찾기 시도
                         targetPort = targetNode.InputPorts
                                                .Concat(targetNode.FlowInPorts)
-                                               .FirstOrDefault(p => p.Name == targetIndexOrName) as IInputPort;
+                                               .FirstOrDefault(p => p.Name == targetPortName) as IInputPort;
                         
                         // 이름으로 찾지 못한 경우, 인덱스로 시도 (이전 버전 호환성)
-                        if (targetPort == null && int.TryParse(targetIndexOrName, out var targetIndex))
+                        if (targetPort == null && int.TryParse(targetPortName, out var targetIndex))
                         {
                             targetPort = targetNode.InputPorts
                                                    .Concat(targetNode.FlowInPorts)
