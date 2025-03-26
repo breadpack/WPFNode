@@ -232,7 +232,6 @@ public class TypeRegistry
             {
                 // GetTypes() 호출 - 각 어셈블리에 대해 한 번만 수행
                 var types = assembly.GetTypes()
-                    .Where(t => !t.IsAbstract && !t.IsGenericTypeDefinition && !t.IsInterface)
                     .ToList();
                 
                 // 타입 정보 추가
