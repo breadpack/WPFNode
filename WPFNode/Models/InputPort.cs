@@ -7,10 +7,10 @@ using WPFNode.Exceptions;
 namespace WPFNode.Models;
 
 public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
-    private readonly Dictionary<Type, Func<object, T>> _converters = new();
-    private readonly int                               _index;
-    private          bool                              _isVisible = true;
-    private          IConnection?                      _connection;
+    protected readonly Dictionary<Type, Func<object, T>> _converters = new();
+    protected readonly int                               _index;
+    protected          bool                              _isVisible = true;
+    protected          IConnection?                      _connection;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -54,13 +54,13 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
     /// <summary>
     /// 주어진 타입이 컬렉션 타입인지 확인하고, 요소 타입을 반환합니다.
     /// </summary>
-    private bool IsCollectionType(Type type, out Type? elementType) {
+    protected bool IsCollectionType(Type type, out Type? elementType) {
         // TypeUtility의 GetElementType 메서드 활용
         elementType = WPFNode.Utilities.TypeExtensions.GetElementType(type);
         return elementType != null;
     }
     
-    public bool CanAcceptType(Type sourceType) {
+    public virtual bool CanAcceptType(Type sourceType) {
         // 1. 직접 타입 체크
         if (DirectTypeCheck(sourceType))
             return true;
@@ -75,7 +75,7 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
     /// <summary>
     /// 기본 타입 호환성 검사를 수행합니다.
     /// </summary>
-    private bool DirectTypeCheck(Type sourceType) {
+    protected virtual bool DirectTypeCheck(Type sourceType) {
         // 1. 컨버터가 등록되어 있으면 변환 가능
         if (_converters.ContainsKey(sourceType))
             return true;
@@ -94,7 +94,7 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
     /// <summary>
     /// 컬렉션 타입 호환성 검사를 수행합니다.
     /// </summary>
-    private bool CollectionTypeCheck(Type sourceType) {
+    protected virtual bool CollectionTypeCheck(Type sourceType) {
         Type? sourceElementType = null;
         Type? targetElementType = null;
         
@@ -112,7 +112,7 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
         return false;
     }
 
-    public T? GetValueOrDefault(T? defaultValue = default) {
+    public virtual T? GetValueOrDefault(T? defaultValue = default) {
         if (_connection?.Source is not { } outputPort || outputPort.Value == null)
             return defaultValue;
         
@@ -152,7 +152,7 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
     /// <summary>
     /// 등록된 커스텀 컨버터를 사용하여 값 변환을 시도합니다.
     /// </summary>
-    private bool TryUseRegisteredConverter(object sourceValue, out T? result) {
+    protected bool TryUseRegisteredConverter(object sourceValue, out T? result) {
         result = default;
         
         if (_converters.TryGetValue(sourceValue.GetType(), out var converter)) {
@@ -166,7 +166,7 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
     /// <summary>
     /// 컬렉션 타입 변환을 시도합니다. IEnumerable<>을 기반으로 통합된 변환 로직입니다.
     /// </summary>
-    private bool TryCollectionConversion(object sourceValue, out T? result) {
+    protected bool TryCollectionConversion(object sourceValue, out T? result) {
         result = default;
         
         // 소스와 타겟의 요소 타입 확인
@@ -240,7 +240,7 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
     /// <summary>
     /// 컬렉션의 요소를 변환하여 새 리스트를 반환합니다.
     /// </summary>
-    private List<object> ConvertCollectionItems(System.Collections.IEnumerable sourceCollection, Type targetElementType, Type sourceElementType) {
+    protected List<object> ConvertCollectionItems(System.Collections.IEnumerable sourceCollection, Type targetElementType, Type sourceElementType) {
         var result = new List<object>();
         
         foreach (var item in sourceCollection) {

@@ -3,7 +3,14 @@ using Newtonsoft.Json;
 
 namespace WPFNode.Demo.Models
 {
-    public class Employee
+    public interface IEmployee {
+        int Id { get; set; }
+        string Name { get; set; }
+        string Department { get; set; }
+        decimal Salary { get; set; }
+    }
+    
+    public class Employee : IEmployee
     {
         public int Id { get; set; }
         public string Name { get; set; }

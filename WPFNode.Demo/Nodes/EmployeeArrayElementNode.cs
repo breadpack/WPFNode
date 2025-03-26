@@ -18,14 +18,14 @@ public class EmployeeArrayElementNode : NodeBase {
     [NodeFlowOut]
     public IFlowOutPort FlowOut { get; private set; }
     
-    [NodeInput]
-    public InputPort<Employee[]> EmployeeArrayInput { get; private set; }
+    [NodeProperty]
+    public NodeProperty<IEmployee[]> EmployeeArrayInput { get; private set; }
     
     [NodeProperty]
     public NodeProperty<int> Index { get; private set; }
     
     [NodeOutput]
-    public OutputPort<Employee> EmployeeOutput { get; private set; }
+    public OutputPort<IEmployee> EmployeeOutput { get; private set; }
     
     
     public EmployeeArrayElementNode(INodeCanvas                                      canvas, Guid guid) : base(canvas, guid) { }
