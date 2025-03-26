@@ -30,8 +30,49 @@ public static class TypeExtensions
         var sourceConverter = System.ComponentModel.TypeDescriptor.GetConverter(sourceType);
         if (sourceConverter.CanConvertTo(targetType))
             return true;
+            
+        // 4. 소스 타입에서 정의된 암시적 변환 연산자 확인
+        var sourceImplicitOp = sourceType.GetMethod("op_Implicit", 
+            BindingFlags.Public | BindingFlags.Static,
+            null, 
+            new[] { sourceType }, 
+            null);
+        if (sourceImplicitOp != null && sourceImplicitOp.ReturnType == targetType)
+            return true;
+        
+        // 5. 대상 타입에서 정의된 암시적 변환 연산자 확인
+        var targetImplicitOp = targetType.GetMethod("op_Implicit", 
+            BindingFlags.Public | BindingFlags.Static,
+            null, 
+            new[] { sourceType }, 
+            null);
+        if (targetImplicitOp != null && targetImplicitOp.ReturnType == targetType)
+            return true;
+        
+        // 6. 소스 타입에서 정의된 명시적 변환 연산자 확인
+        var sourceExplicitOp = sourceType.GetMethod("op_Explicit", 
+            BindingFlags.Public | BindingFlags.Static,
+            null, 
+            new[] { sourceType }, 
+            null);
+        if (sourceExplicitOp != null && sourceExplicitOp.ReturnType == targetType)
+            return true;
+        
+        // 7. 대상 타입에서 정의된 명시적 변환 연산자 확인
+        var targetExplicitOp = targetType.GetMethod("op_Explicit", 
+            BindingFlags.Public | BindingFlags.Static,
+            null, 
+            new[] { sourceType }, 
+            null);
+        if (targetExplicitOp != null && targetExplicitOp.ReturnType == targetType)
+            return true;
+        
+        // 8. 대상 타입이 소스 타입을 매개변수로 받는 생성자를 가지고 있는지 확인
+        var constructor = targetType.GetConstructor(new[] { sourceType });
+        if (constructor != null)
+            return true;
 
-        // 4. 타입 호환성 검사 (암시적 변환)
+        // 9. 타입 호환성 검사 (암시적 변환)
         return sourceType.CanImplicitlyConvertTo(targetType);
     }
     
@@ -173,16 +214,29 @@ public static class ValueConversionExtensions
         
         try
         {
-            // 명시적 변환 연산자 확인
-            var explicitOperator = targetType.GetMethod("op_Explicit",
+            // 대상 타입에서 정의된 명시적 변환 연산자 확인
+            var targetExplicitOp = targetType.GetMethod("op_Explicit",
                 BindingFlags.Public | BindingFlags.Static,
                 null,
                 new[] { sourceType },
                 null);
 
-            if (explicitOperator != null)
+            if (targetExplicitOp != null)
             {
-                result = explicitOperator.Invoke(null, new[] { sourceValue });
+                result = targetExplicitOp.Invoke(null, new[] { sourceValue });
+                return true;
+            }
+            
+            // 소스 타입에서 정의된 명시적 변환 연산자 확인
+            var sourceExplicitOp = sourceType.GetMethod("op_Explicit",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[] { sourceType },
+                null);
+
+            if (sourceExplicitOp != null && sourceExplicitOp.ReturnType == targetType)
+            {
+                result = sourceExplicitOp.Invoke(null, new[] { sourceValue });
                 return true;
             }
             
@@ -228,6 +282,31 @@ public static class ValueConversionExtensions
     }
 
     /// <summary>
+    /// 생성자를 통한 변환을 시도합니다.
+    /// </summary>
+    private static bool TryConstructorConversion(object sourceValue, Type sourceType, Type targetType, out object? result)
+    {
+        result = null;
+        
+        try
+        {
+            // 소스 타입을 매개변수로 받는 생성자 확인
+            var constructor = targetType.GetConstructor(new[] { sourceType });
+            if (constructor != null)
+            {
+                result = constructor.Invoke(new[] { sourceValue });
+                return true;
+            }
+            
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// 값을 대상 타입으로 변환을 시도합니다.
     /// </summary>
     public static bool TryConvertTo<T>(this object? sourceValue, out T? result)
@@ -254,41 +333,61 @@ public static class ValueConversionExtensions
                 return true;
             }
 
-            // 3. 암시적 변환 연산자 확인
-            var implicitOperator = sourceType.GetMethod("op_Implicit",
+            // 3. 소스 타입에서 정의된 암시적 변환 연산자 확인
+            var sourceImplicitOp = sourceType.GetMethod("op_Implicit",
                 BindingFlags.Public | BindingFlags.Static,
                 null,
                 new[] { sourceType },
                 null);
 
-            if (implicitOperator != null && implicitOperator.ReturnType == targetType)
+            if (sourceImplicitOp != null && sourceImplicitOp.ReturnType == targetType)
             {
-                result = (T)implicitOperator.Invoke(null, new[] { sourceValue })!;
+                result = (T)sourceImplicitOp.Invoke(null, new[] { sourceValue })!;
                 return true;
             }
             
-            // 4. 명시적 변환 연산자 확인
+            // 4. 대상 타입에서 정의된 암시적 변환 연산자 확인
+            var targetImplicitOp = targetType.GetMethod("op_Implicit",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[] { sourceType },
+                null);
+                
+            if (targetImplicitOp != null && targetImplicitOp.ReturnType == targetType)
+            {
+                result = (T)targetImplicitOp.Invoke(null, new[] { sourceValue })!;
+                return true;
+            }
+            
+            // 5. 명시적 변환 연산자 확인
             if (TryExplicitConversion(sourceValue, sourceType, targetType, out var explicitResult))
             {
                 result = (T)explicitResult!;
                 return true;
             }
+            
+            // 6. 생성자를 통한 변환 시도
+            if (TryConstructorConversion(sourceValue, sourceType, targetType, out var constructedResult))
+            {
+                result = (T)constructedResult!;
+                return true;
+            }
 
-            // 5. 문자열 변환 시도 (Parse/TryParse)
+            // 7. 문자열 변환 시도 (Parse/TryParse)
             if (sourceValue is string sourceString && TryParseString(sourceString, targetType, out var parsedResult))
             {
                 result = (T)parsedResult!;
                 return true;
             }
             
-            // 6. TypeConverter 사용
+            // 8. TypeConverter 사용
             if (TryTypeConverter(sourceValue, targetType, out var convertedResult))
             {
                 result = (T)convertedResult!;
                 return true;
             }
 
-            // 7. 문자열로 변환
+            // 9. 문자열로 변환
             if (targetType == typeof(string))
             {
                 result = (T)(object)sourceValue.ToString()!;
@@ -326,43 +425,61 @@ public static class ValueConversionExtensions
                 return Convert.ChangeType(sourceValue, targetType);
             }
 
-            // 3. 암시적 변환 연산자 확인
-            var implicitOperator = sourceType.GetMethod("op_Implicit",
+            // 3. 소스 타입에서 정의된 암시적 변환 연산자 확인
+            var sourceImplicitOp = sourceType.GetMethod("op_Implicit",
                 BindingFlags.Public | BindingFlags.Static,
                 null,
                 new[] { sourceType },
                 null);
 
-            if (implicitOperator != null && implicitOperator.ReturnType == targetType)
+            if (sourceImplicitOp != null && sourceImplicitOp.ReturnType == targetType)
             {
-                return implicitOperator.Invoke(null, new[] { sourceValue });
+                return sourceImplicitOp.Invoke(null, new[] { sourceValue });
             }
             
-            // 4. 명시적 변환 연산자 확인
+            // 4. 대상 타입에서 정의된 암시적 변환 연산자 확인
+            var targetImplicitOp = targetType.GetMethod("op_Implicit",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[] { sourceType },
+                null);
+                
+            if (targetImplicitOp != null && targetImplicitOp.ReturnType == targetType)
+            {
+                return targetImplicitOp.Invoke(null, new[] { sourceValue });
+            }
+            
+            // 5. 명시적 변환 연산자 확인
             if (TryExplicitConversion(sourceValue, sourceType, targetType, out var explicitResult))
             {
                 return explicitResult;
             }
+            
+            // 6. 생성자를 통한 변환 시도
+            if (TryConstructorConversion(sourceValue, sourceType, targetType, out var constructedResult))
+            {
+                return constructedResult;
+            }
 
-            // 5. 문자열 변환 시도 (Parse/TryParse)
+            // 7. 문자열 변환 시도 (Parse/TryParse)
             if (sourceValue is string sourceString && TryParseString(sourceString, targetType, out var parsedResult))
             {
                 return parsedResult;
             }
             
-            // 6. TypeConverter 사용
+            // 8. TypeConverter 사용
             if (TryTypeConverter(sourceValue, targetType, out var convertedResult))
             {
                 return convertedResult;
             }
 
-            // 7. 문자열로 변환
+            // 9. 문자열로 변환
             if (targetType == typeof(string))
             {
                 return sourceValue.ToString();
             }
             
-            // 8. 마지막 수단으로 Convert.ChangeType 시도
+            // 10. 마지막 수단으로 Convert.ChangeType 시도
             try
             {
                 return Convert.ChangeType(sourceValue, targetType, CultureInfo.InvariantCulture);

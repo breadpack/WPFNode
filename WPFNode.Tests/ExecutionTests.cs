@@ -7,7 +7,6 @@ using WPFNode.Models;
 using WPFNode.Plugins.Basic;
 using WPFNode.Plugins.Basic.Flow;
 using WPFNode.Plugins.Basic.Constants;
-using WPFNode.Plugins.Basic.Variables;
 using Xunit;
 
 namespace WPFNode.Tests;

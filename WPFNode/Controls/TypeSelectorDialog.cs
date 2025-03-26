@@ -234,50 +234,12 @@ public class TypeSelectorDialog : Window
             
             // UI 트리뷰에 최상위 노드 바인딩 - 자식 노드들은 이미 설정됨
             _namespaceTree.ItemsSource = rootNodes;
-            
-            // 모든 노드 UI 업데이트 확인
-            foreach (var node in rootNodes)
-            {
-                EnsureNodeInitialized(node);
-            }
         }
         catch (Exception ex)
         {
             MessageBox.Show($"네임스페이스 트리 초기화 중 오류 발생: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
-    
-    // 노드와 그 하위 노드가 모두 초기화되었는지 확인
-    private void EnsureNodeInitialized(NamespaceTypeNode node)
-    {
-        // IsExpanded 속성 확인 및 설정 - 트리뷰 아이템 초기화 강제
-        if (node.Children.Count > 0)
-        {
-            // 노드의 타입을 처리 (SetFilteredTypes는 내부적으로 UI 업데이트 수행)
-            // null을 전달하면 모든 타입을 표시
-            node.SetFilteredTypes(null);
-            
-            // 초기 상태에서는 최상위 노드를 시각적으로 표시
-            if (node.FullNamespace.Split('.').Length <= 2)
-            {
-                // 처음 2단계 깊이까지는 확장
-                node.IsExpanded = true;
-            }
-            else if (string.IsNullOrWhiteSpace(_searchBox.Text) || _searchBox.Text == "검색어를 입력하세요...")
-            {
-                // 더 깊은 레벨은 접기
-                node.IsExpanded = false;
-            }
-            
-            // 자식 노드들도 재귀적으로 초기화
-            foreach (var child in node.Children.OfType<NamespaceTypeNode>())
-            {
-                EnsureNodeInitialized(child);
-            }
-        }
-    }
-    
-    // 이 메소드는 초기화 로직 개선으로 제거됨 (InitializeNamespaceTree에서 직접 처리)
     
     // 부모 네임스페이스 이름 가져오기
     private string? GetParentNamespace(string fullNamespace)
