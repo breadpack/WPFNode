@@ -999,6 +999,7 @@ public class DynamicNode : NodeBase
             }
             
             // 역직렬화 후 노드 초기화
+            _isInitialized = false;
             InitializeNode();
         }
         catch (Exception ex)

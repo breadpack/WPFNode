@@ -279,10 +279,9 @@ public partial class MainWindowViewModel : ObservableObject
             IsMigrationCompleted = false;
 
             // JSON 결과 가져오기
-            var jsonResult = await _migrationService.MigrateTableDataToJsonAsync(SelectedTable);
+            await NodeCanvasViewModel.Model.ExecuteAsync();
             
             // 결과 설정
-            MigrationJsonResult = jsonResult;
             IsMigrationCompleted = true;
             StatusMessage = $"{SelectedTable.TableName} 테이블 마이그레이션이 완료되었습니다.";
         }

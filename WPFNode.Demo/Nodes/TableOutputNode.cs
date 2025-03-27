@@ -143,21 +143,12 @@ public class TableOutputNode : DynamicNode, IDisposable {
                                         .Where(p => p.CanWrite);
 
             foreach (var prop in properties) {
-                var port = InputPorts.FirstOrDefault(p => p.Name == prop.Name);
-                if (port == null) continue;
-
-                var portType = typeof(InputPort<>).MakeGenericType(prop.PropertyType);
-                var getValue = portType.GetMethod(nameof(InputPort<object>.GetValueOrDefault),
-                                                  BindingFlags.Public | BindingFlags.Instance);
-
-                if (getValue == null) continue;
-
-                var value = getValue.Invoke(port, null);
+                var port  = Properties.FirstOrDefault(p => p.Name == prop.Name);
+                var value = port.Value;
 
                 // 포트의 값을 프로퍼티에 설정
-                if (value != null) {
-                    prop.SetValue(_resultObject, Convert.ChangeType(value, prop.PropertyType));
-                }
+                prop.SetValue(_resultObject, Convert.ChangeType(value, prop.PropertyType));
+                Console.WriteLine($"{prop.Name} - {value}");
             }
         }
         catch (Exception ex) {

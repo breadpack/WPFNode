@@ -174,8 +174,8 @@ namespace WPFNode.Demo.Nodes
             {
                 if (i < currentRow.Values.Count && i < Headers.Count)
                 {
-                    var port = OutputPorts[i];
-                    var value = JsonSerializer.Deserialize(currentRow.Values[i], Headers[i].Type);
+                    var port  = OutputPorts[i];
+                    var value = 123123;
 
                     // 리플렉션을 사용하여 포트의 Value 속성에 값 설정
                     var portType = port.GetType();
