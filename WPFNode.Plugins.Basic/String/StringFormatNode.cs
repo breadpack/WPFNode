@@ -75,10 +75,6 @@ public class StringFormatNode : DynamicNode {
         var format         = FormatString?.Value ?? "";
         var parameterCount = GetFormatParameterCount(format);
 
-        // 이전 상태와 비교
-        if (parameterCount == _lastParameterCount && _parameterPorts.Count == parameterCount)
-            return;
-
         _lastParameterCount = parameterCount;
         _parameterPorts.Clear();
 

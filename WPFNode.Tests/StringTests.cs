@@ -226,11 +226,17 @@ public class StringTests
         Assert.NotNull(paramPort); // 매개변수 포트가 제대로 생성되었는지 확인
         param0Node.Result.Connect(paramPort);
 
+        var json = canvas.ToJson();
+
+        var deserialized = NodeCanvas.FromJson(json);
+
         // 5. 실행
-        await canvas.ExecuteAsync();
+        await deserialized.ExecuteAsync();
+
+        var formatNode2 = deserialized.Q<StringFormatNode>();
 
         // 6. 결과 확인
-        Assert.Equal("Hello, World!", formatNode.Result.Value);
+        Assert.Equal("Hello, World!", formatNode2.Result.Value);
     }
 
     [Fact]
