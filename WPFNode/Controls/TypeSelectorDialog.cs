@@ -29,6 +29,24 @@ public class TypeSelectorDialog : Window
     // 로딩 인디케이터
     private readonly ProgressBar _loadingIndicator;
     private readonly Grid _mainGrid;
+    
+    // 제네릭 타입 선택 관련
+    private bool _isGenericSelectionMode = false;
+    private Type? _baseGenericType;
+    private List<Type> _selectedTypeArguments = new List<Type>();
+    private int _currentTypeParameterIndex = 0;
+    private Label _genericSelectionInfoLabel;
+    private Button _backButton;
+    private StackPanel _breadcrumbPanel;
+    
+    // 단계별 선택 표시를 위한 패널
+    private StackPanel _selectionStepsPanel;
+    private Grid _selectionInfoContainer;
+
+    private readonly Button _nextButton;
+    private readonly Button _prevButton;
+    private readonly Button _selectGenericArgButton;
+    private readonly StackPanel _genericArgPanel;
 
     public Type? SelectedType => _selectedType;
 
@@ -49,9 +67,51 @@ public class TypeSelectorDialog : Window
         _searchDebounceTimer.Start();
 
         _mainGrid = new Grid();
-        _mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        _mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        _mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        _mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(40, GridUnitType.Pixel) }); // 선택 정보 영역 (고정 높이)
+        _mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // 검색 박스
+        _mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // 콘텐츠 영역
+        _mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // 버튼 영역
+        
+        // 선택 정보 컨테이너 (고정 높이를 가진 영역으로 항상 표시)
+        _selectionInfoContainer = new Grid
+        {
+            Margin = new Thickness(5),
+            Height = 30
+        };
+        _mainGrid.Children.Add(_selectionInfoContainer);
+        Grid.SetRow(_selectionInfoContainer, 0);
+        
+        // 브레드크럼 패널 (제네릭 타입 선택 경로 표시)
+        _breadcrumbPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+            Visibility = Visibility.Collapsed // 초기에는 숨겨둠
+        };
+        _selectionInfoContainer.Children.Add(_breadcrumbPanel);
+        
+        // 단계별 선택 표시를 위한 패널
+        _selectionStepsPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+            Visibility = Visibility.Visible
+        };
+        _selectionStepsPanel.Children.Add(new TextBlock 
+        { 
+            Text = "Type 선택",
+            FontWeight = FontWeights.Bold 
+        });
+        _selectionInfoContainer.Children.Add(_selectionStepsPanel);
+        
+        // 제네릭 타입 선택 정보 라벨
+        _genericSelectionInfoLabel = new Label
+        {
+            VerticalAlignment = VerticalAlignment.Center,
+            FontWeight = FontWeights.Bold,
+            Visibility = Visibility.Collapsed // 초기에는 숨겨둠
+        };
+        _selectionInfoContainer.Children.Add(_genericSelectionInfoLabel);
 
         // 검색 박스
         _searchBox = new TextBox
@@ -73,7 +133,7 @@ public class TypeSelectorDialog : Window
         };
         _searchBox.TextChanged += OnSearchTextChanged;
         _mainGrid.Children.Add(_searchBox);
-        Grid.SetRow(_searchBox, 0);
+        Grid.SetRow(_searchBox, 1);
 
         // 네임스페이스 트리
         _namespaceTree = new TreeView
@@ -83,6 +143,8 @@ public class TypeSelectorDialog : Window
         ScrollViewer.SetCanContentScroll(_namespaceTree, true);
         VirtualizingPanel.SetIsVirtualizing(_namespaceTree, true);
         VirtualizingPanel.SetVirtualizationMode(_namespaceTree, VirtualizationMode.Recycling);
+        _mainGrid.Children.Add(_namespaceTree);
+        Grid.SetRow(_namespaceTree, 2);
         
         // 검색 결과 리스트뷰
         _resultListView = new ListView
@@ -115,21 +177,10 @@ public class TypeSelectorDialog : Window
         _resultListView.ItemTemplate = resultTemplate;
         
         // 리스트뷰 선택 이벤트 연결
-        _resultListView.SelectionChanged += (s, e) => {
-            if (_resultListView.SelectedItem is Type type)
-            {
-                _selectedType = type;
-            }
-        };
+        _resultListView.SelectionChanged += OnListViewSelectionChanged;
         
         // 더블 클릭으로 바로 선택 완료
-        _resultListView.MouseDoubleClick += (s, e) => {
-            if (_selectedType != null)
-            {
-                DialogResult = true;
-                Close();
-            }
-        };
+        _resultListView.MouseDoubleClick += OnListViewDoubleClick;
 
         // TreeView 데이터 템플릿 설정
         var treeTypeTemplate = new DataTemplate(typeof(Type));
@@ -158,12 +209,10 @@ public class TypeSelectorDialog : Window
         _namespaceTree.ItemTemplate = namespaceTemplate;
 
         _namespaceTree.SelectedItemChanged += OnTreeViewSelectedItemChanged;
-        _mainGrid.Children.Add(_namespaceTree);
-        Grid.SetRow(_namespaceTree, 1);
         
         // 리스트뷰를 그리드에 추가
         _mainGrid.Children.Add(_resultListView);
-        Grid.SetRow(_resultListView, 1);
+        Grid.SetRow(_resultListView, 2);
 
         // 버튼 패널
         var buttonPanel = new StackPanel
@@ -197,10 +246,68 @@ public class TypeSelectorDialog : Window
         };
         cancelButton.Click += (s, e) => Close();
 
+        // 이전 버튼 (제네릭 타입 선택 모드에서만 활성화)
+        _backButton = new Button
+        {
+            Content = "이전",
+            Width = 75,
+            Height = 25,
+            Margin = new Thickness(5),
+            Visibility = Visibility.Collapsed
+        };
+        _backButton.Click += OnBackButtonClick;
+        
+        // 제네릭 인자 선택 패널
+        _genericArgPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(5),
+            Visibility = Visibility.Collapsed
+        };
+
+        // 제네릭 인자 선택 버튼
+        _selectGenericArgButton = new Button
+        {
+            Content = "제네릭 인자 선택",
+            Width = 120,
+            Height = 25,
+            Margin = new Thickness(5),
+            Visibility = Visibility.Collapsed
+        };
+        _selectGenericArgButton.Click += OnSelectGenericArgClick;
+
+        // 이전/다음 버튼
+        _prevButton = new Button
+        {
+            Content = "이전",
+            Width = 75,
+            Height = 25,
+            Margin = new Thickness(5),
+            Visibility = Visibility.Collapsed
+        };
+        _prevButton.Click += OnPrevButtonClick;
+
+        _nextButton = new Button
+        {
+            Content = "다음",
+            Width = 75,
+            Height = 25,
+            Margin = new Thickness(5),
+            Visibility = Visibility.Collapsed
+        };
+        _nextButton.Click += OnNextButtonClick;
+
+        _genericArgPanel.Children.Add(_prevButton);
+        _genericArgPanel.Children.Add(_nextButton);
+        _genericArgPanel.Children.Add(_selectGenericArgButton);
+
+        // 버튼 패널에 제네릭 인자 선택 패널 추가
+        buttonPanel.Children.Insert(0, _genericArgPanel);
         buttonPanel.Children.Add(okButton);
         buttonPanel.Children.Add(cancelButton);
         _mainGrid.Children.Add(buttonPanel);
-        Grid.SetRow(buttonPanel, 2);
+        Grid.SetRow(buttonPanel, 3);
 
         // 로딩 인디케이터
         _loadingIndicator = new ProgressBar
@@ -223,7 +330,6 @@ public class TypeSelectorDialog : Window
         // 비동기 초기화 시작
         InitializeAsync();
     }
-
     private async void InitializeAsync()
     {
         try
@@ -424,11 +530,408 @@ public class TypeSelectorDialog : Window
         }
     }
 
+    /// <summary>
+    /// ListView 선택 이벤트 핸들러
+    /// </summary>
+    private void OnListViewSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_resultListView.SelectedItem is Type type)
+        {
+            if (_isGenericSelectionMode)
+            {
+                _selectedTypeArguments[_currentTypeParameterIndex] = type;
+                ProcessGenericTypeArgument();
+                return;
+            }
+            
+            if (type.IsGenericTypeDefinition)
+            {
+                _selectedType = type;
+                _selectGenericArgButton.Visibility = Visibility.Visible;
+                _genericArgPanel.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                _selectedType = type;
+                _selectGenericArgButton.Visibility = Visibility.Collapsed;
+                _genericArgPanel.Visibility = Visibility.Collapsed;
+            }
+        }
+    }
+    
+    /// <summary>
+    /// ListView 더블 클릭 이벤트 핸들러
+    /// </summary>
+    private void OnListViewDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (_selectedType != null && !_isGenericSelectionMode)
+        {
+            DialogResult = true;
+            Close();
+        }
+    }
+
     private void OnTreeViewSelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
         if (e.NewValue is Type type)
         {
-            _selectedType = type;
+            if (_isGenericSelectionMode)
+            {
+                _selectedTypeArguments[_currentTypeParameterIndex] = type;
+                ProcessGenericTypeArgument();
+                return;
+            }
+            
+            if (type.IsGenericTypeDefinition)
+            {
+                _selectedType = type;
+                _selectGenericArgButton.Visibility = Visibility.Visible;
+                _genericArgPanel.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                _selectedType = type;
+                _selectGenericArgButton.Visibility = Visibility.Collapsed;
+                _genericArgPanel.Visibility = Visibility.Collapsed;
+            }
+        }
+    }
+    
+    /// <summary>
+    /// 제네릭 타입 선택 모드로 전환합니다.
+    /// </summary>
+    private void EnterGenericSelectionMode(Type genericTypeDefinition)
+    {
+        _isGenericSelectionMode = true;
+        _baseGenericType = genericTypeDefinition;
+        _selectedTypeArguments.Clear();
+        
+        var typeParams = genericTypeDefinition.GetGenericArguments();
+        _currentTypeParameterIndex = 0;
+        
+        for (int i = 0; i < typeParams.Length; i++)
+        {
+            _selectedTypeArguments.Add(null);
+        }
+        
+        UpdateGenericSelectionUI();
+        
+        _prevButton.Visibility = Visibility.Visible;
+        _nextButton.Visibility = typeParams.Length > 1 ? Visibility.Visible : Visibility.Collapsed;
+        _selectGenericArgButton.Visibility = Visibility.Collapsed;
+    }
+    
+    /// <summary>
+    /// 제네릭 인자 선택 UI를 업데이트합니다.
+    /// </summary>
+    private void UpdateGenericSelectionUI()
+    {
+        if (_baseGenericType == null) return;
+        
+        var typeParams = _baseGenericType.GetGenericArguments();
+        
+        var typeParamNames = typeParams.Select(p => p.Name).ToArray();
+        var genericName = _baseGenericType.Name;
+        
+        // 제네릭 타입 이름에서 `1, `2 등의 부분 제거
+        var nameWithoutArity = genericName.Split('`')[0];
+        
+        var typeArgDisplay = new List<string>();
+        for (int i = 0; i < typeParams.Length; i++)
+        {
+            if (i < _currentTypeParameterIndex && _selectedTypeArguments[i] != null)
+            {
+                typeArgDisplay.Add(_selectedTypeArguments[i].Name);
+            }
+            else if (i == _currentTypeParameterIndex)
+            {
+                typeArgDisplay.Add("?");
+            }
+            else
+            {
+                typeArgDisplay.Add("");
+            }
+        }
+        
+        // 제네릭 타입 정보와 현재 선택된 타입을 별도의 패널에 표시
+        var mainPanel = new StackPanel
+        {
+            Orientation = Orientation.Vertical,
+            Margin = new Thickness(5)
+        };
+
+        // 제네릭 타입 정보
+        var genericTypeInfo = new TextBlock
+        {
+            Text = $"{nameWithoutArity}<{string.Join(",", typeArgDisplay)}>",
+            FontWeight = FontWeights.Bold,
+            Margin = new Thickness(0, 0, 0, 5)
+        };
+        mainPanel.Children.Add(genericTypeInfo);
+
+        // 현재 선택 중인 타입 정보
+        if (_selectedType != null)
+        {
+            var currentTypeInfo = new TextBlock
+            {
+                Text = $"현재 선택: {_selectedType.Name}",
+                Foreground = Brushes.Blue,
+                FontWeight = FontWeights.Bold
+            };
+            mainPanel.Children.Add(currentTypeInfo);
+        }
+
+        _genericSelectionInfoLabel.Content = mainPanel;
+        _genericSelectionInfoLabel.Visibility = Visibility.Visible;
+        
+        UpdateSelectionSteps();
+        UpdateBreadcrumb();
+        
+        var currentParam = typeParams[_currentTypeParameterIndex];
+        Title = $"타입 선택 - {currentParam.Name} 타입 인자 선택";
+    }
+    
+    /// <summary>
+    /// 단계별 선택 표시를 업데이트합니다 (Origin, T1, T2, ...)
+    /// </summary>
+    private void UpdateSelectionSteps()
+    {
+        _selectionStepsPanel.Children.Clear();
+        _selectionStepsPanel.Visibility = Visibility.Visible;
+        
+        if (_baseGenericType == null)
+        {
+            _selectionStepsPanel.Children.Add(new TextBlock 
+            { 
+                Text = "Origin 타입 선택", 
+                FontWeight = FontWeights.Bold 
+            });
+            return;
+        }
+        
+        var typeParams = _baseGenericType.GetGenericArguments();
+        var genericName = _baseGenericType.Name.Split('`')[0];
+        
+        // Origin 타입 표시
+        _selectionStepsPanel.Children.Add(new TextBlock
+        {
+            Text = $"Origin: {genericName}",
+            Margin = new Thickness(0, 0, 5, 0),
+            Foreground = Brushes.Gray
+        });
+        
+        _selectionStepsPanel.Children.Add(new TextBlock 
+        { 
+            Text = " → ", 
+            Margin = new Thickness(0, 0, 5, 0) 
+        });
+        
+        // 제네릭 인자 표시
+        for (int i = 0; i < typeParams.Length; i++)
+        {
+            var brush = (i == _currentTypeParameterIndex) ? Brushes.Blue : 
+                       (i < _currentTypeParameterIndex) ? Brushes.Gray : Brushes.Black;
+            
+            var fontWeight = (i == _currentTypeParameterIndex) ? FontWeights.Bold : FontWeights.Normal;
+            
+            var argName = $"T{i + 1}";
+            if (i < _currentTypeParameterIndex && _selectedTypeArguments[i] != null)
+            {
+                argName += $": {_selectedTypeArguments[i].Name}";
+            }
+            else if (i == _currentTypeParameterIndex)
+            {
+                argName += ": 선택 중...";
+            }
+            
+            _selectionStepsPanel.Children.Add(new TextBlock
+            {
+                Text = argName,
+                Margin = new Thickness(0, 0, 5, 0),
+                Foreground = brush,
+                FontWeight = fontWeight
+            });
+            
+            if (i < typeParams.Length - 1)
+            {
+                _selectionStepsPanel.Children.Add(new TextBlock 
+                { 
+                    Text = " → ", 
+                    Margin = new Thickness(0, 0, 5, 0) 
+                });
+            }
+        }
+    }
+    
+    /// <summary>
+    /// 브레드크럼 내비게이션을 업데이트합니다.
+    /// </summary>
+    private void UpdateBreadcrumb()
+    {
+        _breadcrumbPanel.Children.Clear();
+        _breadcrumbPanel.Visibility = Visibility.Visible;
+        
+        var baseLabel = new TextBlock
+        {
+            Text = "타입 선택",
+            Margin = new Thickness(0, 0, 5, 0)
+        };
+        _breadcrumbPanel.Children.Add(baseLabel);
+        
+        _breadcrumbPanel.Children.Add(new TextBlock { Text = " > ", Margin = new Thickness(0, 0, 5, 0) });
+        
+        if (_baseGenericType != null)
+        {
+            var genericName = _baseGenericType.Name.Split('`')[0];
+            _breadcrumbPanel.Children.Add(new TextBlock 
+            { 
+                Text = genericName, 
+                Margin = new Thickness(0, 0, 5, 0),
+                FontWeight = FontWeights.Bold
+            });
+            
+            if (_currentTypeParameterIndex > 0)
+            {
+                _breadcrumbPanel.Children.Add(new TextBlock { Text = " > ", Margin = new Thickness(0, 0, 5, 0) });
+                
+                var typeParams = _baseGenericType.GetGenericArguments();
+                for (int i = 0; i < _currentTypeParameterIndex; i++)
+                {
+                    var paramLabel = new TextBlock
+                    {
+                        Text = $"{typeParams[i].Name}: {(_selectedTypeArguments[i]?.Name ?? "?")}",
+                        Margin = new Thickness(0, 0, 5, 0)
+                    };
+                    _breadcrumbPanel.Children.Add(paramLabel);
+                    
+                    if (i < _currentTypeParameterIndex - 1)
+                    {
+                        _breadcrumbPanel.Children.Add(new TextBlock { Text = " > ", Margin = new Thickness(0, 0, 5, 0) });
+                    }
+                }
+            }
+            
+            // 현재 선택 중인 인자 표시
+            if (_selectedType != null)
+            {
+                _breadcrumbPanel.Children.Add(new TextBlock { Text = " > ", Margin = new Thickness(0, 0, 5, 0) });
+                _breadcrumbPanel.Children.Add(new TextBlock
+                {
+                    Text = $"현재 선택: {_selectedType.Name}",
+                    Foreground = Brushes.Blue,
+                    FontWeight = FontWeights.Bold,
+                    Margin = new Thickness(0, 0, 5, 0)
+                });
+            }
+        }
+    }
+    
+    /// <summary>
+    /// 타입 인자 선택 완료 후 다음 단계로 진행합니다.
+    /// </summary>
+    private void ProcessGenericTypeArgument()
+    {
+        if (_baseGenericType == null) return;
+        
+        var typeParams = _baseGenericType.GetGenericArguments();
+        
+        if (_currentTypeParameterIndex >= typeParams.Length - 1)
+        {
+            var finalGenericType = CreateGenericType();
+            if (finalGenericType != null)
+            {
+                _selectedType = finalGenericType;
+                _isGenericSelectionMode = false;
+                _genericSelectionInfoLabel.Visibility = Visibility.Collapsed;
+                _prevButton.Visibility = Visibility.Collapsed;
+                _nextButton.Visibility = Visibility.Collapsed;
+                _selectGenericArgButton.Visibility = Visibility.Collapsed;
+                _genericArgPanel.Visibility = Visibility.Collapsed;
+                Title = "타입 선택";
+            }
+        }
+        else
+        {
+            _currentTypeParameterIndex++;
+            UpdateGenericSelectionUI();
+        }
+    }
+    
+    /// <summary>
+    /// 선택한 타입 인자로 최종 제네릭 타입을 생성합니다.
+    /// </summary>
+    private Type CreateGenericType()
+    {
+        if (_baseGenericType == null || _selectedTypeArguments.Count == 0)
+            return null;
+            
+        try
+        {
+            if (_selectedTypeArguments.Any(t => t == null))
+                return null;
+                
+            return _baseGenericType.MakeGenericType(_selectedTypeArguments.ToArray());
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"제네릭 타입 생성 중 오류 발생: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 이전 버튼 클릭 이벤트 처리
+    /// </summary>
+    private void OnBackButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (!_isGenericSelectionMode)
+            return;
+            
+        if (_currentTypeParameterIndex > 0)
+        {
+            _currentTypeParameterIndex--;
+            UpdateGenericSelectionUI();
+        }
+        else
+        {
+            _isGenericSelectionMode = false;
+            _genericSelectionInfoLabel.Visibility = Visibility.Collapsed;
+            _breadcrumbPanel.Visibility = Visibility.Collapsed;
+            _prevButton.Visibility = Visibility.Collapsed;
+            _nextButton.Visibility = Visibility.Collapsed;
+            _selectGenericArgButton.Visibility = Visibility.Collapsed;
+            _genericArgPanel.Visibility = Visibility.Collapsed;
+            Title = "타입 선택";
+        }
+    }
+
+    private void OnSelectGenericArgClick(object sender, RoutedEventArgs e)
+    {
+        if (_selectedType != null && _selectedType.IsGenericTypeDefinition)
+        {
+            EnterGenericSelectionMode(_selectedType);
+        }
+    }
+
+    private void OnPrevButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (_currentTypeParameterIndex > 0)
+        {
+            _currentTypeParameterIndex--;
+            UpdateGenericSelectionUI();
+        }
+    }
+
+    private void OnNextButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (_baseGenericType != null)
+        {
+            var typeParams = _baseGenericType.GetGenericArguments();
+            if (_currentTypeParameterIndex < typeParams.Length - 1)
+            {
+                _currentTypeParameterIndex++;
+                UpdateGenericSelectionUI();
+            }
         }
     }
 

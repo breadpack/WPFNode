@@ -103,10 +103,23 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
         bool targetIsCollection = IsCollectionType(typeof(T), out targetElementType);
         
         // 양쪽 모두 컬렉션이고 요소 타입이 추출되었으면 요소 타입의 호환성 확인
-        if (sourceIsCollection && targetIsCollection && 
-            sourceElementType != null && targetElementType != null) {
-            return sourceElementType == targetElementType || 
-                   sourceElementType.CanConvertTo(targetElementType);
+        if (sourceIsCollection && targetIsCollection) {
+            // 타겟 요소 타입이 있는 경우
+            if (targetElementType != null) {
+                // 소스 요소 타입이 있는 경우 - 일반적인 호환성 확인
+                if (sourceElementType != null) {
+                    return sourceElementType == targetElementType || 
+                           sourceElementType.CanConvertTo(targetElementType);
+                }
+                // 소스가 비제네릭 컬렉션인 경우 (예: IList, ICollection)
+                else if (typeof(System.Collections.IEnumerable).IsAssignableFrom(sourceType)) {
+                    // 비제네릭 IList -> List<int>와 같은 변환을 허용
+                    if (typeof(System.Collections.IList).IsAssignableFrom(sourceType) ||
+                        typeof(System.Collections.ICollection).IsAssignableFrom(sourceType)) {
+                        return true; // 런타임에 변환 시도
+                    }
+                }
+            }
         }
         
         return false;
@@ -169,12 +182,13 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
     protected bool TryCollectionConversion(object sourceValue, out T? result) {
         result = default;
         
-        // 소스와 타겟의 요소 타입 확인
-        if (!IsCollectionType(typeof(T), out Type? targetElementType) || 
-            !IsCollectionType(sourceValue.GetType(), out Type? sourceElementType) ||
-            targetElementType == null || sourceElementType == null) {
+        // 타겟이 컬렉션 타입인지 확인
+        if (!IsCollectionType(typeof(T), out Type? targetElementType) || targetElementType == null) {
             return false;
         }
+        
+        // 소스의 컬렉션 여부 확인
+        bool sourceIsGenericCollection = IsCollectionType(sourceValue.GetType(), out Type? sourceElementType);
         
         // 소스가 IEnumerable이 아니면 변환 불가
         if (!(sourceValue is System.Collections.IEnumerable sourceCollection)) {
@@ -182,8 +196,20 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
         }
         
         try {
-            // 요소들을 변환
-            var convertedItems = ConvertCollectionItems(sourceCollection, targetElementType, sourceElementType);
+            List<object> convertedItems;
+            
+            // 소스가 제네릭 컬렉션이면 요소 타입을 사용하여 변환
+            if (sourceIsGenericCollection && sourceElementType != null) {
+                convertedItems = ConvertCollectionItems(sourceCollection, targetElementType, sourceElementType);
+            }
+            // 소스가 비제네릭 컬렉션(IList, ICollection)인 경우
+            else if (typeof(System.Collections.IList).IsAssignableFrom(sourceValue.GetType()) || 
+                     typeof(System.Collections.ICollection).IsAssignableFrom(sourceValue.GetType())) {
+                convertedItems = ConvertNonGenericCollectionItems(sourceCollection, targetElementType);
+            }
+            else {
+                return false;
+            }
             
             // 대상 타입에 따라 적절한 컬렉션으로 변환
             if (typeof(T).IsArray) {
@@ -235,6 +261,31 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
             System.Diagnostics.Debug.WriteLine($"컬렉션 변환 중 오류: {ex.Message}");
             return false;
         }
+    }
+    
+    /// <summary>
+    /// 비제네릭 컬렉션의 요소를 변환하여 새 리스트를 반환합니다.
+    /// </summary>
+    protected List<object> ConvertNonGenericCollectionItems(System.Collections.IEnumerable sourceCollection, Type targetElementType) {
+        var result = new List<object>();
+        
+        foreach (var item in sourceCollection) {
+            if (item != null) {
+                // 요소 타입이 같거나 할당 가능하면 그대로 사용
+                if (targetElementType.IsAssignableFrom(item.GetType())) {
+                    result.Add(item);
+                }
+                // 요소 타입이 다르면 변환 시도
+                else {
+                    var convertedItem = item.TryConvertTo(targetElementType);
+                    if (convertedItem != null) {
+                        result.Add(convertedItem);
+                    }
+                }
+            }
+        }
+        
+        return result;
     }
     
     /// <summary>

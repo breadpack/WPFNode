@@ -188,7 +188,7 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         string? format           = null,
         bool    canConnectToPort = false
     ) {
-        if(_properties.Exists(p => p.Name == name))
+        if(_properties.Exists(p => p.Name == name && p.PropertyType == type))
             throw new InvalidOperationException($"Property with name '{name}' already exists.");
         
         var property = (INodeProperty)Activator.CreateInstance(
