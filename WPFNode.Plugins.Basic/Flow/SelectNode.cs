@@ -60,7 +60,7 @@ public class SelectNode : DynamicNode {
         for (int i = 0; i < targetCount; i++) {
             try {
                 var casePortName      = $"Case_{i}";
-                var prop      = builder.Property<object>(casePortName, $"Case {i}");
+                var prop      = builder.Property(casePortName, $"Case {i}", caseType);
                 var inputPort = builder.Input(prop.Name, OutputType?.Value ?? typeof(object));
                 _caseValuePorts[casePortName] = inputPort;
             }
