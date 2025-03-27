@@ -160,8 +160,60 @@ public class TypeRegistry
                 break; // 더 이상 매칭되는 것이 없으면 중단
         }
         
-        // 정렬 알고리즘 적용 (정확도 기준)
-        return resultSet.OrderBy(t => t.Name).ToList();
+        // 관련성 점수 계산 및 정렬 (Best fit 우선)
+        return resultSet
+            .Select(t => new { Type = t, Score = CalculateRelevanceScore(t, terms) })
+            .OrderByDescending(item => item.Score) // 점수 내림차순 (높은 점수가 먼저)
+            .ThenBy(item => item.Type.Name) // 동일 점수는 이름 오름차순
+            .Select(item => item.Type)
+            .ToList();
+    }
+    
+    /// <summary>
+    /// 검색어에 대한 타입의 관련성 점수를 계산합니다.
+    /// </summary>
+    /// <param name="type">검사할 타입</param>
+    /// <param name="searchTerms">검색어 배열</param>
+    /// <returns>관련성 점수 (높을수록 더 관련성 높음)</returns>
+    private int CalculateRelevanceScore(Type type, string[] searchTerms)
+    {
+        int score = 0;
+        string typeName = type.Name.ToLowerInvariant();
+        string fullName = type.FullName?.ToLowerInvariant() ?? "";
+        
+        foreach (var term in searchTerms)
+        {
+            // 1. 정확한 타입 이름 일치 (최고 우선순위)
+            if (typeName.Equals(term, StringComparison.OrdinalIgnoreCase))
+                score += 100;
+                
+            // 2. 타입 이름이 검색어로 시작 (접두사 매칭)
+            else if (typeName.StartsWith(term, StringComparison.OrdinalIgnoreCase))
+                score += 75;
+                
+            // 3. 단어 단위 일치 (타입 이름 내 단어가 검색어와 일치)
+            else if (SplitPascalCase(type.Name).Any(word => 
+                     word.Equals(term, StringComparison.OrdinalIgnoreCase)))
+                score += 50;
+                
+            // 4. 타입 이름에 검색어 포함 (부분 문자열)
+            else if (typeName.Contains(term))
+                score += 25;
+                
+            // 5. 네임스페이스에 검색어 포함
+            if (fullName.Contains(term))
+                score += 15;
+                
+            // 6. 약어 매칭 (대문자만 모았을 때 검색어와 일치)
+            string acronym = string.Concat(type.Name.Where(char.IsUpper)).ToLowerInvariant();
+            if (acronym.Equals(term, StringComparison.OrdinalIgnoreCase))
+                score += 40;
+        }
+        
+        // 보너스: 짧은 타입 이름에 약간의 가중치 부여 (동일 점수일 때 간단한 이름 우선)
+        score += Math.Max(0, 10 - typeName.Length);
+        
+        return score;
     }
 
     /// <summary>

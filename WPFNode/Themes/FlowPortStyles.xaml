@@ -61,7 +61,7 @@
                                      VerticalAlignment="Center"
                                      Foreground="Black"/>
                             <TextBlock x:Name="PART_PortType"
-                                     Text="{Binding DataType.Name, FallbackValue=Unknown}"
+                                     Text="{Binding DataType, Converter={StaticResource TypeToUserFriendlyNameConverter}, FallbackValue=Unknown}"
                                      VerticalAlignment="Center"
                                      Foreground="{Binding DataType, Converter={StaticResource TypeToColorConverter}, FallbackValue=Black}"
                                      FontSize="9"/>

@@ -12,6 +12,8 @@
     </ResourceDictionary.MergedDictionaries>
 
     <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    <converters:TypeToUserFriendlyNameConverter x:Key="TypeToUserFriendlyNameConverter"/>
+    <converters:TypeToColorConverter x:Key="TypeToColorConverter" />
 
     <Style TargetType="{x:Type local:NodeControl}">
         <Setter Property="Template">
@@ -147,7 +149,6 @@
         </Setter>
     </Style>
 
-    <converters:TypeToColorConverter x:Key="TypeToColorConverter" />
     <Style TargetType="{x:Type local:PortControl}">
         <Setter Property="MinWidth" Value="50"/>
         <Setter Property="Height" Value="32"/>
@@ -180,7 +181,7 @@
                                      VerticalAlignment="Center"
                                      Foreground="Black"/>
                             <TextBlock x:Name="PART_PortType"
-                                     Text="{Binding DataType.Name, FallbackValue=Unknown}"
+                                       Text="{Binding DataType, Converter={StaticResource TypeToUserFriendlyNameConverter}, FallbackValue=Unknown}"
                                      VerticalAlignment="Center"
                                      Foreground="{Binding DataType, Converter={StaticResource TypeToColorConverter}, FallbackValue=Black}"
                                      FontSize="9"/>

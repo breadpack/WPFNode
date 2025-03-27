@@ -13,6 +13,8 @@ using System.Windows.Threading;
 using WPFNode.Interfaces;
 using WPFNode.Services;
 using WPFNode.ViewModels.Nodes;
+using WPFNode.Extensions;
+using WPFNode.Converters;
 
 namespace WPFNode.Controls;
 
@@ -162,7 +164,10 @@ public class TypeSelectorDialog : Window
         typeStackPanel.SetValue(StackPanel.OrientationProperty, Orientation.Vertical);
         
         var nameTextBlock = new FrameworkElementFactory(typeof(TextBlock));
-        nameTextBlock.SetBinding(TextBlock.TextProperty, new Binding("Name") { Mode = BindingMode.OneTime });
+        nameTextBlock.SetBinding(TextBlock.TextProperty, new Binding(".") { 
+            Converter = new TypeToUserFriendlyNameConverter(),
+            Mode = BindingMode.OneTime 
+        });
         nameTextBlock.SetValue(TextBlock.FontWeightProperty, FontWeights.Bold);
         
         var namespaceTextBlock = new FrameworkElementFactory(typeof(TextBlock));
@@ -449,68 +454,59 @@ public class TypeSelectorDialog : Window
     {
         try
         {
-            // 로딩 표시 활성화
             _loadingIndicator.Visibility = Visibility.Visible;
             
             if (searchText == "검색어를 입력하세요..." || string.IsNullOrWhiteSpace(searchText))
             {
-                // 검색이 없을 때는 TreeView만 표시
                 _namespaceTree.Visibility = Visibility.Visible;
                 _resultListView.Visibility = Visibility.Collapsed;
                 
-                // 필터 제거 (모든 노드 표시)
                 if (_allNodes != null && _allNodes.Count > 0)
                 {
-                    // 루트 노드 찾기 - UI 스레드에서 바로 업데이트
                     var rootNodes = _allNodes
                         .Where(n => !n.FullNamespace.Contains('.') || GetParentNamespace(n.FullNamespace) == null)
                         .ToList();
                     
-                    // UI에 바인딩
                     _namespaceTree.ItemsSource = rootNodes;
                 }
                 
-                // 로딩 표시 비활성화
                 _loadingIndicator.Visibility = Visibility.Collapsed;
                 return;
             }
 
-            // 백그라운드 스레드에서 검색 수행
             var matchedTypes = await Task.Run(() => {
-                // 검색 수행
                 return TypeRegistry.Instance.SearchTypes(searchText, _pluginOnly);
             }, token);
             
             if (token.IsCancellationRequested) return;
 
-            // 검색 결과가 있으면 ListView로 표시 (TreeView 필터링 제거)
             if (matchedTypes.Count > 0)
             {
-                // TreeView 숨기고 ListView만 표시
                 _namespaceTree.Visibility = Visibility.Collapsed;
                 _resultListView.Visibility = Visibility.Visible;
                 
-                // ListView에 바로 결과 바인딩 (정렬만 수행)
-                _resultListView.ItemsSource = matchedTypes.OrderBy(t => t.Name);
+                // 디버그 로깅 추가
+                System.Diagnostics.Debug.WriteLine($"TypeSelectorDialog - 검색어: {searchText}");
+                foreach (var type in matchedTypes.Take(5))
+                {
+                    System.Diagnostics.Debug.WriteLine($"TypeSelectorDialog - 타입: {type.FullName}");
+                }
+                
+                _resultListView.ItemsSource = matchedTypes;
             }
             else
             {
-                // 결과가 없을 때는 TreeView 표시 (전체 트리)
                 _namespaceTree.Visibility = Visibility.Visible;
                 _resultListView.Visibility = Visibility.Collapsed;
                 
-                // 결과 없음을 표시하는 메시지를 보여줄 수도 있음
                 MessageBox.Show($"'{searchText}' 검색 결과가 없습니다.", "검색 결과", MessageBoxButton.OK, MessageBoxImage.Information);
                 
-                // TreeView 초기 상태로 복원
                 if (_allNodes != null && _allNodes.Count > 0)
                 {
-                    // 루트 노드 찾기
                     var rootNodes = _allNodes
                         .Where(n => !n.FullNamespace.Contains('.') || GetParentNamespace(n.FullNamespace) == null)
                         .ToList();
                     
-                    // UI에 바인딩
                     _namespaceTree.ItemsSource = rootNodes;
                 }
             }
@@ -525,7 +521,6 @@ public class TypeSelectorDialog : Window
         }
         finally
         {
-            // 로딩 표시 비활성화
             _loadingIndicator.Visibility = Visibility.Collapsed;
         }
     }
@@ -631,17 +626,14 @@ public class TypeSelectorDialog : Window
         var typeParams = _baseGenericType.GetGenericArguments();
         
         var typeParamNames = typeParams.Select(p => p.Name).ToArray();
-        var genericName = _baseGenericType.Name;
-        
-        // 제네릭 타입 이름에서 `1, `2 등의 부분 제거
-        var nameWithoutArity = genericName.Split('`')[0];
+        var genericName = _baseGenericType.GetUserFriendlyName();
         
         var typeArgDisplay = new List<string>();
         for (int i = 0; i < typeParams.Length; i++)
         {
             if (i < _currentTypeParameterIndex && _selectedTypeArguments[i] != null)
             {
-                typeArgDisplay.Add(_selectedTypeArguments[i].Name);
+                typeArgDisplay.Add(_selectedTypeArguments[i].GetUserFriendlyName());
             }
             else if (i == _currentTypeParameterIndex)
             {
@@ -663,7 +655,7 @@ public class TypeSelectorDialog : Window
         // 제네릭 타입 정보
         var genericTypeInfo = new TextBlock
         {
-            Text = $"{nameWithoutArity}<{string.Join(",", typeArgDisplay)}>",
+            Text = $"{genericName}<{string.Join(",", typeArgDisplay)}>",
             FontWeight = FontWeights.Bold,
             Margin = new Thickness(0, 0, 0, 5)
         };
@@ -674,7 +666,7 @@ public class TypeSelectorDialog : Window
         {
             var currentTypeInfo = new TextBlock
             {
-                Text = $"현재 선택: {_selectedType.Name}",
+                Text = $"현재 선택: {_selectedType.GetUserFriendlyName()}",
                 Foreground = Brushes.Blue,
                 FontWeight = FontWeights.Bold
             };
