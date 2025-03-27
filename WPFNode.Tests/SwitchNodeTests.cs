@@ -9,7 +9,8 @@ using WPFNode.Models.Execution;
 using WPFNode.Plugins.Basic;
 using WPFNode.Plugins.Basic.Constants;
 using WPFNode.Plugins.Basic.Flow;
-using WPFNode.Plugins.Basic.Primitives; // ConstantNode가 이 네임스페이스에 있습니다
+using WPFNode.Plugins.Basic.Primitives;
+using WPFNode.Tests.Helpers; // ConstantNode가 이 네임스페이스에 있습니다
 using Xunit;
 
 namespace WPFNode.Tests
@@ -66,8 +67,8 @@ namespace WPFNode.Tests
             stringValue.Result.Connect(switchNode.InputValue);
             
             // 트래킹 노드에 값 입력 (경로 구분용)
-            var value1 = canvas.AddNode<ConstantNode<int>>(150, 0);
-            var value2 = canvas.AddNode<ConstantNode<int>>(150, 100);
+            var value1       = canvas.AddNode<ConstantNode<int>>(150, 0);
+            var value2       = canvas.AddNode<ConstantNode<int>>(150, 100);
             var valueDefault = canvas.AddNode<ConstantNode<int>>(150, 200);
             
             value1.Value.Value = 1;

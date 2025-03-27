@@ -8,6 +8,7 @@ using WPFNode.Models.Execution;
 using WPFNode.Plugins.Basic;
 using WPFNode.Plugins.Basic.Flow;
 using WPFNode.Plugins.Basic.Constants;
+using WPFNode.Tests.Helpers;
 using Xunit;
 
 namespace WPFNode.Tests;
@@ -111,9 +112,9 @@ public class ExecutionTests
 
         // 2. 노드 추가
         var startNode = canvas.AddNode<StartNode>(0, 0);
-        var numberA = canvas.AddNode<ConstantNode<double>>(0, 0);
-        var numberB = canvas.AddNode<ConstantNode<double>>(0, 100);
-        var addNode = canvas.AddNode<AdditionNode>(100, 50);
+        var numberA   = canvas.AddNode<ConstantNode<double>>(0, 0);
+        var numberB   = canvas.AddNode<ConstantNode<double>>(0, 100);
+        var addNode   = canvas.AddNode<AdditionNode>(100, 50);
 
         // 3. 노드 설정
         numberA.Value.Value = 5.0;

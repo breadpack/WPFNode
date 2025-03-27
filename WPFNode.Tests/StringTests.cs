@@ -8,6 +8,7 @@ using WPFNode.Plugins.Basic.Flow;
 using WPFNode.Plugins.Basic.Constants;
 using WPFNode.Plugins.Basic.String;
 using System.Collections.Generic;
+using WPFNode.Tests.Helpers;
 using Xunit;
 
 namespace WPFNode.Tests;
@@ -33,8 +34,8 @@ public class StringTests
         var canvas = NodeCanvas.Create();
 
         // 2. 노드 추가
-        var startNode = canvas.AddNode<StartNode>(0, 0);
-        var nullStringNode = canvas.AddNode<ConstantNode<string>>(0, 100);
+        var startNode         = canvas.AddNode<StartNode>(0, 0);
+        var nullStringNode    = canvas.AddNode<ConstantNode<string>>(0, 100);
         var isNullOrEmptyNode = canvas.AddNode<StringIsNullOrEmptyNode>(100, 50);
 
         // 3. 노드 설정 - null 문자열 설정

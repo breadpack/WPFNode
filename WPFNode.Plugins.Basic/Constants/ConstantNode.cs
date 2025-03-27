@@ -17,38 +17,41 @@ namespace WPFNode.Plugins.Basic.Constants;
 /// <typeparam name="T">상수의 데이터 타입</typeparam>
 [NodeCategory("Constants")]
 [NodeDescription("상수 값을 출력합니다.")]
-public class ConstantNode<T> : NodeBase
+public class ConstantNode : DynamicNode
 {
-    [NodeProperty("Value")]
-    public NodeProperty<T> Value { get; private set; }
+    [NodeProperty("Type", OnValueChanged = nameof(OnTypeChanged))]
+    public NodeProperty<Type> Type { get; private set; }
 
-    /// <summary>
-    /// 상수 값 출력 포트
-    /// </summary>
-    [NodeOutput("Result")]
-    public OutputPort<T> Result { get; private set; }
+    private INodeProperty _valueProperty;
+    private IOutputPort   _outputPort;
 
     public ConstantNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) { }
+
+    protected override void Configure(NodeBuilder builder) {
+        if (Type.Value == null) {
+            return;
+        }
+
+        _valueProperty = builder.Property("Value", "Value", Type.Value);
+        _outputPort    = builder.Output("Result", Type.Value);
+    }
+    
+    private void OnTypeChanged() {
+        ReconfigurePorts();
+    }
 
     protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
         FlowExecutionContext? context,
         CancellationToken     cancellationToken
     )
     {
+        if(Type.Value == null) {
+            _outputPort.Value = null;
+            yield break;
+        }
+        
         // Value.Value에서 값을 가져와 Result.Value에 설정
-        Debug.WriteLine($"ConstantNode.ProcessAsync: Value={Value}, Type={typeof(T).Name}");
-        
-        if (Value != null && Result != null)
-        {
-            Result.Value = Value.Value;
-            Debug.WriteLine($"ConstantNode.ProcessAsync: 값 설정 완료, Result 값이 설정됨");
-        }
-        else
-        {
-            Debug.WriteLine($"ConstantNode.ProcessAsync: Value 또는 Result가 null입니다. Value={Value != null}, Result={Result != null}");
-        }
-        
-        // 필요한 비동기 작업을 처리하기 위한 대기
-        yield break;
+        Debug.WriteLine($"ConstantNode.ProcessAsync: Value={_valueProperty.Value}, Type={Type.Value}");
+        _outputPort.Value = _valueProperty.Value;
     }
 } 

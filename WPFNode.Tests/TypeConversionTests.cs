@@ -13,6 +13,7 @@ using WPFNode.Plugins.Basic.String;
 using Xunit;
 using Newtonsoft.Json;
 using System.Threading.Tasks;
+using WPFNode.Tests.Helpers;
 
 namespace WPFNode.Tests;
 
