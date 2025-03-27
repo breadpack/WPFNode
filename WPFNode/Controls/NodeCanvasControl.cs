@@ -526,26 +526,6 @@ public class NodeCanvasControl : Control
         }
     }
 
-    public void UpdateAllConnections()
-    {
-        if (!_isUpdatingLayout && !_pendingConnectionUpdate)
-        {
-            _pendingConnectionUpdate = true;
-            Dispatcher.BeginInvoke(new Action(() => {
-                try
-                {
-                    _isUpdatingLayout = true;
-                    UpdateAllConnectionsDirectly();
-                }
-                finally
-                {
-                    _isUpdatingLayout = false;
-                    _pendingConnectionUpdate = false;
-                }
-            }), System.Windows.Threading.DispatcherPriority.Background);
-        }
-    }
-    
     // ItemsControl에서 직접 ConnectionControl 찾기
     private void UpdateAllConnectionsDirectly()
     {
