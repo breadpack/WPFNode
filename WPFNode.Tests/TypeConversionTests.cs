@@ -6,6 +6,8 @@ using WPFNode.Models;
 using WPFNode.Utilities;
 using WPFNode.Demo.Models;
 using WPFNode.Demo.Nodes;
+using WPFNode.Tests.Models;
+using WPFNode.Tests.Helpers;
 using WPFNode.Plugins.Basic;
 using WPFNode.Plugins.Basic.Flow;
 using WPFNode.Plugins.Basic.Constants;
@@ -55,6 +57,13 @@ public class TypeConversionTests
         pluginService.RegisterNodeType(typeof(StringToEmployeeNode));
         pluginService.RegisterNodeType(typeof(EmployeeInfoNode));
         pluginService.RegisterNodeType(typeof(EmployeeToStringNode));
+        
+        // 테스트 변환 타입 노드 등록
+        pluginService.RegisterNodeType(typeof(StringConstructorInfoNode));
+        pluginService.RegisterNodeType(typeof(ImplicitConversionInfoNode));
+        pluginService.RegisterNodeType(typeof(ExplicitConversionToStringNode));
+        pluginService.RegisterNodeType(typeof(StringTestNode));
+        pluginService.RegisterNodeType(typeof(IntTestNode));
     }
     
     /// <summary>
@@ -147,5 +156,135 @@ public class TypeConversionTests
         // 4. 타입 변환 불가능 여부 확인 - bool -> Employee
         bool boolToEmployee = typeof(bool).CanConvertTo(typeof(Employee));
         Assert.False(boolToEmployee);
+    }
+    
+    /// <summary>
+    /// 생성자에서 문자열을 받는 타입(StringConstructorType)이 InputPort에서 자동으로 변환되는지 테스트
+    /// </summary>
+    [Fact]
+    public async Task StringConstructor_InputPort_Test()
+    {
+        // 1. 새 캔버스 생성
+        var canvas = NodeCanvas.Create();
+
+        // 2. 노드 추가
+        var startNode = canvas.AddNode<StartNode>(0, 0);
+        var stringNode = canvas.AddNode<ConstantNode<string>>(0, 100);
+        var infoNode = canvas.AddNode<StringConstructorInfoNode>(300, 100);
+
+        // 3. 노드 설정 - 테스트할 문자열 설정
+        stringNode.Value.Value = "테스트이름:샘플값:테스트카테고리";
+
+        // 4. 노드 연결 - 문자열 출력 포트를 StringConstructorType 입력 포트에 연결
+        startNode.FlowOut.Connect(infoNode.FlowIn);
+        stringNode.Result.Connect(infoNode.TypeInput);
+
+        // 5. 실행
+        await canvas.ExecuteAsync();
+
+        // 6. 결과 확인 - 문자열이 생성자를 통해 StringConstructorType으로 변환되었는지 확인
+        Assert.True(infoNode.WasReceived, "StringConstructorType이 수신되지 않았습니다.");
+        Assert.NotNull(infoNode.ReceivedType);
+        Assert.Equal("테스트이름", infoNode.Name.Value);
+        Assert.Equal("샘플값", infoNode.Value.Value);
+        Assert.Equal("테스트카테고리", infoNode.Category.Value);
+    }
+    
+    /// <summary>
+    /// 암시적 변환 연산자를 가진 타입(ImplicitConversionType)이 InputPort에서 자동으로 변환되는지 테스트
+    /// </summary>
+    [Fact]
+    public async Task ImplicitConversion_InputPort_Test()
+    {
+        // 1. 새 캔버스 생성
+        var canvas = NodeCanvas.Create();
+
+        // 2. 노드 추가
+        var startNode = canvas.AddNode<StartNode>(0, 0);
+        var stringNode = canvas.AddNode<ConstantNode<string>>(0, 100);
+        var intNode = canvas.AddNode<ConstantNode<int>>(0, 200);
+        var infoNode1 = canvas.AddNode<ImplicitConversionInfoNode>(300, 100);
+        var infoNode2 = canvas.AddNode<ImplicitConversionInfoNode>(300, 300);
+
+        // 3. 노드 설정
+        stringNode.Value.Value = "테스트문자열";
+        intNode.Value.Value = 42;
+
+        // 4. 노드 연결 - 두 가지 타입의 입력을 ImplicitConversionType 입력 포트에 연결
+        startNode.FlowOut.Connect(infoNode1.FlowIn);
+        infoNode1.FlowOut.Connect(infoNode2.FlowIn);
+        
+        stringNode.Result.Connect(infoNode1.TypeInput); // string -> ImplicitConversionType
+        intNode.Result.Connect(infoNode2.TypeInput);    // int -> ImplicitConversionType
+
+        // 5. 실행
+        await canvas.ExecuteAsync();
+
+        // 6. 결과 확인 - 암시적 변환 확인
+        // string -> ImplicitConversionType 검증
+        Assert.True(infoNode1.WasReceived, "string에서 변환된 ImplicitConversionType이 수신되지 않았습니다.");
+        Assert.NotNull(infoNode1.ReceivedType);
+        Assert.Equal("String", infoNode1.Source.Value);
+        Assert.Equal(stringNode.Value.Value.Length, infoNode1.Value.Value);
+        
+        // int -> ImplicitConversionType 검증
+        Assert.True(infoNode2.WasReceived, "int에서 변환된 ImplicitConversionType이 수신되지 않았습니다.");
+        Assert.NotNull(infoNode2.ReceivedType);
+        Assert.Equal("Integer", infoNode2.Source.Value);
+        Assert.Equal(intNode.Value.Value, infoNode2.Value.Value);
+    }
+    
+    /// <summary>
+    /// 명시적 변환 연산자를 가진 타입(ExplicitConversionType)이 OutputPort에서 자동으로 변환되는지 테스트
+    /// </summary>
+    [Fact]
+    public async Task ExplicitConversion_OutputPort_Test()
+    {
+        // 1. 새 캔버스 생성
+        var canvas = NodeCanvas.Create();
+
+        // 2. 노드 추가
+        var startNode = canvas.AddNode<StartNode>(0, 0);
+        var stringConstNode = canvas.AddNode<ConstantNode<string>>(0, 100);
+        var conversionNode = canvas.AddNode<ExplicitConversionToStringNode>(200, 100);
+        var stringTestNode = canvas.AddNode<StringTestNode>(400, 50);
+        var intTestNode = canvas.AddNode<IntTestNode>(400, 150);
+
+        // 3. 노드 설정 - ExplicitConversionType을 생성할 문자열 설정
+        var testData = "42";
+        var testType = "Number";
+        
+        // 테스트를 위한 ExplicitConversionType 인스턴스 생성
+        var explicitType = new ExplicitConversionType(testData, testType);
+        stringConstNode.Value.Value = (string)explicitType; // 이미 변환된 문자열
+
+        // 4. 노드 연결
+        startNode.FlowOut.Connect(conversionNode.FlowIn);
+        conversionNode.FlowOut.Connect(stringTestNode.FlowIn);
+        stringTestNode.FlowOut.Connect(intTestNode.FlowIn);
+        
+        // 명시적 변환 테스트 (ExplicitConversionType -> string, int)
+        // InputPort에 직접 값을 설정하는 대신 상수 노드를 추가하여 연결
+        var explicitTypeNode = canvas.AddNode<ConstantNode<ExplicitConversionType>>(0, 300);
+        explicitTypeNode.Value.Value = explicitType;
+        
+        explicitTypeNode.Result.Connect(conversionNode.TypeInput);  // ExplicitConversionType 연결
+        conversionNode.StringResult.Connect(stringTestNode.Input);  // string으로 변환
+        conversionNode.IntResult.Connect(intTestNode.Input);        // int로 변환
+
+        // 5. 실행
+        await canvas.ExecuteAsync();
+
+        // 6. 결과 확인 - 명시적 변환 확인
+        Assert.True(conversionNode.WasReceived, "ExplicitConversionType이 수신되지 않았습니다.");
+        Assert.NotNull(conversionNode.ReceivedType);
+        
+        // string 변환 검증
+        Assert.True(stringTestNode.WasReceived, "string으로 변환된 결과가 수신되지 않았습니다.");
+        Assert.Equal($"{testType}:{testData}", stringTestNode.ReceivedString);
+        
+        // int 변환 검증
+        Assert.True(intTestNode.WasReceived, "int로 변환된 결과가 수신되지 않았습니다.");
+        Assert.Equal(int.Parse(testData), intTestNode.ReceivedInt);
     }
 }
