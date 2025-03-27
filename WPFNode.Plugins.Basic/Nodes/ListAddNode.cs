@@ -62,23 +62,17 @@ namespace WPFNode.Plugins.Basic.Nodes
             
             var listType = listValue.GetType();
             
-            // 원본 리스트 복제
-            var resultList = Activator.CreateInstance(listType);
-            
-            // 기존 항목 복사
-            var addRangeMethod = listType.GetMethod("AddRange");
-            addRangeMethod?.Invoke(resultList, new[] { listValue });
             
             // 새 항목 추가
             var itemValue = ((dynamic)_itemInput).GetValueOrDefault();
             if (itemValue != null)
             {
                 var addMethod = listType.GetMethod("Add");
-                addMethod?.Invoke(resultList, new[] { itemValue });
+                addMethod?.Invoke(listValue, new[] { itemValue });
             }
             
             // 결과 출력
-            ((dynamic)_resultOutput).Value = resultList;
+            ((dynamic)_resultOutput).Value = listValue;
             
             yield return FlowOut;
         }

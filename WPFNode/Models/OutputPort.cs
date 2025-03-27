@@ -50,9 +50,24 @@ public class OutputPort<T> : IOutputPort, INotifyPropertyChanged {
     public object? Value {
         get => _value;
         set {
-            if (value is T typedValue && !Equals(_value, typedValue)) {
-                _value = typedValue;
-                OnPropertyChanged(nameof(Value));
+            // 값이 같은 타입이면 직접 설정
+            if (value is T typedValue) {
+                // 값이 다르거나, 컬렉션 타입인 경우에도 항상 알림 전파
+                var isCollection = typeof(T).IsGenericType && 
+                    (typeof(T).GetGenericTypeDefinition() == typeof(List<>) || 
+                     typeof(T).GetGenericTypeDefinition() == typeof(IList<>) ||
+                     typeof(T).GetGenericTypeDefinition() == typeof(ICollection<>) ||
+                     typeof(T).GetGenericTypeDefinition() == typeof(IEnumerable<>));
+                
+                if (!Equals(_value, typedValue) || isCollection) {
+                    _value = typedValue;
+                    OnPropertyChanged(nameof(Value));
+                    
+                    // 컬렉션인 경우 디버그 로그 출력
+                    if (isCollection && typedValue != null) {
+                        System.Diagnostics.Debug.WriteLine($"OutputPort: 컬렉션 값 설정됨, 타입: {typeof(T).Name}, HashCode: {typedValue.GetHashCode()}");
+                    }
+                }
             }
         }
     }
@@ -121,6 +136,15 @@ public class OutputPort<T> : IOutputPort, INotifyPropertyChanged {
 
     protected virtual void OnPropertyChanged(string propertyName) {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+    
+    /// <summary>
+    /// 값의 참조가 동일하더라도 내용이 변경되었을 때 알림을 전파하는 메서드입니다.
+    /// 특히 컬렉션 타입에서 내용만 변경되었을 때 유용합니다.
+    /// </summary>
+    public void NotifyValueChanged() {
+        // Value 프로퍼티 변경을 알림
+        OnPropertyChanged(nameof(Value));
     }
 
     public void WriteJson(Utf8JsonWriter writer)

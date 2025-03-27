@@ -62,23 +62,18 @@ namespace WPFNode.Plugins.Basic.Nodes
             
             var listType = listValue.GetType();
             
-            // 원본 리스트 복제
-            var resultList = Activator.CreateInstance(listType);
-            
-            // 기존 항목 복사
-            var addRangeMethod = listType.GetMethod("AddRange");
-            addRangeMethod?.Invoke(resultList, new[] { listValue });
-            
-            // 항목 제거
+            // 항목 제거 - 원본 리스트 직접 수정 (참조 유지)
             var itemValue = ((dynamic)_itemInput).GetValueOrDefault();
             if (itemValue != null)
             {
                 var removeMethod = listType.GetMethod("Remove");
-                removeMethod?.Invoke(resultList, new[] { itemValue });
+                removeMethod?.Invoke(listValue, new[] { itemValue });
             }
             
-            // 결과 출력
-            ((dynamic)_resultOutput).Value = resultList;
+            // 원본 리스트 참조를 그대로 출력
+            ((dynamic)_resultOutput).Value = listValue;
+            
+            System.Diagnostics.Debug.WriteLine($"ListRemoveNode: 리스트 참조 유지, HashCode: {listValue.GetHashCode()}");
             
             yield return FlowOut;
         }

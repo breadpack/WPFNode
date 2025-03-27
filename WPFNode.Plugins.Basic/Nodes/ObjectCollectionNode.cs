@@ -82,9 +82,24 @@ namespace WPFNode.Plugins.Basic.Nodes {
             }
 
             try {
-                // 제네릭 리스트 생성
-                Type listType = typeof(List<>).MakeGenericType(targetType);
-                var collection = (IList)Activator.CreateInstance(listType);
+                // 기존 컬렉션 가져오기 시도
+                IList collection = null;
+                
+                // 출력 포트에서 기존 컬렉션 가져오기 시도
+                if (_outputPort?.Value != null && _outputPort.Value is IList existingList) {
+                    collection = existingList;
+                    
+                    // 기존 리스트 재사용 - 비우고 다시 채우기
+                    var clearMethod = collection.GetType().GetMethod("Clear");
+                    clearMethod?.Invoke(collection, null);
+                    
+                    System.Diagnostics.Debug.WriteLine($"ObjectCollectionNode: 기존 리스트 재사용, HashCode: {collection.GetHashCode()}");
+                } else {
+                    // 새 리스트를 생성해야 하는 경우에만 새로 생성
+                    Type listType = typeof(List<>).MakeGenericType(targetType);
+                    collection = (IList)Activator.CreateInstance(listType);
+                    System.Diagnostics.Debug.WriteLine($"ObjectCollectionNode: 새 리스트 생성, HashCode: {collection.GetHashCode()}");
+                }
 
                 // 각 항목 처리
                 foreach (var inputPort in _itemInputPorts) {
@@ -106,6 +121,8 @@ namespace WPFNode.Plugins.Basic.Nodes {
                 if (_outputPort != null) {
                     _outputPort.Value = collection;
                 }
+                
+                System.Diagnostics.Debug.WriteLine($"ObjectCollectionNode: 컬렉션 처리 완료, 항목 수: {collection.Count}, HashCode: {collection.GetHashCode()}");
             }
             catch (Exception ex) {
                 Console.WriteLine($"컬렉션 처리 중 오류: {ex.Message}");
