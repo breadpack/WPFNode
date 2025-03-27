@@ -20,6 +20,9 @@ public class SelectNode : DynamicNode {
     [NodeProperty("Case Type", OnValueChanged = nameof(OnTypeChanged))]
     public NodeProperty<Type> CaseType { get; private set; }
 
+    [NodeProperty("Output Type", OnValueChanged = nameof(OnTypeChanged))]
+    public NodeProperty<Type> OutputType { get; private set; }
+
     [NodeProperty("Case Count", OnValueChanged = nameof(OnCaseCountChanged))]
     public NodeProperty<int> CaseCount { get; private set; }
 
@@ -41,30 +44,29 @@ public class SelectNode : DynamicNode {
     }
 
     private void ConfigureInputOutputPorts(NodeBuilder builder) {
-        var type = CaseType?.Value ?? typeof(object);
-        _valuePort = builder.Input("Value", type);
-        _outputPort = builder.Output("Result", type);
+        var caseType = CaseType?.Value ?? typeof(object);
+        var outputType = OutputType?.Value ?? typeof(object);
+        
+        _valuePort = builder.Input("Value", caseType);
+        _outputPort = builder.Output("Result", outputType);
     }
 
     private void ConfigureCaseProperties(NodeBuilder builder) {
-        var type = CaseType?.Value ?? typeof(object);
+        var caseType = CaseType?.Value ?? typeof(object);
         var targetCount = Math.Max(1, CaseCount?.Value ?? 3);
+
+        _caseValuePorts.Clear();
 
         for (int i = 0; i < targetCount; i++) {
             try {
-                var prop = builder.Property<object>($"Case_{i}", $"케이스 {i}");
-                CreateCaseInputPort(builder, prop, type);
+                var casePortName      = $"Case_{i}";
+                var prop      = builder.Property<object>(casePortName, $"Case {i}");
+                var inputPort = builder.Input(prop.Name, OutputType?.Value ?? typeof(object));
+                _caseValuePorts[casePortName] = inputPort;
             }
             catch (Exception ex) {
                 Logger?.LogWarning($"SelectNode: Error configuring case {i}: {ex.Message}");
             }
-        }
-    }
-
-    private void CreateCaseInputPort(NodeBuilder builder, INodeProperty prop, Type type) {
-        if (prop.Value != null) {
-            var portName = $"Case {prop.Value}";
-            _caseValuePorts[prop.Value] = builder.Input(portName, type);
         }
     }
 
@@ -119,7 +121,7 @@ public class SelectNode : DynamicNode {
             try {
                 var caseValue = GetConvertedCaseValue(prop, type);
                 if (caseValue?.Equals(inputValue) ?? false) {
-                    if (_caseValuePorts.TryGetValue(caseValue, out var matchedPort)) {
+                    if (_caseValuePorts.TryGetValue(prop.Name, out var matchedPort)) {
                         Logger?.LogDebug($"SelectNode: Matched case '{prop.Name}' with value '{caseValue}'");
                         return (true, GetCaseValue(matchedPort));
                     }
@@ -181,7 +183,7 @@ public class SelectNode : DynamicNode {
             throw new IndexOutOfRangeException($"Case_{i} not found. Ensure CaseCount is set appropriately.");
         }
         
-        if (_caseValuePorts.TryGetValue(prop.Value, out var port)) {
+        if (_caseValuePorts.TryGetValue(prop.Name, out var port)) {
             return port;
         }
         

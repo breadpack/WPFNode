@@ -49,11 +49,8 @@ public class DynamicNode : NodeBase
             _node = node;
             
             // 재구성 중인 경우 사용된 객체 추적 초기화
-            if (_node._isReconfiguring)
-            {
-                _node._usedObjects.Clear();
-                MarkAttributeBasedElements();
-            }
+            _node._usedObjects.Clear();
+            MarkAttributeBasedElements();
         }
         
         /// <summary>
