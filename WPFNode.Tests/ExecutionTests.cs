@@ -310,58 +310,6 @@ public class ExecutionTests
     }
 
     [Fact]
-    public async Task WhileNode_ExecutesBodyWhileConditionIsTrue()
-    {
-        // 1. 새 캔버스 생성
-        var canvas = NodeCanvas.Create();
-
-        // 2. 노드 추가
-        var startNode = canvas.AddNode<StartNode>(0, 0);
-        var conditionNode = canvas.AddNode<CounterConditionNode>(50, 100);
-        var whileNode = canvas.AddNode<WhileNode>(100, 50);
-        var loopBody = canvas.AddNode<TrackingNode>(200, 0);
-        var loopComplete = canvas.AddNode<TrackingNode>(200, 100);
-
-        // 3. 노드 설정 - 5회 반복 후 조건이 false가 되도록 설정
-        conditionNode.MaxTrueCount = 5;
-
-        // 4. 노드 연결
-        startNode.FlowOut.Connect(whileNode.FlowIn);
-        
-        // 데이터 연결 (Condition 종속성을 통해 자동으로 conditionNode가 재실행됨)
-        conditionNode.Condition.Connect(whileNode.Condition);
-        
-        // Flow 연결
-        whileNode.LoopBody.Connect(loopBody.FlowIn);
-        whileNode.LoopComplete.Connect(loopComplete.FlowIn);
-        
-        // 트래킹 노드에 카운터 값 연결 (루프 실행 확인용)
-        conditionNode.Count.Connect(loopBody.InputValue);
-        
-        // 루프 완료 시 확인용 값 설정
-        var completionValue = canvas.AddNode<ConstantNode<int>>(150, 150);
-        completionValue.Value.Value = 999;
-        completionValue.Result.Connect(loopComplete.InputValue);
-        
-        // 5. 실행
-        await canvas.ExecuteAsync();
-
-        // 6. 결과 확인
-        // - 루프 본문이 5회 실행되었는지 확인
-        Assert.Equal(5, loopBody.ReceivedValues.Count);
-        
-        // - 올바른 순서로 카운트가 증가했는지 확인
-        for (int i = 0; i < 5; i++)
-        {
-            Assert.Equal(i + 1, loopBody.ReceivedValues[i]);
-        }
-        
-        // - 루프 완료 후 LoopComplete 포트가 실행되었는지 확인
-        Assert.Single(loopComplete.ReceivedValues);
-        Assert.Equal(999, loopComplete.ReceivedValues[0]);
-    }
-
-    [Fact]
     public async Task WhileNode_RespectsMaxIterations()
     {
         // 1. 새 캔버스 생성

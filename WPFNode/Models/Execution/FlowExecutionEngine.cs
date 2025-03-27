@@ -338,9 +338,19 @@ public class FlowExecutionEngine {
                         continue; // 순환 참조 시 건너뛰기
                     }
                     
-                    // 실행 여부와 관계없이 항상 소스 노드 재실행
-                    // 이전 실행 여부 체크를 제거하고 항상 입력 노드를 추가
-                    inputNodes.Add(sourceNode);
+                    // 이미 실행된 노드인지 확인
+                    if (!context.IsNodeExecuted(sourceNode))
+                    {
+                        // 실행되지 않은 노드만 추가
+                        _logger?.LogDebug("Adding source node {SourceNodeId} to input nodes as it was not executed yet", 
+                            sourceNodeId);
+                        inputNodes.Add(sourceNode);
+                    }
+                    else
+                    {
+                        _logger?.LogDebug("Skipping source node {SourceNodeId} as it was already executed", 
+                            sourceNodeId);
+                    }
                 }
             }
         }
