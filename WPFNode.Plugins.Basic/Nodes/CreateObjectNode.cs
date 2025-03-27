@@ -8,6 +8,7 @@ using WPFNode.Attributes;
 using WPFNode.Models;
 using WPFNode.Models.Properties;
 using WPFNode.Interfaces;
+using WPFNode.Models.Execution;
 
 namespace WPFNode.Plugins.Basic.Nodes {
     [NodeName("객체 생성")]
@@ -83,7 +84,7 @@ namespace WPFNode.Plugins.Basic.Nodes {
         }
     }
 
-        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
+        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
             var targetType = SelectedType.Value;
             if (targetType == null) 
                 throw new InvalidOperationException("Target type is not selected.");

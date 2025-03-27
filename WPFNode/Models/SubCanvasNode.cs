@@ -7,6 +7,7 @@ using WPFNode.Models.Properties;
 using WPFNode.Models.Serialization;
 using System.Reflection;
 using WPFNode.Attributes;
+using WPFNode.Models.Execution;
 
 namespace WPFNode.Models;
 
@@ -97,7 +98,7 @@ public class SubCanvasNode : NodeBase
         return outputNode;
     }
 
-    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
+    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
         await _innerCanvas.ExecuteAsync(cancellationToken);
         yield return FlowOut;
     }

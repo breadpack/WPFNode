@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using WPFNode.Interfaces;
+using WPFNode.Models.Execution;
 
 namespace WPFNode.Models;
 
@@ -26,7 +27,7 @@ public class GraphInputNode<T> : NodeBase
 
     public OutputPort<T> Output => _output;
     
-    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
+    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
         if (_parentInput != null)
         {
             _output.Value = _parentInput.GetValueOrDefault();

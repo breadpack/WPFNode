@@ -389,7 +389,22 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         Logger?.LogDebug("Executing node {NodeName} with IAsyncEnumerable", Name);
         
         // ProcessAsync에서 반환된 IAsyncEnumerable을 그대로 전달
-        return ProcessAsync(cancellationToken);
+        // 실행 컨텍스트가 없는 경우에는 null로 전달
+        return ProcessAsync(null, cancellationToken);
+    }
+    
+    /// <summary>
+    /// 노드를 실행하고 활성화할 FlowOutPort를 yield return으로 순차적으로 반환합니다.
+    /// 실행 컨텍스트를 활용하여 활성화된 FlowInPort 정보를 사용할 수 있습니다.
+    /// </summary>
+    public virtual IAsyncEnumerable<IFlowOutPort> ExecuteAsyncFlow(
+        Models.Execution.FlowExecutionContext context,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        Logger?.LogDebug("Executing node {NodeName} with context and IAsyncEnumerable", Name);
+        
+        // ProcessAsync에서 반환된 IAsyncEnumerable을 그대로 전달
+        return ProcessAsync(context, cancellationToken);
     }
 
     /// <summary>
@@ -397,7 +412,9 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
     /// 상속받은 클래스에서 반드시 구현해야 합니다.
     /// 이 메서드는 실행 중에 활성화할 FlowOutPort를 순차적으로 yield return해야 합니다.
     /// </summary>
-    protected abstract IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default);
+    protected abstract IAsyncEnumerable<IFlowOutPort> ProcessAsync(
+        Models.Execution.FlowExecutionContext? context,
+        CancellationToken cancellationToken = default);
 
     public virtual void WriteJson(Utf8JsonWriter writer) {
         writer.WriteString("Guid", Guid.ToString());

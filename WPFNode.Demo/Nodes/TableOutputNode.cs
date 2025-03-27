@@ -10,6 +10,7 @@ using WPFNode.Attributes;
 using WPFNode.Demo.Models;
 using WPFNode.Interfaces;
 using WPFNode.Models;
+using WPFNode.Models.Execution;
 using WPFNode.Models.Properties;
 
 namespace WPFNode.Demo.Nodes;
@@ -125,7 +126,7 @@ public class TableOutputNode : DynamicNode, IDisposable {
                ? JsonSerializer.Serialize(_resultObject, _targetType, _jsonOptions)
                : string.Empty;
 
-    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
+    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
         if (_targetType == null) {
             throw new InvalidOperationException("대상 타입이 지정되지 않았습니다.");
         }

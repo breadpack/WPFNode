@@ -2,6 +2,7 @@ using System.Threading.Tasks;
 using WPFNode.Attributes;
 using WPFNode.Interfaces;
 using WPFNode.Models;
+using WPFNode.Models.Execution;
 
 namespace WPFNode.Plugins.Basic;
 
@@ -28,7 +29,7 @@ public class DivisionNode : NodeBase
     public DivisionNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) {
     }
 
-    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
+    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
         var a = InputA.GetValueOrDefault(0.0);
         var b = InputB.GetValueOrDefault(1.0); // 0으로 나누는 것을 방지하기 위해 기본값을 1.0으로 설정
         

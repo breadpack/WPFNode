@@ -2,6 +2,7 @@ using System.Threading.Tasks;
 using WPFNode.Attributes;
 using WPFNode.Interfaces;
 using WPFNode.Models;
+using WPFNode.Models.Execution;
 
 namespace WPFNode.Plugins.Basic;
 
@@ -27,7 +28,7 @@ public class MultiplicationNode : NodeBase
 
     public MultiplicationNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) { }
     
-    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
+    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
         var a = InputA.GetValueOrDefault(0.0);
         var b = InputB.GetValueOrDefault(0.0);
         Result.Value = a * b;

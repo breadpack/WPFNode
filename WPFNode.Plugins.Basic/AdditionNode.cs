@@ -5,6 +5,7 @@ using WPFNode.Models;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Diagnostics;
+using WPFNode.Models.Execution;
 
 namespace WPFNode.Plugins.Basic;
 
@@ -45,7 +46,9 @@ public class AdditionNode : NodeBase
     }
 
     protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        FlowExecutionContext? context,
+        CancellationToken     cancellationToken
+    )
     {
         // InputPort에서 값을 가져옵니다
         double a = InputA?.GetValueOrDefault(0.0) ?? 0.0;

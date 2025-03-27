@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.ComponentModel;
 using System.Diagnostics;
+using WPFNode.Models.Execution;
 
 namespace WPFNode.Plugins.Basic.String;
 
@@ -89,7 +90,8 @@ public class StringFormatNode : DynamicNode {
     }
 
     protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
-        [EnumeratorCancellation] CancellationToken cancellationToken = default
+        FlowExecutionContext? context,
+        CancellationToken     cancellationToken
     ) {
         try {
             // 형식 문자열 가져오기

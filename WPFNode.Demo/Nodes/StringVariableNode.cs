@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using WPFNode.Attributes;
 using WPFNode.Interfaces;
 using WPFNode.Models;
+using WPFNode.Models.Execution;
 using WPFNode.Models.Properties;
 
 namespace WPFNode.Demo.Nodes
@@ -29,7 +30,7 @@ namespace WPFNode.Demo.Nodes
         {
         }
 
-        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
+        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
         {
             var defaultVal = DefaultValue?.Value ?? "";
             // 입력 값을 출력 포트로 전달

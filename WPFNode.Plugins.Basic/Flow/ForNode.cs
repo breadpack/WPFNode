@@ -91,7 +91,9 @@ public class ForNode : NodeBase
     /// 루프 실행 및 흐름 제어를 담당합니다.
     /// </summary>
     protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        FlowExecutionContext? context,
+        CancellationToken     cancellationToken
+    )
     {
         Logger?.LogDebug("Executing ForNode: {StartIndex} to {EndIndex} step {Step}", 
             StartIndex.Value, EndIndex.Value, Step.Value);

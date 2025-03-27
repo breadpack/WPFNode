@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using WPFNode.Attributes;
 using WPFNode.Interfaces;
 using WPFNode.Models;
+using WPFNode.Models.Execution;
 using WPFNode.Models.Properties;
 
 namespace WPFNode.Plugins.Basic.Flow;
@@ -65,7 +66,7 @@ public class SwitchNode : DynamicNode {
     /// <summary>
     /// 노드의 처리 로직을 구현합니다.
     /// </summary>
-    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
+    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
         // 입력 값 가져오기
         object inputValue = null;
 

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using WPFNode.Attributes;
 using WPFNode.Interfaces;
 using WPFNode.Models;
+using WPFNode.Models.Execution;
 using WPFNode.Plugins.Basic;
 using WPFNode.Plugins.Basic.Flow;
 using WPFNode.Plugins.Basic.Constants;
@@ -30,7 +31,7 @@ public class TrackingNode : NodeBase
     {
     }
     
-    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default)
+    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
     {
         // 입력 값을 기록
         int value = InputValue.GetValueOrDefault(0);
@@ -70,7 +71,7 @@ public class CounterConditionNode : NodeBase
         _callCount = 0;
     }
     
-    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default)
+    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
     {
         // 호출 횟수가 MaxTrueCount 미만이면 true, 이상이면 false 반환
         bool condition = _callCount < MaxTrueCount;

@@ -5,6 +5,7 @@ using WPFNode.Interfaces;
 using WPFNode.Models;
 using WPFNode.Models.Properties;
 using WPFNode.Demo.Models;
+using WPFNode.Models.Execution;
 
 namespace WPFNode.Demo.Nodes
 {
@@ -39,7 +40,7 @@ namespace WPFNode.Demo.Nodes
         {
         }
 
-        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
+        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
         {
             var employee = EmployeeInput.GetValueOrDefault(new Employee());
             

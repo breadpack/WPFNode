@@ -6,6 +6,7 @@ using WPFNode.Models.Properties;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Linq;
+using WPFNode.Models.Execution;
 
 namespace WPFNode.Plugins.Basic.String;
 
@@ -54,7 +55,9 @@ public class StringSplitNode : NodeBase
     }
 
     protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        FlowExecutionContext? context,
+        CancellationToken     cancellationToken
+    )
     {
         // 입력 문자열 가져오기
         string input = Input?.GetValueOrDefault(string.Empty) ?? string.Empty;

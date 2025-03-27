@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using WPFNode.Attributes;
 using WPFNode.Interfaces;
 using WPFNode.Models;
+using WPFNode.Models.Execution;
 
 namespace WPFNode.Plugins.Basic.Flow;
 
@@ -54,7 +55,9 @@ public class IfNode : NodeBase
     /// 조건에 따라 True 또는 False 포트를 반환합니다.
     /// </summary>
     protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        FlowExecutionContext? context,
+        CancellationToken     cancellationToken
+    )
     {
         // 조건 평가
         bool condition = Condition.GetValueOrDefault(false);

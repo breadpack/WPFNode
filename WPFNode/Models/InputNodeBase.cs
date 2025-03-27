@@ -1,6 +1,7 @@
 using WPFNode.Attributes;
 using WPFNode.Constants;
 using WPFNode.Interfaces;
+using WPFNode.Models.Execution;
 using WPFNode.Models.Properties;
 
 namespace WPFNode.Models;
@@ -36,7 +37,7 @@ public abstract class InputNodeBase<T> : NodeBase
         set => InputProperty.Value = value;
     }
 
-    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
+    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
         // Value 속성의 값이 이미 OutputPort에 연결되어 있으므로
         // 추가 작업 필요 없음
         Result.Value = Value;

@@ -3,6 +3,7 @@ using WPFNode.Attributes;
 using WPFNode.Demo.Models;
 using WPFNode.Interfaces;
 using WPFNode.Models;
+using WPFNode.Models.Execution;
 using WPFNode.Models.Properties;
 
 namespace WPFNode.Demo.Nodes;
@@ -30,7 +31,7 @@ public class EmployeeArrayElementNode : NodeBase {
     
     public EmployeeArrayElementNode(INodeCanvas                                      canvas, Guid guid) : base(canvas, guid) { }
     
-    protected override IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
+    protected override IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
         throw new NotImplementedException();
     }
 }

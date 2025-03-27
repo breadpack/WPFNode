@@ -211,8 +211,8 @@ public class FlowExecutionEngine {
             context.MarkNodeExecuted(node);
             _logger?.LogDebug("Executing node: {NodeId}", nodeId);
             
-            // 노드 실행 및 FlowOutPort 즉시 처리
-            await foreach (var flowOutPort in node.ExecuteAsyncFlow(cancellationToken).ConfigureAwait(false))
+            // 노드 실행 및 FlowOutPort 즉시 처리 (컨텍스트 전달)
+            await foreach (var flowOutPort in node.ExecuteAsyncFlow(context, cancellationToken).ConfigureAwait(false))
             {
                 if (cancellationToken.IsCancellationRequested)
                     break;
@@ -269,6 +269,9 @@ public class FlowExecutionEngine {
                     _logger?.LogWarning("Cycle detected: Node {NodeId} is already in execution path", nodeId);
                     continue; // 순환 감지 시 건너뛰기
                 }
+                
+                // 활성화된 FlowInPort 설정
+                context.SetActiveFlowInPort(flowInPort);
                 
                 connectedNodes.Add(targetNode);
             }

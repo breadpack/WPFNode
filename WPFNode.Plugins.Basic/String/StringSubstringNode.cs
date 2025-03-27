@@ -6,6 +6,7 @@ using WPFNode.Models.Properties;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Diagnostics;
+using WPFNode.Models.Execution;
 
 namespace WPFNode.Plugins.Basic.String;
 
@@ -42,7 +43,9 @@ public class StringSubstringNode : NodeBase
     }
 
     protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        FlowExecutionContext? context,
+        CancellationToken     cancellationToken
+    )
     {
         string result = string.Empty;
         

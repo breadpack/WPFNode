@@ -5,6 +5,7 @@ using WPFNode.Models;
 using WPFNode.Models.Properties;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using WPFNode.Models.Execution;
 
 namespace WPFNode.Plugins.Basic.Object;
 
@@ -37,7 +38,9 @@ public class EqualsNode : NodeBase
     }
 
     protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        FlowExecutionContext? context,
+        CancellationToken     cancellationToken
+    )
     {
         // 입력 객체 가져오기
         object objectA = InputA?.GetValueOrDefault(null);

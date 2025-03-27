@@ -69,7 +69,9 @@ namespace WPFNode.Plugins.Basic.Nodes {
             }
         }
         
-        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
+        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
+            Models.Execution.FlowExecutionContext? context,
+            CancellationToken cancellationToken = default) {
             var targetType = SelectedType.Value;
             if (targetType == null) throw new InvalidOperationException("Target type is not selected.");
 

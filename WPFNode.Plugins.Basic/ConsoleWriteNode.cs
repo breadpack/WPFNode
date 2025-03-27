@@ -1,6 +1,7 @@
 ﻿using WPFNode.Attributes;
 using WPFNode.Interfaces;
 using WPFNode.Models;
+using WPFNode.Models.Execution;
 
 namespace WPFNode.Plugins.Basic;
 
@@ -20,7 +21,7 @@ public class ConsoleWriteNode : NodeBase {
 
     public ConsoleWriteNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) { }
 
-    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(CancellationToken cancellationToken = default) {
+    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
         Console.WriteLine(Input.GetValueOrDefault(string.Empty));
         yield return OutPort;
     }

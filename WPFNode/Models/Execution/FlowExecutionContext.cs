@@ -11,6 +11,19 @@ public class FlowExecutionContext
     private readonly Dictionary<INode, NodeExecutionState> _nodeStates = new();
     private readonly Dictionary<INode, Dictionary<IOutputPort, object?>> _nodeOutputs = new();
     private readonly ILogger? _logger;
+    
+    /// <summary>
+    /// 현재 활성화된 FlowInPort
+    /// </summary>
+    public IFlowInPort? ActiveFlowInPort { get; private set; }
+    
+    /// <summary>
+    /// 활성화된 FlowInPort를 설정합니다.
+    /// </summary>
+    public void SetActiveFlowInPort(IFlowInPort port)
+    {
+        ActiveFlowInPort = port;
+    }
 
     public FlowExecutionContext(ILogger? logger = null)
     {

@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
+using WPFNode.Models.Execution;
 
 namespace WPFNode.Plugins.Basic.Constants;
 
@@ -30,7 +31,9 @@ public class ConstantNode<T> : NodeBase
     public ConstantNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) { }
 
     protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        FlowExecutionContext? context,
+        CancellationToken     cancellationToken
+    )
     {
         // Value.Value에서 값을 가져와 Result.Value에 설정
         Debug.WriteLine($"ConstantNode.ProcessAsync: Value={Value}, Type={typeof(T).Name}");
