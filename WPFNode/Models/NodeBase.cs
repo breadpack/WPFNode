@@ -270,6 +270,7 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         }
         
         _properties.Remove(property);
+        OnPropertyChanged(nameof(Properties));
     }
 
     protected void OnPropertyChanged([CallerMemberName] string? propertyName = null) {

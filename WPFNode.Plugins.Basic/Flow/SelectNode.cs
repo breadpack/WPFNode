@@ -61,8 +61,8 @@ public class SelectNode : DynamicNode {
             try {
                 var casePortName      = $"Case_{i}";
                 var prop      = builder.Property(casePortName, $"Case {i}", caseType);
-                var inputPort = builder.Input(prop.Name, OutputType?.Value ?? typeof(object));
-                _caseValuePorts[casePortName] = inputPort;
+                var inputPort = builder.Property($"{prop.Name}_Value", $"Case Value {i}", OutputType.Value ?? typeof(object));
+                _caseValuePorts[casePortName] = (IInputPort)inputPort;
             }
             catch (Exception ex) {
                 Logger?.LogWarning($"SelectNode: Error configuring case {i}: {ex.Message}");
@@ -121,7 +121,7 @@ public class SelectNode : DynamicNode {
             try {
                 var caseValue = GetConvertedCaseValue(prop, type);
                 if (caseValue?.Equals(inputValue) ?? false) {
-                    if (_caseValuePorts.TryGetValue(prop.Name, out var matchedPort)) {
+                    if (_caseValuePorts.TryGetValue($"{prop.Name}_Value", out var matchedPort)) {
                         Logger?.LogDebug($"SelectNode: Matched case '{prop.Name}' with value '{caseValue}'");
                         return (true, GetCaseValue(matchedPort));
                     }
@@ -183,7 +183,7 @@ public class SelectNode : DynamicNode {
             throw new IndexOutOfRangeException($"Case_{i} not found. Ensure CaseCount is set appropriately.");
         }
         
-        if (_caseValuePorts.TryGetValue(prop.Name, out var port)) {
+        if (_caseValuePorts.TryGetValue($"{prop.Name}_Value", out var port)) {
             return port;
         }
         
