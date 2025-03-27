@@ -38,9 +38,9 @@ namespace WPFNode.Tests
             // 2. 노드 추가
             var startNode = canvas.AddNode<StartNode>(0, 0);
             var switchNode = canvas.AddNode<SwitchNode>(100, 50);
-            var case1Node = canvas.AddNode<TrackingNode>(200, 0);
-            var case2Node = canvas.AddNode<TrackingNode>(200, 100);
-            var defaultNode = canvas.AddNode<TrackingNode>(200, 200);
+            var case1Node = canvas.AddNode<TrackingNode<int>>(200, 0);
+            var case2Node = canvas.AddNode<TrackingNode<int>>(200, 100);
+            var defaultNode = canvas.AddNode<TrackingNode<int>>(200, 200);
             
             // 입력값 노드 (문자열 상수)
             var stringValue = canvas.AddNode<ConstantNode<string>>(50, 100);
@@ -98,9 +98,9 @@ namespace WPFNode.Tests
             // 2. 노드 추가
             var startNode = canvas.AddNode<StartNode>(0, 0);
             var switchNode = canvas.AddNode<SwitchNode>(100, 50);
-            var case1Node = canvas.AddNode<TrackingNode>(200, 0);
-            var case2Node = canvas.AddNode<TrackingNode>(200, 100);
-            var defaultNode = canvas.AddNode<TrackingNode>(200, 200);
+            var case1Node = canvas.AddNode<TrackingNode<int>>(200, 0);
+            var case2Node = canvas.AddNode<TrackingNode<int>>(200, 100);
+            var defaultNode = canvas.AddNode<TrackingNode<int>>(200, 200);
             
             // 입력값 노드 (문자열 상수)
             var stringValue = canvas.AddNode<ConstantNode<string>>(50, 100);

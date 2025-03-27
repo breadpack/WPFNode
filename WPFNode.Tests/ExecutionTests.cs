@@ -14,9 +14,9 @@ using Xunit;
 namespace WPFNode.Tests;
 
 // 테스트에서 실행 경로 및 결과 추적을 위한 간단한 트래커 노드
-public class TrackingNode : NodeBase
+public class TrackingNode<T> : NodeBase
 {
-    public List<int> ReceivedValues { get; } = new List<int>();
+    public List<T> ReceivedValues { get; } = new List<T>();
     
     [NodeFlowIn("Enter")]
     public FlowInPort FlowIn { get; private set; }
@@ -25,7 +25,7 @@ public class TrackingNode : NodeBase
     public FlowOutPort FlowOut { get; private set; }
     
     [NodeInput("Value")]
-    public InputPort<int> InputValue { get; private set; }
+    public InputPort<T> InputValue { get; private set; }
     
     public TrackingNode(INodeCanvas canvas, Guid id) 
         : base(canvas, id)
@@ -35,7 +35,7 @@ public class TrackingNode : NodeBase
     protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
     {
         // 입력 값을 기록
-        int value = InputValue.GetValueOrDefault(0);
+        T value = InputValue.GetValueOrDefault();
         ReceivedValues.Add(value);
         
         await Task.CompletedTask;
@@ -143,8 +143,8 @@ public class ExecutionTests
         var startNode = canvas.AddNode<StartNode>(0, 0);
         var conditionNode = canvas.AddNode<ConstantNode<bool>>(0, 100);
         var ifNode = canvas.AddNode<IfNode>(100, 50);
-        var truePath = canvas.AddNode<TrackingNode>(200, 0);
-        var falsePath = canvas.AddNode<TrackingNode>(200, 100);
+        var truePath = canvas.AddNode<TrackingNode<int>>(200, 0);
+        var falsePath = canvas.AddNode<TrackingNode<int>>(200, 100);
 
         // 3. 노드 설정 - 조건을 true로 설정
         conditionNode.Value.Value = true;
@@ -184,8 +184,8 @@ public class ExecutionTests
         var startNode = canvas.AddNode<StartNode>(0, 0);
         var conditionNode = canvas.AddNode<ConstantNode<bool>>(0, 100);
         var ifNode = canvas.AddNode<IfNode>(100, 50);
-        var truePath = canvas.AddNode<TrackingNode>(200, 0);
-        var falsePath = canvas.AddNode<TrackingNode>(200, 100);
+        var truePath = canvas.AddNode<TrackingNode<int>>(200, 0);
+        var falsePath = canvas.AddNode<TrackingNode<int>>(200, 100);
 
         // 3. 노드 설정 - 조건을 false로 설정
         conditionNode.Value.Value = false;
@@ -224,8 +224,8 @@ public class ExecutionTests
         // 2. 노드 추가
         var startNode = canvas.AddNode<StartNode>(0, 0);
         var forNode = canvas.AddNode<ForNode>(100, 50);
-        var loopBody = canvas.AddNode<TrackingNode>(200, 0);
-        var loopComplete = canvas.AddNode<TrackingNode>(200, 100);
+        var loopBody = canvas.AddNode<TrackingNode<int>>(200, 0);
+        var loopComplete = canvas.AddNode<TrackingNode<int>>(200, 100);
 
         // 3. 노드 설정 - 0부터 4까지 반복 (총 5회)
         forNode.StartIndex.Value = 0;
@@ -272,8 +272,8 @@ public class ExecutionTests
         // 2. 노드 추가
         var startNode = canvas.AddNode<StartNode>(0, 0);
         var forNode = canvas.AddNode<ForNode>(100, 50);
-        var loopBody = canvas.AddNode<TrackingNode>(200, 0);
-        var loopComplete = canvas.AddNode<TrackingNode>(200, 100);
+        var loopBody = canvas.AddNode<TrackingNode<int>>(200, 0);
+        var loopComplete = canvas.AddNode<TrackingNode<int>>(200, 100);
 
         // 3. 노드 설정 - 10부터 5까지 역순으로 반복 (총 6회)
         forNode.StartIndex.Value = 10;
@@ -321,8 +321,8 @@ public class ExecutionTests
         var startNode = canvas.AddNode<StartNode>(0, 0);
         var conditionNode = canvas.AddNode<CounterConditionNode>(50, 100);  // ConstantNode 대신 CounterConditionNode 사용
         var whileNode = canvas.AddNode<WhileNode>(100, 50);
-        var loopBody = canvas.AddNode<TrackingNode>(200, 0);
-        var loopComplete = canvas.AddNode<TrackingNode>(200, 100);
+        var loopBody = canvas.AddNode<TrackingNode<int>>(200, 0);
+        var loopComplete = canvas.AddNode<TrackingNode<int>>(200, 100);
 
         // 3. 노드 설정
         // - 최대 반복 횟수 설정
@@ -371,9 +371,9 @@ public class ExecutionTests
         
         var startNode = canvas.AddNode<StartNode>(0, 0);
         var switchNode = canvas.AddNode<SwitchNode>(100, 50);
-        var case1Node = canvas.AddNode<TrackingNode>(200, 0);
-        var case2Node = canvas.AddNode<TrackingNode>(200, 100);
-        var defaultNode = canvas.AddNode<TrackingNode>(200, 200);
+        var case1Node = canvas.AddNode<TrackingNode<string>>(200, 0);
+        var case2Node = canvas.AddNode<TrackingNode<string>>(200, 100);
+        var defaultNode = canvas.AddNode<TrackingNode<string>>(200, 200);
         
         // 3. 노드 설정
         switchNode.ValueType.Value = typeof(string);
@@ -396,13 +396,13 @@ public class ExecutionTests
         inputValue.Result.Connect(switchNode.InputValue);
         
         // 트래킹 노드에 값 설정 (실행 경로 확인용)
-        var value1 = canvas.AddNode<ConstantNode<int>>(150, 0);
-        var value2 = canvas.AddNode<ConstantNode<int>>(150, 100);
-        var valueDefault = canvas.AddNode<ConstantNode<int>>(150, 200);
+        var value1 = canvas.AddNode<ConstantNode<string>>(150, 0);
+        var value2 = canvas.AddNode<ConstantNode<string>>(150, 100);
+        var valueDefault = canvas.AddNode<ConstantNode<string>>(150, 200);
         
-        value1.Value.Value = 1;
-        value2.Value.Value = 2;
-        valueDefault.Value.Value = 999;
+        value1.Value.Value = "A";
+        value2.Value.Value = "B";
+        valueDefault.Value.Value = "Default";
         
         value1.Result.Connect(case1Node.InputValue);
         value2.Result.Connect(case2Node.InputValue);
@@ -413,7 +413,7 @@ public class ExecutionTests
         
         // 결과 확인 - Case A가 선택되어야 함
         Assert.Single(case1Node.ReceivedValues);
-        Assert.Equal(1, case1Node.ReceivedValues[0]);
+        Assert.Equal("A", case1Node.ReceivedValues[0]);
         Assert.Empty(case2Node.ReceivedValues);
         Assert.Empty(defaultNode.ReceivedValues);
     }

@@ -157,7 +157,7 @@ namespace WPFNode.Tests
             listCollectNode.ElementType.Value = typeof(int);
             
             // Flow가 완료된 후 검증하기 위한 TrackingNode 추가
-            var completionTrackingNode = canvas.AddNode<TrackingNode>(300, 100);
+            var completionTrackingNode = canvas.AddNode<TrackingNode<int>>(300, 100);
             
             // 완료 확인을 위한 상수 노드
             var completionConstant = canvas.AddNode<ConstantNode<int>>(250, 150);
@@ -196,12 +196,12 @@ namespace WPFNode.Tests
             var canvas = NodeCanvas.Create();
 
             // 2. 노드 추가
-            var startNode      = canvas.AddNode<StartNode>(0, 0);
+            var startNode = canvas.AddNode<StartNode>(0, 0);
             var listCreateNode = canvas.AddNode<ListCreateNode>(100, 0);
-            var constNode      = canvas.AddNode<ConstantNode<int>>(100, 100);
-            var listAddNode    = canvas.AddNode<ListAddNode>(200, 0);
-            var listAddNode2   = canvas.AddNode<ListAddNode>(200, 100);
-            var trackingNode   = canvas.AddNode<TrackingNode>(300, 0);
+            var constNode = canvas.AddNode<ConstantNode<int>>(100, 100);
+            var listAddNode = canvas.AddNode<ListAddNode>(200, 0);
+            var listAddNode2 = canvas.AddNode<ListAddNode>(200, 100);
+            var trackingNode = canvas.AddNode<TrackingNode<List<int>>>(300, 0);
 
             // 3. 노드 설정
             listCreateNode.ElementType.Value = typeof(int);
@@ -223,16 +223,16 @@ namespace WPFNode.Tests
             Canvas_ConnectNodePorts(canvas, listAddNode, "결과", listAddNode2, "리스트");
             Canvas_ConnectNodePorts(canvas, constNode, "Result", listAddNode, "항목");
             Canvas_ConnectNodePorts(canvas, constNode, "Result", listAddNode2, "항목");
+            Canvas_ConnectNodePorts(canvas, listAddNode2, "결과", trackingNode, "Value");
 
             // 5. 실행
             await canvas.ExecuteAsync();
 
             // 6. 결과 확인 - 추적 노드가 실행되었는지 확인
-            Assert.True(trackingNode.ReceivedValues.Count > 0);
-            Assert.Contains(42, (List<int>)listAddNode.OutputPorts[0].Value!);
-            Assert.Contains(42, (List<int>)listAddNode2.OutputPorts[0].Value!);
-            Assert.Equal(2, ((List<int>)listAddNode2.OutputPorts[0].Value!).Count);
-            Assert.Equal(2, ((List<int>)listAddNode.OutputPorts[0].Value!).Count);
+            Assert.Single(trackingNode.ReceivedValues);
+            var resultList = trackingNode.ReceivedValues[0];
+            Assert.Contains(42, resultList);
+            Assert.Equal(2, resultList.Count);
         }
 
         [Fact]
@@ -249,8 +249,8 @@ namespace WPFNode.Tests
             var listAddNode1 = canvas.AddNode<ListAddNode>(200, 0);
             var listAddNode2 = canvas.AddNode<ListAddNode>(300, 0);
             var forEachNode = canvas.AddNode<ListForEachNode>(400, 0);
-            var itemTrackingNode = canvas.AddNode<TrackingNode>(500, 0);
-            var completeTrackingNode = canvas.AddNode<TrackingNode>(500, 100);
+            var itemTrackingNode = canvas.AddNode<TrackingNode<int>>(500, 0);
+            var completeTrackingNode = canvas.AddNode<TrackingNode<int>>(500, 100);
 
             // 3. 노드 설정
             listCreateNode.ElementType.Value = typeof(int);
@@ -264,7 +264,6 @@ namespace WPFNode.Tests
             
             // 완료 트래킹 값 설정
             var completionValue = canvas.AddNode<ConstantNode<int>>(450, 150);
-
             completionValue.Value.Value = 450;
 
             // 4. 노드 연결 - Flow
@@ -412,6 +411,86 @@ namespace WPFNode.Tests
             // 내용물이 올바르게 수정되었는지 확인 (비어있어야 함)
             var resultList = (List<int>)listClearNode.OutputPorts[0].Value;
             Assert.Empty(resultList);
+        }
+
+        [Fact]
+        public async Task ObjectCollectionNodeTest()
+        {
+            // 1. 새 캔버스 생성
+            var canvas = NodeCanvas.Create();
+
+            // 2. 노드 추가
+            var startNode = canvas.AddNode<StartNode>(0, 0);
+            var objectCollectionNode = canvas.AddNode<ObjectCollectionNode>(100, 0);
+            var constNode1 = canvas.AddNode<ConstantNode<int>>(100, 100);
+            var constNode2 = canvas.AddNode<ConstantNode<int>>(100, 150);
+            var trackingNode = canvas.AddNode<TrackingNode<List<int>>>(200, 0);
+
+            // 3. 노드 설정
+            objectCollectionNode.SelectedType.Value = typeof(int);
+            objectCollectionNode.ItemCount.Value = 2;
+            constNode1.Value.Value = 42;
+            constNode2.Value.Value = 84;
+
+            // 4. 노드 연결
+            // Flow 연결
+            startNode.FlowOut.Connect(objectCollectionNode.FlowIn);
+            objectCollectionNode.FlowOut.Connect(trackingNode.FlowIn);
+            
+            // 데이터 연결
+            Canvas_ConnectNodePorts(canvas, constNode1, "Result", objectCollectionNode, "Item 1");
+            Canvas_ConnectNodePorts(canvas, constNode2, "Result", objectCollectionNode, "Item 2");
+            Canvas_ConnectNodePorts(canvas, objectCollectionNode, "Collection", trackingNode, "Value");
+
+            // 5. 실행
+            await canvas.ExecuteAsync();
+
+            // 6. 결과 확인
+            Assert.Single(trackingNode.ReceivedValues);
+            var resultList = trackingNode.ReceivedValues[0];
+            Assert.Equal(2, resultList.Count);
+            Assert.Contains(42, resultList);
+            Assert.Contains(84, resultList);
+        }
+
+        [Fact]
+        public async Task ObjectCollectionNodeStringTest()
+        {
+            // 1. 새 캔버스 생성
+            var canvas = NodeCanvas.Create();
+
+            // 2. 노드 추가
+            var startNode = canvas.AddNode<StartNode>(0, 0);
+            var objectCollectionNode = canvas.AddNode<ObjectCollectionNode>(100, 0);
+            var constNode1 = canvas.AddNode<ConstantNode<string>>(100, 100);
+            var constNode2 = canvas.AddNode<ConstantNode<string>>(100, 150);
+            var trackingNode = canvas.AddNode<TrackingNode<List<string>>>(200, 0);
+
+            // 3. 노드 설정
+            objectCollectionNode.SelectedType.Value = typeof(string);
+            objectCollectionNode.ItemCount.Value = 2;
+            constNode1.Value.Value = "Hello";
+            constNode2.Value.Value = "World";
+
+            // 4. 노드 연결
+            // Flow 연결
+            startNode.FlowOut.Connect(objectCollectionNode.FlowIn);
+            objectCollectionNode.FlowOut.Connect(trackingNode.FlowIn);
+            
+            // 데이터 연결
+            Canvas_ConnectNodePorts(canvas, constNode1, "Result", objectCollectionNode, "Item 1");
+            Canvas_ConnectNodePorts(canvas, constNode2, "Result", objectCollectionNode, "Item 2");
+            Canvas_ConnectNodePorts(canvas, objectCollectionNode, "Collection", trackingNode, "Value");
+
+            // 5. 실행
+            await canvas.ExecuteAsync();
+
+            // 6. 결과 확인
+            Assert.Single(trackingNode.ReceivedValues);
+            var resultList = trackingNode.ReceivedValues[0];
+            Assert.Equal(2, resultList.Count);
+            Assert.Contains("Hello", resultList);
+            Assert.Contains("World", resultList);
         }
 
         // 리플렉션을 사용하여 노드 포트 연결하는 헬퍼 메서드

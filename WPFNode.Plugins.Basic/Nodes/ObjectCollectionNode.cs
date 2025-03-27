@@ -22,10 +22,10 @@ namespace WPFNode.Plugins.Basic.Nodes {
         public IFlowOutPort FlowOut { get; set; }
         
         [NodeProperty("Target Type", OnValueChanged = nameof(SelectedType_PropertyChanged))]
-        NodeProperty<Type> SelectedType { get; set; }
+        public NodeProperty<Type> SelectedType { get; set; }
 
         [NodeProperty("Item Count", OnValueChanged = nameof(ItemCount_PropertyChanged))]
-        NodeProperty<int> ItemCount { get; set; }
+        public NodeProperty<int> ItemCount { get; set; }
 
         private readonly List<IInputPort> _itemInputPorts = [];
         private IOutputPort? _outputPort;
@@ -91,9 +91,9 @@ namespace WPFNode.Plugins.Basic.Nodes {
                     if (!inputPort.IsConnected) continue;
                     
                     // 리플렉션을 사용하여 GetValueOrDefault 메서드 호출
-                    var getValueMethod = inputPort.GetType().GetMethod("GetValueOrDefault", Type.EmptyTypes);
+                    var getValueMethod = inputPort.GetType().GetMethod("GetValueOrDefault");
                     if (getValueMethod != null) {
-                        var itemValue = getValueMethod.Invoke(inputPort, null);
+                        var itemValue = getValueMethod.Invoke(inputPort, [null]);
                         
                         // 값이 있는 경우에만 컬렉션에 추가
                         if (itemValue != null) {
