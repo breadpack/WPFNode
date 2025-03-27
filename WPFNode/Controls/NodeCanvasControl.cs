@@ -503,27 +503,139 @@ public class NodeCanvasControl : Control
         }
     }
 
+    private bool _pendingConnectionUpdate = false;
+    
     private void OnCanvasLayoutUpdated(object? sender, EventArgs e)
     {
-        if (!_isUpdatingLayout)
+        if (!_isUpdatingLayout && !_pendingConnectionUpdate)
         {
-            try
-            {
-                _isUpdatingLayout = true;
-                UpdateAllConnections();
-            }
-            finally
-            {
-                _isUpdatingLayout = false;
-            }
+            _pendingConnectionUpdate = true;
+            Dispatcher.BeginInvoke(new Action(() => {
+                try
+                {
+                    _isUpdatingLayout = true;
+                    // GetVisualDescendants 직접 호출 대신 컨트롤을 직접 찾음
+                    UpdateAllConnectionsDirectly();
+                }
+                finally
+                {
+                    _isUpdatingLayout = false;
+                    _pendingConnectionUpdate = false;
+                }
+            }), System.Windows.Threading.DispatcherPriority.Background);
         }
     }
 
     public void UpdateAllConnections()
     {
-        foreach (var connection in this.GetVisualDescendants().OfType<ConnectionControl>())
+        if (!_isUpdatingLayout && !_pendingConnectionUpdate)
         {
-            connection.UpdateConnection();
+            _pendingConnectionUpdate = true;
+            Dispatcher.BeginInvoke(new Action(() => {
+                try
+                {
+                    _isUpdatingLayout = true;
+                    UpdateAllConnectionsDirectly();
+                }
+                finally
+                {
+                    _isUpdatingLayout = false;
+                    _pendingConnectionUpdate = false;
+                }
+            }), System.Windows.Threading.DispatcherPriority.Background);
+        }
+    }
+    
+    // ItemsControl에서 직접 ConnectionControl 찾기
+    private void UpdateAllConnectionsDirectly()
+    {
+        if (_dragCanvas == null) return;
+        
+        // 첫 번째 ItemsControl이 일반적으로 연결을 표시
+        var connectionItemsControl = FindConnectionsItemsControl();
+        if (connectionItemsControl == null) return;
+        
+        foreach (ConnectionViewModel connectionVM in connectionItemsControl.Items)
+        {
+            var container = connectionItemsControl.ItemContainerGenerator.ContainerFromItem(connectionVM);
+            if (container == null) continue;
+            
+            // 컨테이너 내에서 ConnectionControl 찾기
+            var connectionControl = FindConnectionControlInContainer(container);
+            if (connectionControl != null)
+            {
+                connectionControl.UpdateConnection();
+            }
+        }
+    }
+    
+    // ItemsControl에서 직접 ConnectionControl 찾는 도우미 메서드
+    private ItemsControl? FindConnectionsItemsControl()
+    {
+        if (_dragCanvas == null) return null;
+        
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(_dragCanvas); i++)
+        {
+            var child = VisualTreeHelper.GetChild(_dragCanvas, i);
+            if (child is ItemsControl itemsControl && 
+                itemsControl.Items.Count > 0 && 
+                itemsControl.Items[0] is ConnectionViewModel)
+            {
+                return itemsControl;
+            }
+        }
+        return null;
+    }
+    
+    // 컨테이너에서 ConnectionControl 찾기
+    private ConnectionControl? FindConnectionControlInContainer(DependencyObject container)
+    {
+        if (container is ConnectionControl connectionControl)
+            return connectionControl;
+            
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(container); i++)
+        {
+            var child = VisualTreeHelper.GetChild(container, i);
+            
+            if (child is ConnectionControl control)
+                return control;
+                
+            var foundInChild = FindConnectionControlInContainer(child);
+            if (foundInChild != null)
+                return foundInChild;
+        }
+        
+        return null;
+    }
+    
+    // 특정 노드와 관련된 연결만 업데이트 - 직접 찾기 방식 사용
+    public void UpdateConnectionsForNode(NodeViewModel node)
+    {
+        if (node == null || _dragCanvas == null) return;
+        
+        var connectionItemsControl = FindConnectionsItemsControl();
+        if (connectionItemsControl == null) return;
+        
+        foreach (ConnectionViewModel connectionVM in connectionItemsControl.Items)
+        {
+            // 소스나 타겟 노드가 변경된 노드인 경우만 확인
+            var sourcePort = connectionVM.Source;
+            var targetPort = connectionVM.Target;
+            
+            var sourceNodeViewModel = _stateManager.FindNodeForPort(sourcePort);
+            var targetNodeViewModel = _stateManager.FindNodeForPort(targetPort);
+            
+            if (sourceNodeViewModel == node || targetNodeViewModel == node)
+            {
+                var container = connectionItemsControl.ItemContainerGenerator.ContainerFromItem(connectionVM);
+                if (container == null) continue;
+                
+                var connectionControl = FindConnectionControlInContainer(container);
+                if (connectionControl != null)
+                {
+                    connectionControl.UpdateConnection();
+                }
+            }
         }
     }
 

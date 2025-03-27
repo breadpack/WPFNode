@@ -184,6 +184,21 @@ public class NodeCanvasStateManager
             
         return portControl;
     }
+    
+    /// <summary>
+    /// 특정 포트에 대한 부모 노드 ViewModel을 찾습니다.
+    /// </summary>
+    public NodeViewModel? FindNodeForPort(NodePortViewModel port)
+    {
+        if (_owner.ViewModel == null || port == null) return null;
+        
+        // 해당 포트를 포함하는 노드 찾기
+        return _owner.ViewModel.Nodes
+            .FirstOrDefault(n => n.InputPorts.Contains(port) || 
+                                 n.OutputPorts.Contains(port) || 
+                                 n.FlowInPorts.Contains(port) || 
+                                 n.FlowOutPorts.Contains(port));
+    }
 
     // 다음 메서드들은 캐시 관련이므로 제거
     // private void InitializeControlCache(INodeCanvasViewModel viewModel)
@@ -313,15 +328,25 @@ public class NodeCanvasStateManager
 
     private static IEnumerable<T> FindChildrenOfType<T>(DependencyObject parent) where T : DependencyObject
     {
-        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        if (parent == null) yield break;
+
+        var queue = new Queue<DependencyObject>();
+        queue.Enqueue(parent);
+
+        while (queue.Count > 0)
         {
-            var child = VisualTreeHelper.GetChild(parent, i);
+            var current = queue.Dequeue();
+            int childCount = VisualTreeHelper.GetChildrenCount(current);
             
-            if (child is T result)
-                yield return result;
+            for (int i = 0; i < childCount; i++)
+            {
+                var child = VisualTreeHelper.GetChild(current, i);
                 
-            foreach (var childOfChild in FindChildrenOfType<T>(child))
-                yield return childOfChild;
+                if (child is T result)
+                    yield return result;
+                
+                queue.Enqueue(child);
+            }
         }
     }
 
@@ -336,4 +361,4 @@ public class NodeCanvasStateManager
         }
         return null;
     }
-} 
+}

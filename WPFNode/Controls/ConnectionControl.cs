@@ -209,6 +209,13 @@ public class ConnectionControl : Control
         return canvas?.FindPortControl(port);
     }
 
+    // 최적화를 위한 캐싱 변수
+    private PortControl? _cachedSourcePort;
+    private PortControl? _cachedTargetPort;
+    private NodePortViewModel? _lastSource;
+    private NodePortViewModel? _lastTarget;
+    private bool _pendingUpdate;
+
     internal void UpdateConnection()
     {
         if (ViewModel == null)
@@ -217,33 +224,88 @@ public class ConnectionControl : Control
         // 템플릿에서 필요한 요소를 찾지 못했다면 지연 호출로 다시 시도
         if (_pathFigure == null || _bezierSegment == null || _arrow == null)
         {
-            Dispatcher.BeginInvoke(new Action(() => {
-                // 템플릿 적용을 기다렸다가 다시 시도
-                _path = GetTemplateChild("PART_Path") as Path;
-                _arrow = GetTemplateChild("PART_Arrow") as Path;
-                _pathFigure = GetTemplateChild("PART_PathFigure") as PathFigure;
-                _bezierSegment = GetTemplateChild("PART_BezierSegment") as BezierSegment;
-                
-                if (_pathFigure != null && _bezierSegment != null && _arrow != null)
-                {
-                    UpdateConnection();
-                    UpdateVisualState(); // 시각 스타일도 업데이트
-                }
-            }), System.Windows.Threading.DispatcherPriority.ContextIdle);
+            if (!_pendingUpdate)
+            {
+                _pendingUpdate = true;
+                Dispatcher.BeginInvoke(new Action(() => {
+                    try 
+                    {
+                        // 템플릿 적용을 기다렸다가 다시 시도
+                        _path = GetTemplateChild("PART_Path") as Path;
+                        _arrow = GetTemplateChild("PART_Arrow") as Path;
+                        _pathFigure = GetTemplateChild("PART_PathFigure") as PathFigure;
+                        _bezierSegment = GetTemplateChild("PART_BezierSegment") as BezierSegment;
+                        
+                        if (_pathFigure != null && _bezierSegment != null && _arrow != null)
+                        {
+                            UpdateConnection();
+                            UpdateVisualState(); // 시각 스타일도 업데이트
+                        }
+                    }
+                    finally 
+                    {
+                        _pendingUpdate = false;
+                    }
+                }), System.Windows.Threading.DispatcherPriority.Render);
+            }
             return;
         }
 
-        var sourcePort = GetPortControl(ViewModel.Source);
-        var targetPort = GetPortControl(ViewModel.Target);
+        // 포트 컨트롤 가져오기 - 캐싱 적용
+        PortControl? sourcePort;
+        PortControl? targetPort;
+
+        // Source 포트가 변경되었는지 확인
+        if (_lastSource != ViewModel.Source)
+        {
+            sourcePort = GetPortControl(ViewModel.Source);
+            _lastSource = ViewModel.Source;
+            _cachedSourcePort = sourcePort;
+        }
+        else
+        {
+            sourcePort = _cachedSourcePort;
+        }
+
+        // Target 포트가 변경되었는지 확인
+        if (_lastTarget != ViewModel.Target)
+        {
+            targetPort = GetPortControl(ViewModel.Target);
+            _lastTarget = ViewModel.Target;
+            _cachedTargetPort = targetPort;
+        }
+        else
+        {
+            targetPort = _cachedTargetPort;
+        }
 
         // 포트를 찾지 못했으면 다시 시도
         if (sourcePort == null || targetPort == null)
         {
-            Dispatcher.BeginInvoke(new Action(UpdateConnection), 
-                System.Windows.Threading.DispatcherPriority.ContextIdle);
+            if (!_pendingUpdate)
+            {
+                _pendingUpdate = true;
+                Dispatcher.BeginInvoke(new Action(() => {
+                    try 
+                    {
+                        // 캐시 초기화
+                        _lastSource = null;
+                        _lastTarget = null;
+                        _cachedSourcePort = null;
+                        _cachedTargetPort = null;
+                        
+                        UpdateConnection();
+                    }
+                    finally 
+                    {
+                        _pendingUpdate = false;
+                    }
+                }), System.Windows.Threading.DispatcherPriority.Render);
+            }
             return;
         }
 
+        // 좌표 계산
         var sourceCenter = GetPortCenterPosition(sourcePort);
         var targetCenter = GetPortCenterPosition(targetPort);
             

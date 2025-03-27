@@ -409,20 +409,28 @@ public class NodeControl : ContentControl, INodeControl
         return null;
     }
 
-    // 자식 요소들 중 특정 타입 모두 찾기
+    // 자식 요소들 중 특정 타입 모두 찾기 - BFS 방식으로 최적화
     private IEnumerable<T> FindChildrenOfType<T>(DependencyObject parent) where T : DependencyObject
     {
         if (parent == null) yield break;
 
-        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        var queue = new Queue<DependencyObject>();
+        queue.Enqueue(parent);
+
+        while (queue.Count > 0)
         {
-            var child = VisualTreeHelper.GetChild(parent, i);
+            var current = queue.Dequeue();
+            int childCount = VisualTreeHelper.GetChildrenCount(current);
             
-            if (child is T result)
-                yield return result;
+            for (int i = 0; i < childCount; i++)
+            {
+                var child = VisualTreeHelper.GetChild(current, i);
                 
-            foreach (var childOfChild in FindChildrenOfType<T>(child))
-                yield return childOfChild;
+                if (child is T result)
+                    yield return result;
+                
+                queue.Enqueue(child);
+            }
         }
     }
 }
