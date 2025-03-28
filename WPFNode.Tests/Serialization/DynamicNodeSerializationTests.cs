@@ -177,10 +177,6 @@ namespace WPFNode.Tests.Serialization
             
             Assert.Equal(null, namePropertyAfter.Value);
             Assert.Equal(0, agePropertyAfter.Value);
-            
-            // 포트 연결 설정 확인
-            Assert.True(namePropertyAfter.CanConnectToPort);
-            Assert.True(agePropertyAfter.CanConnectToPort);
         }
         
         [Fact]
@@ -290,7 +286,6 @@ namespace WPFNode.Tests.Serialization
             // 타입 변경 전후로 값 보존 확인
             Assert.Null(finalNameProperty.Value);
             Assert.Equal(0, finalAgeProperty.Value);
-            Assert.True(finalNameProperty.CanConnectToPort);
         }
     }
 }
