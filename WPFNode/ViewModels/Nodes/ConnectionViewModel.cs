@@ -49,17 +49,33 @@ public class ConnectionViewModel : ViewModelBase, ISelectable, IDisposable
         OnPropertyChanged(nameof(IsSelected));
     }
 
-    public NodePortViewModel Source
-    {
-        get => _source;
-        private set => SetProperty(ref _source, value);
-    }
+public NodePortViewModel Source
+{
+    get => _source;
+    private set => SetProperty(ref _source, value);
+}
 
-    public NodePortViewModel Target
+public NodePortViewModel Target
+{
+    get => _target;
+    private set => SetProperty(ref _target, value);
+}
+
+/// <summary>
+/// 포트 참조를 최신 상태로 업데이트합니다.
+/// 포트가 변경된 경우에만 PropertyChanged 이벤트를 발생시킵니다.
+/// </summary>
+public void UpdatePortReferences()
+{
+    var newSource = _canvas.FindPortViewModel(Model.Source);
+    var newTarget = _canvas.FindPortViewModel(Model.Target);
+    
+    if (newSource != _source || newTarget != _target)
     {
-        get => _target;
-        private set => SetProperty(ref _target, value);
+        Source = newSource;
+        Target = newTarget;
     }
+}
     
     public IConnection Model => _model;
 
@@ -86,4 +102,4 @@ public class ConnectionViewModel : ViewModelBase, ISelectable, IDisposable
     public Guid   Id            => Model.Guid;
     public string Name          => $"{Source.Name} → {Target.Name}";
     public string SelectionType => "Connection";
-} 
+}

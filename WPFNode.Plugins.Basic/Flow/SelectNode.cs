@@ -26,9 +26,9 @@ public class SelectNode : DynamicNode {
     [NodeProperty("Case Count", OnValueChanged = nameof(OnCaseCountChanged))]
     public NodeProperty<int> CaseCount { get; private set; }
 
-    private IInputPort _valuePort;
-    private Dictionary<object, IInputPort> _caseValuePorts = new();
-    private IOutputPort _outputPort;
+    private IInputPort                                                    _valuePort;
+    private Dictionary<object, (INodeProperty Case, INodeProperty Value)> _caseValuePorts = new();
+    private IOutputPort                                                   _outputPort;
 
     public SelectNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) {
         Name = "Select";
@@ -62,7 +62,7 @@ public class SelectNode : DynamicNode {
                 var casePortName      = $"Case_{i}";
                 var prop      = builder.Property(casePortName, $"Case {i}", caseType);
                 var inputPort = builder.Property($"{prop.Name}_Value", $"Case Value {i}", OutputType.Value ?? typeof(object));
-                _caseValuePorts[casePortName] = (IInputPort)inputPort;
+                _caseValuePorts[casePortName] = (prop, inputPort);
             }
             catch (Exception ex) {
                 Logger?.LogWarning($"SelectNode: Error configuring case {i}: {ex.Message}");
@@ -113,47 +113,22 @@ public class SelectNode : DynamicNode {
         return inputValue;
     }
 
-    private (bool IsMatch, object SelectedValue) FindMatchingCase(object inputValue) {
-        var type      = OutputType?.Value ?? typeof(object);
-        var caseProps = GetOrderedCaseProperties();
+    private (bool IsMatch, object? SelectedValue) FindMatchingCase(object inputValue) {
+        var type      = CaseType?.Value ?? typeof(object);
 
-        foreach (var prop in caseProps) {
+        foreach (var prop in _caseValuePorts.Values) {
             try {
-                var caseValue = GetConvertedCaseValue(prop, type);
-                if (caseValue?.Equals(inputValue) ?? false) {
-                    if (_caseValuePorts.TryGetValue($"{prop.Name}_Value", out var matchedPort)) {
-                        Logger?.LogDebug($"SelectNode: Matched case '{prop.Name}' with value '{caseValue}'");
-                        return (true, GetCaseValue(matchedPort));
-                    }
+                if (prop.Case.Value?.Equals(inputValue) ?? false) {
+                    Logger?.LogDebug($"SelectNode: Matched case '{prop.Case.Name}' with value '{prop.Case.Value}'");
+                    return (true, prop.Value.Value);
                 }
             }
             catch (Exception ex) {
-                Logger?.LogWarning($"SelectNode: Error processing case {prop.Name}: {ex.Message}");
+                Logger?.LogWarning($"SelectNode: Error processing case {prop.Case.Name}: {ex.Message}");
             }
         }
 
         return (false, null);
-    }
-
-    private IEnumerable<INodeProperty> GetOrderedCaseProperties() {
-        return Properties.Where(p => p.Name.StartsWith("Case_"))
-                        .OrderBy(p => {
-                            string indexStr = p.Name.Substring("Case_".Length);
-                            return int.TryParse(indexStr, out int index) ? index : int.MaxValue;
-                        });
-    }
-
-    private object GetConvertedCaseValue(INodeProperty prop, Type type) {
-        var caseValue = prop.Value;
-        if (caseValue != null && caseValue.GetType() != type) {
-            caseValue = Convert.ChangeType(caseValue, type);
-        }
-        return caseValue;
-    }
-
-    private object GetCaseValue(IInputPort matchedPort) {
-        dynamic dynamicCasePort = matchedPort;
-        return dynamicCasePort.GetValueOrDefault();
     }
 
     private IFlowOutPort HandleMatch(object selectedValue) {
@@ -175,18 +150,5 @@ public class SelectNode : DynamicNode {
             Logger?.LogWarning($"SelectNode: Failed to set output value to null: {ex.Message}");
         }
         return FlowOut;
-    }
-
-    public IInputPort CaseInput(int i) {
-        var prop = Properties.FirstOrDefault(p => p.Name == $"Case_{i}");
-        if (prop == null) {
-            throw new IndexOutOfRangeException($"Case_{i} not found. Ensure CaseCount is set appropriately.");
-        }
-        
-        if (_caseValuePorts.TryGetValue($"{prop.Name}_Value", out var port)) {
-            return port;
-        }
-        
-        throw new InvalidOperationException($"Input port for case {i} not found.");
     }
 }

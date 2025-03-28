@@ -204,6 +204,7 @@ public class NodeViewModel : ViewModelBase, INodeViewModel, ISelectable, IDispos
                 {
                     _inputPorts.Add(new(port, _canvas));
                 }
+                OnPropertyChanged(nameof(InputPorts));
                 break;
             case nameof(INode.OutputPorts):
                 _outputPorts.Clear();
@@ -211,6 +212,7 @@ public class NodeViewModel : ViewModelBase, INodeViewModel, ISelectable, IDispos
                 {
                     _outputPorts.Add(new(port, _canvas));
                 }
+                OnPropertyChanged(nameof(OutputPorts));
                 break;
             case nameof(NodeBase.FlowInPorts):
                 _flowInPorts.Clear();
@@ -218,6 +220,7 @@ public class NodeViewModel : ViewModelBase, INodeViewModel, ISelectable, IDispos
                 {
                     _flowInPorts.Add(new(port, _canvas));
                 }
+                OnPropertyChanged(nameof(FlowInPorts));
                 break;
             case nameof(NodeBase.FlowOutPorts):
                 _flowOutPorts.Clear();
@@ -225,6 +228,7 @@ public class NodeViewModel : ViewModelBase, INodeViewModel, ISelectable, IDispos
                 {
                     _flowOutPorts.Add(new(port, _canvas));
                 }
+                OnPropertyChanged(nameof(FlowOutPorts));
                 break;
             case nameof(INode.Properties):
                 OnPropertyChanged(nameof(Properties));

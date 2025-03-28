@@ -639,7 +639,11 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
     }
 
     public void OnPortsChanged() {
-        // SynchronizeWithModel();
+        // 모든 ConnectionViewModel의 포트 참조 업데이트
+        foreach (var connection in Connections)
+        {
+            connection.UpdatePortReferences();
+        }
     }
 
     public NodeCanvas Model => _canvas;
