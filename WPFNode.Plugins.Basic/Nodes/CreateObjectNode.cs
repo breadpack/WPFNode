@@ -67,7 +67,7 @@ namespace WPFNode.Plugins.Basic.Nodes {
             
             // builder.Property가 내부적으로 기존 프로퍼티를 찾아 반환하므로 
             // 별도의 existingProps Dictionary를 만들 필요가 없음
-            var nodeProperty = builder.Property(propName, propName, prop.PropertyType, canConnectToPort: true);
+            var nodeProperty = builder.Property(propName, propName, prop.PropertyType);
             
             _propertyList.Add(nodeProperty);
         }
@@ -78,7 +78,7 @@ namespace WPFNode.Plugins.Basic.Nodes {
             
             // builder.Property가 내부적으로 기존 프로퍼티를 찾아 반환하므로
             // 별도의 existingProps Dictionary를 만들 필요가 없음
-            var nodeProperty = builder.Property(fieldName, fieldName, field.FieldType, canConnectToPort: true);
+            var nodeProperty = builder.Property(fieldName, fieldName, field.FieldType);
             
             _propertyList.Add(nodeProperty);
         }
