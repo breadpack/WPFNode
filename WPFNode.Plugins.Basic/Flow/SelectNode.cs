@@ -114,7 +114,7 @@ public class SelectNode : DynamicNode {
     }
 
     private (bool IsMatch, object SelectedValue) FindMatchingCase(object inputValue) {
-        var type = CaseType?.Value ?? typeof(object);
+        var type      = OutputType?.Value ?? typeof(object);
         var caseProps = GetOrderedCaseProperties();
 
         foreach (var prop in caseProps) {
