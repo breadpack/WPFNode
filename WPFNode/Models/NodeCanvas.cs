@@ -118,13 +118,6 @@ public partial class NodeCanvas : INodeCanvas, INotifyPropertyChanged
     
     public List<NodeGroup> SerializableGroups => _groups;
 
-    public T CreateNode<T>(double x = 0, double y = 0) where T : INode
-    {
-        var nodeType = typeof(T);
-        var node = (T)CreateNode(nodeType, x, y);
-        return node;
-    }
-
     public INode CreateNode(Type nodeType, double x = 0, double y = 0)
     {
         if (!typeof(NodeBase).IsAssignableFrom(nodeType))
@@ -136,11 +129,8 @@ public partial class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         node.X = x;
         node.Y = y;
         
-        // DynamicNode 타입인 경우 초기화 호출
-        if (node is DynamicNode dynamicNode)
-        {
-            dynamicNode.InitializeNode();
-        }
+        // 모든 노드에 대해 초기화 메서드 호출
+        node.InitializeNode();
         
         AddNodeInternal(node);
         return node;
@@ -335,9 +325,8 @@ public partial class NodeCanvas : INodeCanvas, INotifyPropertyChanged
     /// <param name="x">노드 X 위치</param>
     /// <param name="y">노드 Y 위치</param>
     /// <returns>생성된 노드</returns>
-    public T AddNode<T>(double x = 0, double y = 0) where T : INode
-    {
-        return CreateNode<T>(x, y);
+    public T CreateNode<T>(double x = 0, double y = 0) where T : INode {
+        return (T)CreateNode(typeof(T), x, y);
     }
 
     /// <summary>
@@ -417,11 +406,8 @@ public partial class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         node.X = x;
         node.Y = y;
         
-        // DynamicNode 타입인 경우 초기화 호출
-        if (node is DynamicNode dynamicNode)
-        {
-            dynamicNode.InitializeNode();
-        }
+        // 모든 노드에 대해 초기화 메서드 호출
+        node.InitializeNode();
         
         AddNodeInternal(node);
         return node;

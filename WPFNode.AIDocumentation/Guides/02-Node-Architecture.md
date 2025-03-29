@@ -71,46 +71,106 @@ public NodeProperty<int> Value { get; set; }
 
 캔버스는 노드와 연결을 시각적으로 배치하고 관리하는 작업 공간입니다. `NodeCanvas` 클래스는 노드 추가, 삭제, 연결 관리 등의 기능을 제공합니다.
 
-## 노드 유형
+## 노드 유형 및 기능
 
-WPFNode는 다양한 종류의 노드를 지원합니다:
+WPFNode의 NodeBase 클래스는 두 가지 주요 노드 생성 방식을 지원합니다:
 
-### 1. 기본 노드 (NodeBase)
+### 1. 정적 노드
 
-모든 노드의 기본 클래스입니다. 핵심 기능과 인터페이스를 제공합니다.
-
-### 2. 동적 노드 (DynamicNode)
-
-런타임에 포트 구성을 변경할 수 있는 노드입니다. 사용자 입력이나 외부 데이터에 따라 포트를 추가하거나 제거할 수 있습니다.
+어트리뷰트를 사용하여 포트와 프로퍼티를 정의하는 기본적인 방식입니다:
 
 ```csharp
-// 동적 노드 예시
-public class DynamicInputNode : DynamicNode
+[NodeName("덧셈")]
+[NodeCategory("수학")]
+[NodeDescription("두 숫자를 더합니다.")]
+public class AdditionNode : NodeBase
 {
-    [NodeProperty("입력 개수", OnValueChanged = nameof(ReconfigurePorts))]
-    public NodeProperty<int> InputCount { get; set; }
+    [NodeInput("A")]
+    public InputPort<int> InputA { get; set; }
     
-    protected override void Configure(NodeBuilder builder)
+    [NodeInput("B")]
+    public InputPort<int> InputB { get; set; }
+    
+    [NodeOutput("결과")]
+    public OutputPort<int> Result { get; set; }
+    
+    // 생성자
+    public AdditionNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) { }
+    
+    // 실행 로직
+    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
+        CancellationToken cancellationToken = default)
     {
-        // InputCount에 따라 동적으로 입력 포트 생성
-        for (int i = 0; i < InputCount.Value; i++)
-        {
-            builder.Input<int>($"입력 {i + 1}");
-        }
-        
-        // 항상 하나의 출력 포트 생성
-        builder.Output<int>("결과");
+        int a = InputA.GetValueOrDefault(0);
+        int b = InputB.GetValueOrDefault(0);
+        Result.Value = a + b;
+        yield break;
     }
 }
 ```
 
-### 3. 특수 노드
+### 2. 동적 노드
 
-WPFNode는 특정 목적을 위한 여러 특수 노드를 제공합니다:
+런타임에 포트 구성을 변경할 수 있는 방식으로, Configure 메서드를 오버라이드하여 구현합니다:
 
-- **StartNode**: 흐름 실행의 시작점
-- **SubCanvasNode**: 다른 캔버스를 하위 노드로 포함
-- **GraphInputNode/GraphOutputNode**: 그래프 간 데이터 연결
+```csharp
+[NodeName("동적 입력 노드")]
+[NodeCategory("예제")]
+[NodeDescription("입력 개수를 동적으로 변경할 수 있는 노드입니다.")]
+public class DynamicInputNode : NodeBase
+{
+    [NodeProperty("입력 개수", OnValueChanged = nameof(ReconfigurePorts))]
+    public NodeProperty<int> InputCount { get; set; }
+    
+    [NodeOutput("결과")]
+    public OutputPort<int> Result { get; set; }
+    
+    public DynamicInputNode(INodeCanvas canvas, Guid guid) : base(canvas, guid)
+    {
+        InputCount.Value = 2; // 기본값 설정
+    }
+    
+    protected override void Configure(NodeBuilder builder)
+    {
+        // 입력 개수에 따라 동적으로 포트 생성
+        for (int i = 0; i < InputCount.Value; i++)
+        {
+            builder.Input<int>($"입력 {i + 1}");
+        }
+    }
+    
+    private void ReconfigurePorts()
+    {
+        base.ReconfigurePorts();
+    }
+    
+    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
+        CancellationToken cancellationToken = default)
+    {
+        int sum = 0;
+        foreach (var port in InputPorts)
+        {
+            if (port is InputPort<int> intPort)
+            {
+                sum += intPort.GetValueOrDefault(0);
+            }
+        }
+        Result.Value = sum;
+        yield break;
+    }
+}
+```
+
+## 고급 기능
+
+WPFNode는 다음과 같은 고급 기능도 제공합니다:
+
+1. **타입 변환**: 서로 다른 타입 간의 자동 또는 명시적 변환
+2. **비동기 실행**: 비동기 작업 지원
+3. **직렬화/역직렬화**: 노드와 연결 구성 저장 및 복원
+4. **유효성 검사**: 노드 및 연결 구성의 유효성 검증
+5. **이벤트 처리**: 노드 상태 변경 알림
+6. **확장성**: 플러그인 시스템을 통한 확장
 
 ## 실행 모델
 

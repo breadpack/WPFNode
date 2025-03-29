@@ -10,13 +10,17 @@ using System.Runtime.CompilerServices;
 using System.ComponentModel;
 using System.Diagnostics;
 using WPFNode.Models.Execution;
+using System.Text;
 
 namespace WPFNode.Plugins.Basic.String;
 
-[NodeName("String.Format")]
+/// <summary>
+/// 문자열 형식 지정 노드
+/// </summary>
+[NodeName("문자열 형식 지정")]
 [NodeCategory("문자열")]
-[NodeDescription("형식 문자열에 값을 삽입하여 새 문자열을 생성합니다.")]
-public class StringFormatNode : DynamicNode {
+[NodeDescription("형식 지정 문자열({0}, {1} 등)을 사용하여 문자열을 생성합니다.")]
+public class StringFormatNode : NodeBase {
     [NodeFlowIn("실행")]
     public FlowInPort FlowIn { get; private set; }
 

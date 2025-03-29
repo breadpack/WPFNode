@@ -135,9 +135,4 @@ public class NodeProperty<T> : InputPort<T>, INodeProperty {
         // 부모 클래스의 ReadJson 호출
         base.ReadJson(element, options);
     }
-
-    // INodeProperty 추가 인터페이스 메서드
-    public void ConnectToPort(IInputPort port) {
-        // 이미 자신이 InputPort이므로 구현 불필요
-    }
 }

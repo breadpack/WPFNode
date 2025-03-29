@@ -148,19 +148,19 @@ namespace WPFNode.Tests
             var canvas = NodeCanvas.Create();
 
             // 2. 노드 추가
-            var collectTestNode = canvas.AddNode<CollectTestNode>(0, 0);
-            var listCollectNode = canvas.AddNode<ListCollectNode>(100, 0);
-            var consoleWriteNode = canvas.AddNode<ConsoleWriteNode>(200, 100);
+            var collectTestNode = canvas.CreateNode<CollectTestNode>(0, 0);
+            var listCollectNode = canvas.CreateNode<ListCollectNode>(100, 0);
+            var consoleWriteNode = canvas.CreateNode<ConsoleWriteNode>(200, 100);
 
             // 3. 노드 설정
             collectTestNode.CountProperty.Value = 5; // 5개의 값을 생성
             listCollectNode.ElementType.Value = typeof(int);
             
             // Flow가 완료된 후 검증하기 위한 TrackingNode 추가
-            var completionTrackingNode = canvas.AddNode<TrackingNode<int>>(300, 100);
+            var completionTrackingNode = canvas.CreateNode<TrackingNode<int>>(300, 100);
             
             // 완료 확인을 위한 상수 노드
-            var completionConstant = canvas.AddNode<ConstantNode<int>>(250, 150);
+            var completionConstant = canvas.CreateNode<ConstantNode<int>>(250, 150);
             completionConstant.Value.Value = 999; // 완료 신호 값
             
             // 4. 노드 연결
@@ -196,12 +196,12 @@ namespace WPFNode.Tests
             var canvas = NodeCanvas.Create();
 
             // 2. 노드 추가
-            var startNode = canvas.AddNode<StartNode>(0, 0);
-            var listCreateNode = canvas.AddNode<ListCreateNode>(100, 0);
-            var constNode = canvas.AddNode<ConstantNode<int>>(100, 100);
-            var listAddNode = canvas.AddNode<ListAddNode>(200, 0);
-            var listAddNode2 = canvas.AddNode<ListAddNode>(200, 100);
-            var trackingNode = canvas.AddNode<TrackingNode<List<int>>>(300, 0);
+            var startNode = canvas.CreateNode<StartNode>(0, 0);
+            var listCreateNode = canvas.CreateNode<ListCreateNode>(100, 0);
+            var constNode = canvas.CreateNode<ConstantNode<int>>(100, 100);
+            var listAddNode = canvas.CreateNode<ListAddNode>(200, 0);
+            var listAddNode2 = canvas.CreateNode<ListAddNode>(200, 100);
+            var trackingNode = canvas.CreateNode<TrackingNode<List<int>>>(300, 0);
 
             // 3. 노드 설정
             listCreateNode.ElementType.Value = typeof(int);
@@ -242,15 +242,15 @@ namespace WPFNode.Tests
             var canvas = NodeCanvas.Create();
 
             // 2. 노드 추가
-            var startNode = canvas.AddNode<StartNode>(0, 0);
-            var listCreateNode = canvas.AddNode<ListCreateNode>(100, 0);
-            var constNode1 = canvas.AddNode<ConstantNode<int>>(100, 100);
-            var constNode2 = canvas.AddNode<ConstantNode<int>>(100, 150);
-            var listAddNode1 = canvas.AddNode<ListAddNode>(200, 0);
-            var listAddNode2 = canvas.AddNode<ListAddNode>(300, 0);
-            var forEachNode = canvas.AddNode<ListForEachNode>(400, 0);
-            var itemTrackingNode = canvas.AddNode<TrackingNode<int>>(500, 0);
-            var completeTrackingNode = canvas.AddNode<TrackingNode<int>>(500, 100);
+            var startNode = canvas.CreateNode<StartNode>(0, 0);
+            var listCreateNode = canvas.CreateNode<ListCreateNode>(100, 0);
+            var constNode1 = canvas.CreateNode<ConstantNode<int>>(100, 100);
+            var constNode2 = canvas.CreateNode<ConstantNode<int>>(100, 150);
+            var listAddNode1 = canvas.CreateNode<ListAddNode>(200, 0);
+            var listAddNode2 = canvas.CreateNode<ListAddNode>(300, 0);
+            var forEachNode = canvas.CreateNode<ListForEachNode>(400, 0);
+            var itemTrackingNode = canvas.CreateNode<TrackingNode<int>>(500, 0);
+            var completeTrackingNode = canvas.CreateNode<TrackingNode<int>>(500, 100);
 
             // 3. 노드 설정
             listCreateNode.ElementType.Value = typeof(int);
@@ -263,7 +263,7 @@ namespace WPFNode.Tests
             constNode2.Value.Value = 20;
             
             // 완료 트래킹 값 설정
-            var completionValue = canvas.AddNode<ConstantNode<int>>(450, 150);
+            var completionValue = canvas.CreateNode<ConstantNode<int>>(450, 150);
             completionValue.Value.Value = 450;
 
             // 4. 노드 연결 - Flow
@@ -306,14 +306,14 @@ namespace WPFNode.Tests
             var canvas = NodeCanvas.Create();
 
             // 2. 노드 추가
-            var startNode = canvas.AddNode<StartNode>(0, 0);
-            var listCreateNode = canvas.AddNode<ListCreateNode>(100, 0);
-            var constNode1 = canvas.AddNode<ConstantNode<int>>(100, 100);
-            var constNode2 = canvas.AddNode<ConstantNode<int>>(100, 150);
-            var listAddNode1 = canvas.AddNode<ListAddNode>(200, 0);
-            var listAddNode2 = canvas.AddNode<ListAddNode>(200, 100);
-            var listRemoveNode = canvas.AddNode<ListRemoveNode>(300, 0);
-            var consoleWriteNode = canvas.AddNode<ConsoleWriteNode>(400, 0);
+            var startNode = canvas.CreateNode<StartNode>(0, 0);
+            var listCreateNode = canvas.CreateNode<ListCreateNode>(100, 0);
+            var constNode1 = canvas.CreateNode<ConstantNode<int>>(100, 100);
+            var constNode2 = canvas.CreateNode<ConstantNode<int>>(100, 150);
+            var listAddNode1 = canvas.CreateNode<ListAddNode>(200, 0);
+            var listAddNode2 = canvas.CreateNode<ListAddNode>(200, 100);
+            var listRemoveNode = canvas.CreateNode<ListRemoveNode>(300, 0);
+            var consoleWriteNode = canvas.CreateNode<ConsoleWriteNode>(400, 0);
 
             // 3. 노드 설정
             listCreateNode.ElementType.Value = typeof(int);
@@ -368,12 +368,12 @@ namespace WPFNode.Tests
             var canvas = NodeCanvas.Create();
 
             // 2. 노드 추가
-            var startNode = canvas.AddNode<StartNode>(0, 0);
-            var listCreateNode = canvas.AddNode<ListCreateNode>(100, 0);
-            var constNode = canvas.AddNode<ConstantNode<int>>(100, 100);
-            var listAddNode = canvas.AddNode<ListAddNode>(200, 0);
-            var listClearNode = canvas.AddNode<ListClearNode>(300, 0);
-            var consoleWriteNode = canvas.AddNode<ConsoleWriteNode>(400, 0);
+            var startNode = canvas.CreateNode<StartNode>(0, 0);
+            var listCreateNode = canvas.CreateNode<ListCreateNode>(100, 0);
+            var constNode = canvas.CreateNode<ConstantNode<int>>(100, 100);
+            var listAddNode = canvas.CreateNode<ListAddNode>(200, 0);
+            var listClearNode = canvas.CreateNode<ListClearNode>(300, 0);
+            var consoleWriteNode = canvas.CreateNode<ConsoleWriteNode>(400, 0);
 
             // 3. 노드 설정
             listCreateNode.ElementType.Value = typeof(int);
@@ -420,11 +420,11 @@ namespace WPFNode.Tests
             var canvas = NodeCanvas.Create();
 
             // 2. 노드 추가
-            var startNode = canvas.AddNode<StartNode>(0, 0);
-            var objectCollectionNode = canvas.AddNode<ObjectCollectionNode>(100, 0);
-            var constNode1 = canvas.AddNode<ConstantNode<int>>(100, 100);
-            var constNode2 = canvas.AddNode<ConstantNode<int>>(100, 150);
-            var trackingNode = canvas.AddNode<TrackingNode<List<int>>>(200, 0);
+            var startNode = canvas.CreateNode<StartNode>(0, 0);
+            var objectCollectionNode = canvas.CreateNode<ObjectCollectionNode>(100, 0);
+            var constNode1 = canvas.CreateNode<ConstantNode<int>>(100, 100);
+            var constNode2 = canvas.CreateNode<ConstantNode<int>>(100, 150);
+            var trackingNode = canvas.CreateNode<TrackingNode<List<int>>>(200, 0);
 
             // 3. 노드 설정
             objectCollectionNode.SelectedType.Value = typeof(int);
@@ -460,11 +460,11 @@ namespace WPFNode.Tests
             var canvas = NodeCanvas.Create();
 
             // 2. 노드 추가
-            var startNode = canvas.AddNode<StartNode>(0, 0);
-            var objectCollectionNode = canvas.AddNode<ObjectCollectionNode>(100, 0);
-            var constNode1 = canvas.AddNode<ConstantNode<string>>(100, 100);
-            var constNode2 = canvas.AddNode<ConstantNode<string>>(100, 150);
-            var trackingNode = canvas.AddNode<TrackingNode<List<string>>>(200, 0);
+            var startNode = canvas.CreateNode<StartNode>(0, 0);
+            var objectCollectionNode = canvas.CreateNode<ObjectCollectionNode>(100, 0);
+            var constNode1 = canvas.CreateNode<ConstantNode<string>>(100, 100);
+            var constNode2 = canvas.CreateNode<ConstantNode<string>>(100, 150);
+            var trackingNode = canvas.CreateNode<TrackingNode<List<string>>>(200, 0);
 
             // 3. 노드 설정
             objectCollectionNode.SelectedType.Value = typeof(string);

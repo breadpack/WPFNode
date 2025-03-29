@@ -36,14 +36,14 @@ namespace WPFNode.Tests
             var canvas = NodeCanvas.Create();
 
             // 2. 노드 추가
-            var startNode = canvas.AddNode<StartNode>(0, 0);
-            var switchNode = canvas.AddNode<SwitchNode>(100, 50);
-            var case1Node = canvas.AddNode<TrackingNode<int>>(200, 0);
-            var case2Node = canvas.AddNode<TrackingNode<int>>(200, 100);
-            var defaultNode = canvas.AddNode<TrackingNode<int>>(200, 200);
+            var startNode = canvas.CreateNode<StartNode>(0, 0);
+            var switchNode = canvas.CreateNode<SwitchNode>(100, 50);
+            var case1Node = canvas.CreateNode<TrackingNode<int>>(200, 0);
+            var case2Node = canvas.CreateNode<TrackingNode<int>>(200, 100);
+            var defaultNode = canvas.CreateNode<TrackingNode<int>>(200, 200);
             
             // 입력값 노드 (문자열 상수)
-            var stringValue = canvas.AddNode<ConstantNode<string>>(50, 100);
+            var stringValue = canvas.CreateNode<ConstantNode<string>>(50, 100);
 
             // 3. 노드 설정
             switchNode.ValueType.Value = typeof(string);
@@ -67,9 +67,9 @@ namespace WPFNode.Tests
             stringValue.Result.Connect(switchNode.InputValue);
             
             // 트래킹 노드에 값 입력 (경로 구분용)
-            var value1       = canvas.AddNode<ConstantNode<int>>(150, 0);
-            var value2       = canvas.AddNode<ConstantNode<int>>(150, 100);
-            var valueDefault = canvas.AddNode<ConstantNode<int>>(150, 200);
+            var value1       = canvas.CreateNode<ConstantNode<int>>(150, 0);
+            var value2       = canvas.CreateNode<ConstantNode<int>>(150, 100);
+            var valueDefault = canvas.CreateNode<ConstantNode<int>>(150, 200);
             
             value1.Value.Value = 1;
             value2.Value.Value = 2;
@@ -96,14 +96,14 @@ namespace WPFNode.Tests
             var canvas = NodeCanvas.Create();
 
             // 2. 노드 추가
-            var startNode = canvas.AddNode<StartNode>(0, 0);
-            var switchNode = canvas.AddNode<SwitchNode>(100, 50);
-            var case1Node = canvas.AddNode<TrackingNode<int>>(200, 0);
-            var case2Node = canvas.AddNode<TrackingNode<int>>(200, 100);
-            var defaultNode = canvas.AddNode<TrackingNode<int>>(200, 200);
+            var startNode = canvas.CreateNode<StartNode>(0, 0);
+            var switchNode = canvas.CreateNode<SwitchNode>(100, 50);
+            var case1Node = canvas.CreateNode<TrackingNode<int>>(200, 0);
+            var case2Node = canvas.CreateNode<TrackingNode<int>>(200, 100);
+            var defaultNode = canvas.CreateNode<TrackingNode<int>>(200, 200);
             
             // 입력값 노드 (문자열 상수)
-            var stringValue = canvas.AddNode<ConstantNode<string>>(50, 100);
+            var stringValue = canvas.CreateNode<ConstantNode<string>>(50, 100);
 
             // 3. 노드 설정
             switchNode.ValueType.Value = typeof(string);
@@ -127,9 +127,9 @@ namespace WPFNode.Tests
             stringValue.Result.Connect(switchNode.InputValue);
             
             // 트래킹 노드에 값 입력 (경로 구분용)
-            var value1 = canvas.AddNode<ConstantNode<int>>(150, 0);
-            var value2 = canvas.AddNode<ConstantNode<int>>(150, 100);
-            var valueDefault = canvas.AddNode<ConstantNode<int>>(150, 200);
+            var value1 = canvas.CreateNode<ConstantNode<int>>(150, 0);
+            var value2 = canvas.CreateNode<ConstantNode<int>>(150, 100);
+            var valueDefault = canvas.CreateNode<ConstantNode<int>>(150, 200);
             
             value1.Value.Value = 1;
             value2.Value.Value = 2;

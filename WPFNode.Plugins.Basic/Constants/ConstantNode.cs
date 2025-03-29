@@ -17,7 +17,7 @@ namespace WPFNode.Plugins.Basic.Constants;
 /// <typeparam name="T">상수의 데이터 타입</typeparam>
 [NodeCategory("Constants")]
 [NodeDescription("상수 값을 출력합니다.")]
-public class ConstantNode : DynamicNode
+public class ConstantNode : NodeBase
 {
     [NodeProperty("Type", OnValueChanged = nameof(OnTypeChanged))]
     public NodeProperty<Type> Type { get; private set; }

@@ -12,7 +12,7 @@ namespace WPFNode.Plugins.Basic.Nodes
     [NodeName("List.Clear")]
     [NodeDescription("리스트의 모든 항목을 제거합니다.")]
     [NodeCategory("컬렉션")]
-    public class ListClearNode : DynamicNode
+    public class ListClearNode : NodeBase
     {
         [NodeFlowIn]
         public IFlowInPort FlowIn { get; set; }

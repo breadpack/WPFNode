@@ -12,7 +12,7 @@ namespace WPFNode.Plugins.Basic.Nodes
     [NodeName("List.Add")]
     [NodeDescription("리스트에 항목을 추가합니다.")]
     [NodeCategory("컬렉션")]
-    public class ListAddNode : DynamicNode
+    public class ListAddNode : NodeBase
     {
         [NodeFlowIn]
         public IFlowInPort FlowIn { get; set; }

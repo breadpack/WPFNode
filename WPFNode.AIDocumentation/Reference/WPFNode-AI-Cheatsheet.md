@@ -100,7 +100,7 @@ namespace YourNamespace;
 [NodeName("동적 노드 이름")]
 [NodeCategory("카테고리")]
 [NodeDescription("노드 설명")]
-public class YourDynamicNodeName : DynamicNode
+public class YourDynamicNodeName : NodeBase
 {
     // 포트 구성을 결정하는 프로퍼티
     [NodeProperty("구성 프로퍼티", OnValueChanged = nameof(ReconfigurePorts))]

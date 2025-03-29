@@ -35,9 +35,9 @@ namespace WPFNode.Tests
             var canvas = NodeCanvas.Create();
 
             // 2. 노드 추가
-            var startNode = canvas.AddNode<StartNode>(0, 0);
-            var outputNode = canvas.AddNode<CollectionOutputNode<int>>(100, 0);
-            var validationNode = canvas.AddNode<CollectionValidationNode<int>>(200, 0);
+            var startNode = canvas.CreateNode<StartNode>(0, 0);
+            var outputNode = canvas.CreateNode<CollectionOutputNode<int>>(100, 0);
+            var validationNode = canvas.CreateNode<CollectionValidationNode<int>>(200, 0);
 
             // 3. 노드 설정 - 소스 아이템 설정
             outputNode.SourceItems = new List<int> { 1, 2, 3, 4, 5 };
@@ -65,9 +65,9 @@ namespace WPFNode.Tests
             var canvas = NodeCanvas.Create();
 
             // 2. 노드 추가
-            var startNode = canvas.AddNode<StartNode>(0, 0);
-            var outputNode = canvas.AddNode<CollectionOutputNode<string>>(100, 0);
-            var validationNode = canvas.AddNode<CollectionValidationNode<string>>(200, 0);
+            var startNode = canvas.CreateNode<StartNode>(0, 0);
+            var outputNode = canvas.CreateNode<CollectionOutputNode<string>>(100, 0);
+            var validationNode = canvas.CreateNode<CollectionValidationNode<string>>(200, 0);
 
             // 3. 노드 설정 - 소스 아이템 설정
             outputNode.SourceItems = new List<string> { "A", "B", "C" };
@@ -95,9 +95,9 @@ namespace WPFNode.Tests
             var canvas = NodeCanvas.Create();
 
             // 2. 노드 추가
-            var startNode = canvas.AddNode<StartNode>(0, 0);
-            var outputNode = canvas.AddNode<CollectionOutputNode<int>>(100, 0);
-            var validationNode = canvas.AddNode<CollectionValidationNode<int>>(200, 0);
+            var startNode = canvas.CreateNode<StartNode>(0, 0);
+            var outputNode = canvas.CreateNode<CollectionOutputNode<int>>(100, 0);
+            var validationNode = canvas.CreateNode<CollectionValidationNode<int>>(200, 0);
 
             // 3. 노드 설정 - 소스 아이템 설정 (중복 값 포함)
             outputNode.SourceItems = new List<int> { 1, 2, 3, 3, 2, 1 };
@@ -127,10 +127,10 @@ namespace WPFNode.Tests
             var canvas = NodeCanvas.Create();
 
             // 2. 노드 추가
-            var startNode = canvas.AddNode<StartNode>(0, 0);
-            var outputNode = canvas.AddNode<CollectionOutputNode<int>>(100, 0);
-            var transformNode = canvas.AddNode<CollectionTransformNode<int>>(200, 0);
-            var validationNode = canvas.AddNode<CollectionValidationNode<int>>(300, 0);
+            var startNode = canvas.CreateNode<StartNode>(0, 0);
+            var outputNode = canvas.CreateNode<CollectionOutputNode<int>>(100, 0);
+            var transformNode = canvas.CreateNode<CollectionTransformNode<int>>(200, 0);
+            var validationNode = canvas.CreateNode<CollectionValidationNode<int>>(300, 0);
 
             // 3. 노드 설정 - 소스 아이템 설정
             outputNode.SourceItems = new List<int> { 10, 20, 30, 40, 50 };
@@ -162,9 +162,9 @@ namespace WPFNode.Tests
             var canvas = NodeCanvas.Create();
 
             // 2. 노드 추가
-            var startNode = canvas.AddNode<StartNode>(0, 0);
-            var outputNode = canvas.AddNode<CollectionOutputNode<int>>(100, 0);
-            var inputNode = canvas.AddNode<CollectionInputNode<int>>(200, 0);
+            var startNode = canvas.CreateNode<StartNode>(0, 0);
+            var outputNode = canvas.CreateNode<CollectionOutputNode<int>>(100, 0);
+            var inputNode = canvas.CreateNode<CollectionInputNode<int>>(200, 0);
 
             // 3. 노드 설정 - 소스 아이템 설정
             outputNode.SourceItems = new List<int> { 1, 2, 3, 4, 5 };
@@ -201,10 +201,10 @@ namespace WPFNode.Tests
             var canvas = NodeCanvas.Create();
 
             // 2. 노드 추가
-            var startNode = canvas.AddNode<StartNode>(0, 0);
+            var startNode = canvas.CreateNode<StartNode>(0, 0);
             // TestPerson 타입의 컬렉션을 다루는 노드들
-            var outputNode = canvas.AddNode<CollectionOutputNode<TestPerson>>(100, 0);
-            var validationNode = canvas.AddNode<CollectionValidationNode<TestPerson>>(200, 0);
+            var outputNode = canvas.CreateNode<CollectionOutputNode<TestPerson>>(100, 0);
+            var validationNode = canvas.CreateNode<CollectionValidationNode<TestPerson>>(200, 0);
 
             // 3. 노드 설정 - 소스 아이템 설정
             var people = new List<TestPerson>
@@ -242,10 +242,10 @@ namespace WPFNode.Tests
             var canvas = NodeCanvas.Create();
 
             // 2. 노드 추가
-            var startNode = canvas.AddNode<StartNode>(0, 0);
-            var outputNode = canvas.AddNode<CollectionOutputNode<string>>(100, 0);
-            var transformNode = canvas.AddNode<CollectionTransformNode<string>>(200, 0);
-            var validationNode = canvas.AddNode<CollectionValidationNode<string>>(300, 0);
+            var startNode = canvas.CreateNode<StartNode>(0, 0);
+            var outputNode = canvas.CreateNode<CollectionOutputNode<string>>(100, 0);
+            var transformNode = canvas.CreateNode<CollectionTransformNode<string>>(200, 0);
+            var validationNode = canvas.CreateNode<CollectionValidationNode<string>>(300, 0);
 
             // 3. 노드 설정 - 소스 아이템 설정
             outputNode.SourceItems = new List<string> { "A", "B", "C", "D" };

@@ -55,7 +55,7 @@ namespace WPFNode.Tests.Serialization
         {
             // Canvas 생성 및 노드 추가
             var canvas = NodeCanvas.Create();
-            var node = canvas.AddNode<CreateObjectNode>();
+            var node = canvas.CreateNode<CreateObjectNode>();
             
             // 타입 설정을 통해 프로퍼티 생성 유도
             var typeProperty = node.Properties.FirstOrDefault(p => p.DisplayName == "Target Type") as NodeProperty<Type>;
@@ -229,7 +229,7 @@ namespace WPFNode.Tests.Serialization
         {
             // Arrange - Canvas 생성 및 노드 추가
             var canvas = NodeCanvas.Create();
-            var node = canvas.AddNode<CreateObjectNode>();
+            var node = canvas.CreateNode<CreateObjectNode>();
             
             // 초기 타입 설정
             var typeProperty = node.Properties.FirstOrDefault(p => p.DisplayName == "Target Type") as NodeProperty<Type>;

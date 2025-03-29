@@ -11,7 +11,7 @@ namespace WPFNode.Plugins.Basic.Nodes {
     [NodeName("List.Collect")]
     [NodeDescription("순차적으로 실행될 때마다 항목을 수집하여 리스트를 생성합니다.")]
     [NodeCategory("컬렉션")]
-    public class ListCollectNode : DynamicNode {
+    public class ListCollectNode : NodeBase {
         [NodeFlowIn("Add")]
         public IFlowInPort AddFlowIn { get; set; }
 

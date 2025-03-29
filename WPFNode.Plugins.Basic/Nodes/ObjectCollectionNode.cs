@@ -14,7 +14,7 @@ namespace WPFNode.Plugins.Basic.Nodes {
     [NodeName("Object Collection")]
     [NodeDescription("객체 리스트를 생성합니다.")]
     [NodeCategory("데이터 변환")]
-    public class ObjectCollectionNode : DynamicNode {
+    public class ObjectCollectionNode : NodeBase {
         [NodeFlowIn]
         public IFlowInPort FlowIn { get; set; }
         

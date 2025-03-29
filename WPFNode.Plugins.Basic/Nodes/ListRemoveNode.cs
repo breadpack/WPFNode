@@ -12,7 +12,7 @@ namespace WPFNode.Plugins.Basic.Nodes
     [NodeName("List.Remove")]
     [NodeDescription("리스트에서 항목을 제거합니다.")]
     [NodeCategory("컬렉션")]
-    public class ListRemoveNode : DynamicNode
+    public class ListRemoveNode : NodeBase
     {
         [NodeFlowIn]
         public IFlowInPort FlowIn { get; set; }

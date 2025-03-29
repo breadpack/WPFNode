@@ -1,19 +1,19 @@
 # 동적 노드 만들기
 
-이 가이드에서는 런타임에 포트 구성을 변경할 수 있는 동적 노드(DynamicNode)를 생성하는 방법을 설명합니다.
+이 가이드에서는 런타임에 포트 구성을 변경할 수 있는 동적 노드를 생성하는 방법을 설명합니다.
 
 ## 동적 노드 소개
 
-`DynamicNode`는 `NodeBase`를 확장한 특수 클래스로, 런타임에 노드의 포트 및 프로퍼티 구성을 변경할 수 있습니다. 이러한 기능은 다음과 같은 상황에서 유용합니다:
+NodeBase 클래스는 런타임에 노드의 포트 및 프로퍼티 구성을 동적으로 변경할 수 있습니다. 이러한 기능은 다음과 같은 상황에서 유용합니다:
 
 - 사용자 입력에 따라 입력 또는 출력 포트의 수를 조정해야 할 때
 - 선택된 설정에 따라 다른 프로퍼티를 표시해야 할 때
 - 외부 데이터 소스의 스키마에 따라 포트를 동적으로 생성해야 할 때
 - 노드의 동작을 런타임에 완전히 재구성해야 할 때
 
-## 1단계: DynamicNode 클래스 상속
+## 1단계: NodeBase 클래스 상속
 
-먼저, `DynamicNode` 클래스를 상속받는 새로운 클래스를 생성합니다:
+먼저, `NodeBase` 클래스를 상속받는 새로운 클래스를 생성합니다:
 
 ```csharp
 using System.Threading.Tasks;
@@ -28,7 +28,7 @@ namespace YourNamespace;
 [NodeName("동적 입력 노드")]
 [NodeCategory("예제")]
 [NodeDescription("입력 개수를 동적으로 변경할 수 있는 노드입니다.")]
-public class DynamicInputNode : DynamicNode
+public class DynamicInputNode : NodeBase
 {
     public DynamicInputNode(INodeCanvas canvas, Guid guid) : base(canvas, guid)
     {
@@ -71,7 +71,7 @@ public DynamicInputNode(INodeCanvas canvas, Guid guid) : base(canvas, guid)
 
 ## 3단계: Configure 메서드 구현
 
-`DynamicNode`의 핵심은 `Configure` 메서드입니다. 이 메서드는 노드의 포트 구성을 정의하며, 노드가 초기화될 때와 재구성될 때 호출됩니다:
+동적 노드의 핵심은 `Configure` 메서드입니다. 이 메서드는 노드의 포트 구성을 정의하며, 노드가 초기화될 때와 재구성될 때 호출됩니다:
 
 ```csharp
 protected override void Configure(NodeBuilder builder)
@@ -105,13 +105,13 @@ protected override void Configure(NodeBuilder builder)
 ```csharp
 private void ReconfigurePorts()
 {
-    // DynamicNode의 ReconfigurePorts 메서드 호출
+    // NodeBase의 ReconfigurePorts 메서드 호출
     // 이 메서드는 동적 포트를 제거하고 Configure를 다시 호출합니다
     base.ReconfigurePorts();
 }
 ```
 
-`DynamicNode.ReconfigurePorts()` 메서드는 다음과 같은 작업을 수행합니다:
+`ReconfigurePorts()` 메서드는 다음과 같은 작업을 수행합니다:
 1. 동적으로 추가된 포트와 프로퍼티를 제거합니다 (어트리뷰트로 정의된 포트는 유지)
 2. 노드를 재초기화하고 `Configure` 메서드를 다시 호출합니다
 
@@ -124,14 +124,13 @@ protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
     [EnumeratorCancellation] CancellationToken cancellationToken = default)
 {
     // 모든 입력 포트의 값을 합산
-    int sum = 0;
+    double sum = 0;
     
-    // InputPorts에서 동적으로 생성된 포트를 찾아 처리
     foreach (var port in InputPorts)
     {
-        if (port is InputPort<int> intPort)
+        if (port is InputPort<double> doublePort)
         {
-            sum += intPort.GetValueOrDefault(0);
+            sum += doublePort.GetValueOrDefault(0);
         }
     }
     
@@ -139,7 +138,7 @@ protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
     if (Result != null)
         Result.Value = sum;
     
-    // 비동기 작업 대기 (예시)
+    // 비동기 작업 대기 (필요한 경우)
     await Task.CompletedTask;
     
     // 다음 노드 실행
@@ -148,42 +147,9 @@ protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
 }
 ```
 
-## 6단계: 포트 정보 저장 및 복원
+## 예제: 동적 덧셈 노드
 
-`DynamicNode`는 동적 포트 및 프로퍼티 정보를 자동으로 저장하고 복원합니다. 특수한 직렬화 요구사항이 있는 경우 `WriteJson`과 `ReadJson` 메서드를 오버라이드할 수 있습니다:
-
-```csharp
-public override void WriteJson(Utf8JsonWriter writer)
-{
-    // 기본 JSON 직렬화 수행 (필수)
-    base.WriteJson(writer);
-    
-    // 추가 데이터 저장 (필요한 경우)
-    writer.WritePropertyName("CustomData");
-    writer.WriteStartObject();
-    writer.WriteNumber("LastComputedResult", _lastComputedResult);
-    writer.WriteEndObject();
-}
-
-public override void ReadJson(JsonElement element, JsonSerializerOptions options)
-{
-    // 기본 JSON 역직렬화 수행 (필수)
-    base.ReadJson(element, options);
-    
-    // 추가 데이터 복원 (필요한 경우)
-    if (element.TryGetProperty("CustomData", out var customData))
-    {
-        if (customData.TryGetProperty("LastComputedResult", out var lastResult))
-        {
-            _lastComputedResult = lastResult.GetInt32();
-        }
-    }
-}
-```
-
-## 완성된 동적 노드 예제
-
-다음은 입력 개수를 동적으로 변경할 수 있는 덧셈 노드의 완전한 구현 예제입니다:
+다음은 입력 개수를 동적으로 변경할 수 있는 덧셈 노드의 완전한 예제입니다:
 
 ```csharp
 using System;
@@ -198,8 +164,8 @@ namespace WPFNode.Examples;
 
 [NodeName("동적 덧셈")]
 [NodeCategory("수학")]
-[NodeDescription("여러 숫자를 더합니다. 입력 개수를 동적으로 변경할 수 있습니다.")]
-public class DynamicAdditionNode : DynamicNode
+[NodeDescription("가변 개수의 숫자를 더합니다.")]
+public class DynamicAdditionNode : NodeBase
 {
     [NodeProperty("입력 개수", OnValueChanged = nameof(ReconfigurePorts))]
     public NodeProperty<int> InputCount { get; set; }
@@ -289,7 +255,7 @@ public enum FilterType
 [NodeName("동적 필터")]
 [NodeCategory("데이터 처리")]
 [NodeDescription("다양한 조건으로 데이터를 필터링합니다. 필터 유형에 따라 설정이 변경됩니다.")]
-public class DynamicFilterNode : DynamicNode
+public class DynamicFilterNode : NodeBase
 {
     [NodeProperty("필터 유형", OnValueChanged = nameof(ReconfigurePorts))]
     public NodeProperty<FilterType> FilterTypeProperty { get; set; }
@@ -325,93 +291,101 @@ public class DynamicFilterNode : DynamicNode
     
     protected override void Configure(NodeBuilder builder)
     {
-        // 현재 필터 유형에 따라 다른 프로퍼티 구성
+        // 필터 유형에 따라 다른 프로퍼티 표시
         switch (FilterTypeProperty.Value)
         {
             case FilterType.Range:
-                _minValue = builder.Property<double>("MinValue", "최소값", null, true);
-                _maxValue = builder.Property<double>("MaxValue", "최대값", null, true);
+                _minValue = builder.Property<double>("최소값", "최소값", null, true);
+                _maxValue = builder.Property<double>("최대값", "최대값", null, true);
                 break;
                 
             case FilterType.Threshold:
-                _threshold = builder.Property<double>("Threshold", "임계값", null, true);
+                _threshold = builder.Property<double>("임계값", "임계값", null, true);
                 break;
                 
             case FilterType.Pattern:
-                _pattern = builder.Property<string>("Pattern", "패턴", null, true);
+                _pattern = builder.Property<string>("패턴", "패턴", null, true);
                 break;
         }
     }
     
     private void ReconfigurePorts()
     {
-        // 필터 유형이 변경되었을 때 포트 재구성
         base.ReconfigurePorts();
     }
     
     protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        // 입력 데이터 가져오기
-        double input = InputData?.GetValueOrDefault(0) ?? 0;
-        bool passes = false;
+        bool passed = false;
+        double inputValue = InputData.GetValueOrDefault(0);
+        double outputValue = inputValue;
         
-        // 필터 유형에 따라 다른 필터링 로직 적용
+        // 필터 유형에 따라 다른 로직 적용
         switch (FilterTypeProperty.Value)
         {
             case FilterType.Range:
                 double min = _minValue?.Value ?? 0;
                 double max = _maxValue?.Value ?? 0;
-                passes = (input >= min && input <= max);
+                passed = inputValue >= min && inputValue <= max;
                 break;
                 
             case FilterType.Threshold:
                 double threshold = _threshold?.Value ?? 0;
-                passes = (input >= threshold);
+                passed = inputValue >= threshold;
                 break;
                 
             case FilterType.Pattern:
                 string pattern = _pattern?.Value ?? "";
-                string inputStr = input.ToString();
-                passes = !string.IsNullOrEmpty(pattern) && inputStr.Contains(pattern);
+                passed = !string.IsNullOrEmpty(pattern) && 
+                         inputValue.ToString().Contains(pattern);
                 break;
         }
         
-        // 결과 설정
-        if (FilteredData != null)
-            FilteredData.Value = passes ? input : 0;
-            
-        if (Passed != null)
-            Passed.Value = passes;
+        // 출력 설정
+        FilteredData.Value = outputValue;
+        Passed.Value = passed;
         
-        // 비동기 작업 대기 (필요한 경우)
-        await Task.CompletedTask;
-        
-        // 결과에 따라 다른 흐름 포트 반환
-        if (passes)
-        {
-            if (FlowPassed != null)
-                yield return FlowPassed;
-        }
-        else
-        {
-            if (FlowFailed != null)
-                yield return FlowFailed;
-        }
+        // 흐름 제어
+        yield return passed ? FlowPassed : FlowFailed;
     }
 }
 ```
 
-## 모범 사례
+## 직렬화 및 역직렬화
 
-동적 노드를 개발할 때 다음 모범 사례를 따르는 것이 좋습니다:
+NodeBase는 동적 포트 및 프로퍼티 정보를 자동으로 저장하고 복원합니다. 특수한 직렬화 요구사항이 있는 경우 `WriteJson`과 `ReadJson` 메서드를 오버라이드할 수 있습니다:
 
-1. **포트 이름의 일관성**: 동적으로 생성되는 포트의 이름을 명확하고 일관되게 지정합니다.
-2. **합리적인 기본값**: 모든 프로퍼티에 적절한 기본값을 제공합니다.
-3. **최소/최대 제한**: 입력 개수와 같은 값에 적절한 최소/최대 제한을 적용합니다.
-4. **효율적인 재구성**: 불필요한 재구성을 피하고, 값이 실제로 변경되었을 때만 재구성합니다.
-5. **직렬화 고려**: 동적 포트와 프로퍼티가 올바르게 직렬화되고 역직렬화되는지 확인합니다.
-6. **메모리 관리**: 더 이상 필요하지 않은 포트는 명시적으로 제거하여 메모리 누수를 방지합니다.
+```csharp
+public override void WriteJson(Utf8JsonWriter writer)
+{
+    base.WriteJson(writer);
+    
+    // 추가 정보 직렬화
+    writer.WriteNumber("CustomField", _customValue);
+}
+
+public override void ReadJson(JsonElement element, JsonSerializerOptions options)
+{
+    base.ReadJson(element, options);
+    
+    // 추가 정보 역직렬화
+    if (element.TryGetProperty("CustomField", out var customElement))
+        _customValue = customElement.GetInt32();
+}
+```
+
+## 요약
+
+동적 노드를 만드는 방법을 요약하면 다음과 같습니다:
+
+1. `NodeBase`를 상속받는 클래스 생성
+2. 포트 구성을 제어하는 프로퍼티 정의 (`OnValueChanged = nameof(ReconfigurePorts)` 속성 사용)
+3. `Configure` 메서드 오버라이드하여 동적 포트 구성
+4. 필요한 경우 `ReconfigurePorts` 메서드 구현
+5. `ProcessAsync` 메서드에서 노드 실행 로직 구현
+
+이러한 단계를 따르면 사용자 입력이나 외부 데이터에 따라 포트 구성을 동적으로 변경하는 유연한 노드를 만들 수 있습니다.
 
 ## 다음 단계
 

@@ -10,7 +10,7 @@ namespace WPFNode.Plugins.Basic.Flow;
 [NodeCategory("Flow Control")]
 [NodeName("Select")]
 [NodeDescription("입력 값에 따라 여러 케이스 중 하나를 선택하여 해당 값을 출력합니다.")]
-public class SelectNode : DynamicNode {
+public class SelectNode : NodeBase {
     [NodeFlowIn]
     public IFlowInPort FlowIn { get; private set; }
 

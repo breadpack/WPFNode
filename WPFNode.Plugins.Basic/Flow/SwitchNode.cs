@@ -15,7 +15,7 @@ namespace WPFNode.Plugins.Basic.Flow;
 [NodeCategory("Flow Control")]
 [NodeName("Switch")]
 [NodeDescription("입력 값에 따라 실행 경로를 분기합니다.")]
-public class SwitchNode : DynamicNode {
+public class SwitchNode : NodeBase {
     // 동적 포트 관리 필드
     private IInputPort _inputValuePort;
     private Dictionary<string, FlowOutPort> _flowOutPorts = new();

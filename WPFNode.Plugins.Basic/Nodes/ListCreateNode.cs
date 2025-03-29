@@ -12,7 +12,7 @@ namespace WPFNode.Plugins.Basic.Nodes
     [NodeName("List.Create")]
     [NodeDescription("빈 리스트를 생성합니다.")]
     [NodeCategory("컬렉션")]
-    public class ListCreateNode : DynamicNode
+    public class ListCreateNode : NodeBase
     {
         [NodeFlowIn]
         public IFlowInPort FlowIn { get; set; }

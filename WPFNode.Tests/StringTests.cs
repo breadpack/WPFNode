@@ -34,9 +34,9 @@ public class StringTests
         var canvas = NodeCanvas.Create();
 
         // 2. 노드 추가
-        var startNode         = canvas.AddNode<StartNode>(0, 0);
-        var nullStringNode    = canvas.AddNode<ConstantNode<string>>(0, 100);
-        var isNullOrEmptyNode = canvas.AddNode<StringIsNullOrEmptyNode>(100, 50);
+        var startNode         = canvas.CreateNode<StartNode>(0, 0);
+        var nullStringNode    = canvas.CreateNode<ConstantNode<string>>(0, 100);
+        var isNullOrEmptyNode = canvas.CreateNode<StringIsNullOrEmptyNode>(100, 50);
 
         // 3. 노드 설정 - null 문자열 설정
         nullStringNode.Value.Value = null;
@@ -59,9 +59,9 @@ public class StringTests
         var canvas = NodeCanvas.Create();
 
         // 2. 노드 추가
-        var startNode = canvas.AddNode<StartNode>(0, 0);
-        var emptyStringNode = canvas.AddNode<ConstantNode<string>>(0, 100);
-        var isNullOrEmptyNode = canvas.AddNode<StringIsNullOrEmptyNode>(100, 50);
+        var startNode = canvas.CreateNode<StartNode>(0, 0);
+        var emptyStringNode = canvas.CreateNode<ConstantNode<string>>(0, 100);
+        var isNullOrEmptyNode = canvas.CreateNode<StringIsNullOrEmptyNode>(100, 50);
 
         // 3. 노드 설정 - 빈 문자열 설정
         emptyStringNode.Value.Value = "";
@@ -84,9 +84,9 @@ public class StringTests
         var canvas = NodeCanvas.Create();
 
         // 2. 노드 추가
-        var startNode = canvas.AddNode<StartNode>(0, 0);
-        var stringNode = canvas.AddNode<ConstantNode<string>>(0, 100);
-        var isNullOrEmptyNode = canvas.AddNode<StringIsNullOrEmptyNode>(100, 50);
+        var startNode = canvas.CreateNode<StartNode>(0, 0);
+        var stringNode = canvas.CreateNode<ConstantNode<string>>(0, 100);
+        var isNullOrEmptyNode = canvas.CreateNode<StringIsNullOrEmptyNode>(100, 50);
 
         // 3. 노드 설정 - 비어있지 않은 문자열 설정
         stringNode.Value.Value = "Hello";
@@ -109,9 +109,9 @@ public class StringTests
         var canvas = NodeCanvas.Create();
 
         // 2. 노드 추가
-        var startNode = canvas.AddNode<StartNode>(0, 0);
-        var nullStringNode = canvas.AddNode<ConstantNode<string>>(0, 100);
-        var isNullOrWhiteSpaceNode = canvas.AddNode<StringIsNullOrWhiteSpaceNode>(100, 50);
+        var startNode = canvas.CreateNode<StartNode>(0, 0);
+        var nullStringNode = canvas.CreateNode<ConstantNode<string>>(0, 100);
+        var isNullOrWhiteSpaceNode = canvas.CreateNode<StringIsNullOrWhiteSpaceNode>(100, 50);
 
         // 3. 노드 설정 - null 문자열 설정
         nullStringNode.Value.Value = null;
@@ -134,9 +134,9 @@ public class StringTests
         var canvas = NodeCanvas.Create();
 
         // 2. 노드 추가
-        var startNode = canvas.AddNode<StartNode>(0, 0);
-        var emptyStringNode = canvas.AddNode<ConstantNode<string>>(0, 100);
-        var isNullOrWhiteSpaceNode = canvas.AddNode<StringIsNullOrWhiteSpaceNode>(100, 50);
+        var startNode = canvas.CreateNode<StartNode>(0, 0);
+        var emptyStringNode = canvas.CreateNode<ConstantNode<string>>(0, 100);
+        var isNullOrWhiteSpaceNode = canvas.CreateNode<StringIsNullOrWhiteSpaceNode>(100, 50);
 
         // 3. 노드 설정 - 빈 문자열 설정
         emptyStringNode.Value.Value = "";
@@ -159,9 +159,9 @@ public class StringTests
         var canvas = NodeCanvas.Create();
 
         // 2. 노드 추가
-        var startNode = canvas.AddNode<StartNode>(0, 0);
-        var whiteSpaceStringNode = canvas.AddNode<ConstantNode<string>>(0, 100);
-        var isNullOrWhiteSpaceNode = canvas.AddNode<StringIsNullOrWhiteSpaceNode>(100, 50);
+        var startNode = canvas.CreateNode<StartNode>(0, 0);
+        var whiteSpaceStringNode = canvas.CreateNode<ConstantNode<string>>(0, 100);
+        var isNullOrWhiteSpaceNode = canvas.CreateNode<StringIsNullOrWhiteSpaceNode>(100, 50);
 
         // 3. 노드 설정 - 공백만 있는 문자열 설정
         whiteSpaceStringNode.Value.Value = "   \t\n";
@@ -184,9 +184,9 @@ public class StringTests
         var canvas = NodeCanvas.Create();
 
         // 2. 노드 추가
-        var startNode = canvas.AddNode<StartNode>(0, 0);
-        var stringNode = canvas.AddNode<ConstantNode<string>>(0, 100);
-        var isNullOrWhiteSpaceNode = canvas.AddNode<StringIsNullOrWhiteSpaceNode>(100, 50);
+        var startNode = canvas.CreateNode<StartNode>(0, 0);
+        var stringNode = canvas.CreateNode<ConstantNode<string>>(0, 100);
+        var isNullOrWhiteSpaceNode = canvas.CreateNode<StringIsNullOrWhiteSpaceNode>(100, 50);
 
         // 3. 노드 설정 - 비어있지 않은 문자열 설정
         stringNode.Value.Value = "Hello World";
@@ -209,9 +209,9 @@ public class StringTests
         var canvas = NodeCanvas.Create();
 
         // 2. 노드 추가
-        var startNode = canvas.AddNode<StartNode>(0, 0);
-        var formatNode = canvas.AddNode<StringFormatNode>(100, 50);
-        var param0Node = canvas.AddNode<ConstantNode<string>>(0, 100);
+        var startNode = canvas.CreateNode<StartNode>(0, 0);
+        var formatNode = canvas.CreateNode<StringFormatNode>(100, 50);
+        var param0Node = canvas.CreateNode<ConstantNode<string>>(0, 100);
 
         // 3. 노드 설정
         formatNode.FormatString.Value = "Hello, {0}!";
@@ -246,11 +246,11 @@ public class StringTests
         var canvas = NodeCanvas.Create();
 
         // 2. 노드 추가
-        var startNode = canvas.AddNode<StartNode>(0, 0);
-        var formatNode = canvas.AddNode<StringFormatNode>(100, 50);
-        var param0Node = canvas.AddNode<ConstantNode<string>>(0, 100);
-        var param1Node = canvas.AddNode<ConstantNode<int>>(0, 150);
-        var param2Node = canvas.AddNode<ConstantNode<double>>(0, 200);
+        var startNode = canvas.CreateNode<StartNode>(0, 0);
+        var formatNode = canvas.CreateNode<StringFormatNode>(100, 50);
+        var param0Node = canvas.CreateNode<ConstantNode<string>>(0, 100);
+        var param1Node = canvas.CreateNode<ConstantNode<int>>(0, 150);
+        var param2Node = canvas.CreateNode<ConstantNode<double>>(0, 200);
 
         // 3. 노드 설정
         formatNode.FormatString.Value = "{0}님 안녕하세요! 현재 {1}개의 메시지가 있으며, 평점은 {2:F1}점입니다.";
@@ -289,9 +289,9 @@ public class StringTests
         var canvas = NodeCanvas.Create();
 
         // 2. 노드 추가
-        var startNode = canvas.AddNode<StartNode>(0, 0);
-        var formatNode = canvas.AddNode<StringFormatNode>(100, 50);
-        var param0Node = canvas.AddNode<ConstantNode<string>>(0, 100);
+        var startNode = canvas.CreateNode<StartNode>(0, 0);
+        var formatNode = canvas.CreateNode<StringFormatNode>(100, 50);
+        var param0Node = canvas.CreateNode<ConstantNode<string>>(0, 100);
 
         // 3. 노드 설정 - 잘못된 형식 문자열 설정
         formatNode.FormatString.Value = "오류가 있는 {0} {1 형식 문자열";
@@ -320,9 +320,9 @@ public class StringTests
         var canvas = NodeCanvas.Create();
 
         // 2. 노드 추가
-        var startNode = canvas.AddNode<StartNode>(0, 0);
-        var formatNode = canvas.AddNode<StringFormatNode>(100, 50);
-        var param0Node = canvas.AddNode<ConstantNode<string>>(0, 100);
+        var startNode = canvas.CreateNode<StartNode>(0, 0);
+        var formatNode = canvas.CreateNode<StringFormatNode>(100, 50);
+        var param0Node = canvas.CreateNode<ConstantNode<string>>(0, 100);
 
         // 3. 노드 설정 - 부족한 파라미터 설정
         formatNode.FormatString.Value = "파라미터 0: {0}, 파라미터 1: {1}, 파라미터 2: {2}";

@@ -76,9 +76,9 @@ public class TypeConversionTests
         var canvas = NodeCanvas.Create();
 
         // 2. 노드 추가
-        var startNode = canvas.AddNode<StartNode>(0, 0);
-        var intNode = canvas.AddNode<ConstantNode<int>>(0, 100);
-        var employeeInfoNode = canvas.AddNode<EmployeeInfoNode>(100, 100);
+        var startNode = canvas.CreateNode<StartNode>(0, 0);
+        var intNode = canvas.CreateNode<ConstantNode<int>>(0, 100);
+        var employeeInfoNode = canvas.CreateNode<EmployeeInfoNode>(100, 100);
 
         // 3. 노드 설정 - 정수 값 설정
         intNode.Value.Value = 4001;
@@ -107,9 +107,9 @@ public class TypeConversionTests
         var canvas = NodeCanvas.Create();
 
         // 2. 노드 추가
-        var startNode = canvas.AddNode<StartNode>(0, 0);
-        var stringNode = canvas.AddNode<ConstantNode<string>>(0, 100);
-        var employeeInfoNode = canvas.AddNode<EmployeeInfoNode>(100, 100);
+        var startNode = canvas.CreateNode<StartNode>(0, 0);
+        var stringNode = canvas.CreateNode<ConstantNode<string>>(0, 100);
+        var employeeInfoNode = canvas.CreateNode<EmployeeInfoNode>(100, 100);
 
         // 3. 노드 설정 - JSON 문자열 설정
         var employee = new Employee
@@ -168,9 +168,9 @@ public class TypeConversionTests
         var canvas = NodeCanvas.Create();
 
         // 2. 노드 추가
-        var startNode = canvas.AddNode<StartNode>(0, 0);
-        var stringNode = canvas.AddNode<ConstantNode<string>>(0, 100);
-        var infoNode = canvas.AddNode<StringConstructorInfoNode>(300, 100);
+        var startNode = canvas.CreateNode<StartNode>(0, 0);
+        var stringNode = canvas.CreateNode<ConstantNode<string>>(0, 100);
+        var infoNode = canvas.CreateNode<StringConstructorInfoNode>(300, 100);
 
         // 3. 노드 설정 - 테스트할 문자열 설정
         stringNode.Value.Value = "테스트이름:샘플값:테스트카테고리";
@@ -200,11 +200,11 @@ public class TypeConversionTests
         var canvas = NodeCanvas.Create();
 
         // 2. 노드 추가
-        var startNode = canvas.AddNode<StartNode>(0, 0);
-        var stringNode = canvas.AddNode<ConstantNode<string>>(0, 100);
-        var intNode = canvas.AddNode<ConstantNode<int>>(0, 200);
-        var infoNode1 = canvas.AddNode<ImplicitConversionInfoNode>(300, 100);
-        var infoNode2 = canvas.AddNode<ImplicitConversionInfoNode>(300, 300);
+        var startNode = canvas.CreateNode<StartNode>(0, 0);
+        var stringNode = canvas.CreateNode<ConstantNode<string>>(0, 100);
+        var intNode = canvas.CreateNode<ConstantNode<int>>(0, 200);
+        var infoNode1 = canvas.CreateNode<ImplicitConversionInfoNode>(300, 100);
+        var infoNode2 = canvas.CreateNode<ImplicitConversionInfoNode>(300, 300);
 
         // 3. 노드 설정
         stringNode.Value.Value = "테스트문자열";
@@ -244,11 +244,11 @@ public class TypeConversionTests
         var canvas = NodeCanvas.Create();
 
         // 2. 노드 추가
-        var startNode = canvas.AddNode<StartNode>(0, 0);
-        var stringConstNode = canvas.AddNode<ConstantNode<string>>(0, 100);
-        var conversionNode = canvas.AddNode<ExplicitConversionToStringNode>(200, 100);
-        var stringTestNode = canvas.AddNode<StringTestNode>(400, 50);
-        var intTestNode = canvas.AddNode<IntTestNode>(400, 150);
+        var startNode = canvas.CreateNode<StartNode>(0, 0);
+        var stringConstNode = canvas.CreateNode<ConstantNode<string>>(0, 100);
+        var conversionNode = canvas.CreateNode<ExplicitConversionToStringNode>(200, 100);
+        var stringTestNode = canvas.CreateNode<StringTestNode>(400, 50);
+        var intTestNode = canvas.CreateNode<IntTestNode>(400, 150);
 
         // 3. 노드 설정 - ExplicitConversionType을 생성할 문자열 설정
         var testData = "42";
@@ -265,7 +265,7 @@ public class TypeConversionTests
         
         // 명시적 변환 테스트 (ExplicitConversionType -> string, int)
         // InputPort에 직접 값을 설정하는 대신 상수 노드를 추가하여 연결
-        var explicitTypeNode = canvas.AddNode<ConstantNode<ExplicitConversionType>>(0, 300);
+        var explicitTypeNode = canvas.CreateNode<ConstantNode<ExplicitConversionType>>(0, 300);
         explicitTypeNode.Value.Value = explicitType;
         
         explicitTypeNode.Result.Connect(conversionNode.TypeInput);  // ExplicitConversionType 연결

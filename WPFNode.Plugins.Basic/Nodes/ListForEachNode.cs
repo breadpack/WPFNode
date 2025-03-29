@@ -13,7 +13,7 @@ namespace WPFNode.Plugins.Basic.Nodes
     [NodeName("List.ForEach")]
     [NodeDescription("리스트의 각 항목을 순회합니다.")]
     [NodeCategory("컬렉션")]
-    public class ListForEachNode : DynamicNode
+    public class ListForEachNode : NodeBase
     {
         [NodeFlowIn]
         public IFlowInPort FlowIn { get; set; }

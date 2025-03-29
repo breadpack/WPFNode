@@ -14,7 +14,7 @@ namespace WPFNode.Demo.Nodes
     [NodeName("Excel Input")]
     [NodeCategory("Data")]
     [NodeDescription("엑셀 테이블 데이터를 입력으로 사용하는 노드")]
-    public class ExcelInputNode : DynamicNode, IFlowEntry
+    public class ExcelInputNode : NodeBase, IFlowEntry
     {
         [NodeFlowOut]
         public IFlowOutPort FlowOut { get; set; }
