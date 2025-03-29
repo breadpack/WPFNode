@@ -28,7 +28,7 @@ public class StringTrimNode : NodeBase
     public StringTrimNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) {
     }
 
-    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
+    public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
         FlowExecutionContext? context,
         CancellationToken     cancellationToken
     )

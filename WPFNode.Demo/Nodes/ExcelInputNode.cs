@@ -160,8 +160,8 @@ namespace WPFNode.Demo.Nodes
 
             return Task.FromResult(true);
         }
-        
-        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
+
+        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
             if (_currentRowIndex >= _tableData.Rows.Count)
             {
                 _currentRowIndex = 0;

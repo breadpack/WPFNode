@@ -870,7 +870,7 @@ public class DynamicNode : NodeBase
         _dynamicProperties.Clear();
     }
     
-    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
+    public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
         Models.Execution.FlowExecutionContext? context,
         CancellationToken cancellationToken = default) {
         yield break;

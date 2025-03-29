@@ -70,7 +70,7 @@ public class SelectNode : DynamicNode {
         }
     }
 
-    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
+    public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
         var inputValue = GetInputValue();
         if (inputValue == null) {
             yield return HandleNoMatch();

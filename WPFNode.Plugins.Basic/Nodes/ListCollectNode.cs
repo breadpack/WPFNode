@@ -46,7 +46,7 @@ namespace WPFNode.Plugins.Basic.Nodes {
             _collectedList = Activator.CreateInstance(listType)!;
         }
 
-        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
+        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
             FlowExecutionContext? context,
             CancellationToken     cancellationToken = default
         ) {

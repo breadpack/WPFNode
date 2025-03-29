@@ -47,8 +47,8 @@ namespace WPFNode.Plugins.Basic.Nodes
             _itemInput = builder.Input("항목", elementType);
             _resultOutput = builder.Output("결과", listType);
         }
-        
-        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
+
+        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
             FlowExecutionContext? context,
             CancellationToken cancellationToken = default)
         {

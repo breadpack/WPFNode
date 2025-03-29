@@ -37,7 +37,7 @@ public class StringReplaceNode : NodeBase
         NewValue.Value = "";
     }
 
-    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
+    public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
         FlowExecutionContext? context,
         CancellationToken     cancellationToken
     )

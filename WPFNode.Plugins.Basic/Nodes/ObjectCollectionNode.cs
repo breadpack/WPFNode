@@ -68,8 +68,8 @@ namespace WPFNode.Plugins.Basic.Nodes {
                 _itemInputPorts.Add(inputPort);
             }
         }
-        
-        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
+
+        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
             Models.Execution.FlowExecutionContext? context,
             CancellationToken cancellationToken = default) {
             var targetType = SelectedType.Value;

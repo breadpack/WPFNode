@@ -30,8 +30,8 @@ public class EmployeeArrayElementNode : NodeBase {
     
     
     public EmployeeArrayElementNode(INodeCanvas                                      canvas, Guid guid) : base(canvas, guid) { }
-    
-    protected override IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
+
+    public override IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
         throw new NotImplementedException();
     }
 }

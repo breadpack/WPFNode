@@ -40,7 +40,7 @@ namespace WPFNode.Demo.Nodes
         {
         }
 
-        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
+        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
         {
             var employee = EmployeeInput.GetValueOrDefault(new Employee());
             

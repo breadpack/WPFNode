@@ -5,7 +5,7 @@ using WPFNode.Interfaces;
 
 namespace WPFNode.Models;
 
-public class FlowInPort : IFlowInPort, IFlowNodePort, INotifyPropertyChanged
+public class FlowInPort : IFlowInPort, INotifyPropertyChanged
 {
     private readonly int _index;
     private bool _isVisible = true;
@@ -145,31 +145,5 @@ public class FlowInPort : IFlowInPort, IFlowNodePort, INotifyPropertyChanged
             Name = nameElement.GetString()!;
         if (element.TryGetProperty("IsVisible", out var visibleElement))
             IsVisible = visibleElement.GetBoolean();
-    }
-    
-    /// <summary>
-    /// 이 Flow 입력 포트를 실행합니다. 이 메서드가 호출되면 포트가 속한 노드가 실행됩니다.
-    /// </summary>
-    public void Execute()
-    {
-        // 연결된 노드 실행
-        if (Node is NodeBase nodeBase)
-        {
-            // 노드의 실행 로직을 호출합니다.
-            // 비동기 메서드를 동기적으로 호출하므로 주의해야 합니다.
-            try
-            {
-                // ExecuteAsync를 동기적으로 호출하기 위해 Wait 사용
-                // 실제 프로덕션 환경에서는 안전한 비동기 호출 패턴을 사용하는 것이 좋습니다.
-                nodeBase.ExecuteAsync(CancellationToken.None).Wait();
-            }
-            catch (AggregateException ae)
-            {
-                // 원본 예외 전파
-                if (ae.InnerException != null)
-                    throw ae.InnerException;
-                throw;
-            }
-        }
     }
 }

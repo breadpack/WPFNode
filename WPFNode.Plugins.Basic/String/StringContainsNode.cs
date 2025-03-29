@@ -37,7 +37,7 @@ public class StringContainsNode : NodeBase
         Value.Value = "";
     }
 
-    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
+    public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
         FlowExecutionContext? context,
         CancellationToken     cancellationToken
     )

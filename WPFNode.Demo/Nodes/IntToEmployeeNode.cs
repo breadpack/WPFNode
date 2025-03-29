@@ -30,7 +30,7 @@ namespace WPFNode.Demo.Nodes
         {
         }
 
-        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
+        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
         {
             var id = IdInput.GetValueOrDefault(0);
             // 암시적 변환 연산자를 통해 int -> Employee 변환

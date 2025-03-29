@@ -37,7 +37,7 @@ public class EqualsNode : NodeBase
         InputB.Value = null;
     }
 
-    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
+    public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
         FlowExecutionContext? context,
         CancellationToken     cancellationToken
     )

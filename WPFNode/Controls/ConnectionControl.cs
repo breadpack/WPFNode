@@ -265,18 +265,18 @@ public class ConnectionControl : Control {
         var sourceCenter = GetPortCenterPosition(sourcePort);
         var targetCenter = GetPortCenterPosition(targetPort);
 
-        // Ellipse 가장자리 위치 계산
-        var startPoint = GetPortEdgePosition(sourceCenter, targetCenter);
-        var endPoint   = GetPortEdgePosition(targetCenter, sourceCenter);
+        sourceCenter.Offset(6, 0);
+        targetCenter.Offset(-20, 0);
 
-        // Flow 연결일 경우 곡선 제어점 계산 방식 조정
-        bool isFlow = IsFlowConnection;
+        // Ellipse 가장자리 위치 계산
+        var startPoint = sourceCenter;// GetPortEdgePosition(sourceCenter, targetCenter);
+        var endPoint   = targetCenter; // GetPortEdgePosition(targetCenter, sourceCenter);
 
         // 베지어 곡선의 제어점 계산
         var deltaX = Math.Abs(endPoint.X - startPoint.X);
 
         // Flow 연결은 더 직선에 가깝게 표현
-        var controlOffset = isFlow ? 0.2 : 0.5;
+        var controlOffset = 0.5;
         var controlPoint1 = new Point(startPoint.X + deltaX * controlOffset, startPoint.Y);
         var controlPoint2 = new Point(endPoint.X - deltaX * controlOffset, endPoint.Y);
 

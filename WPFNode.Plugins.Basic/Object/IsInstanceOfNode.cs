@@ -41,7 +41,7 @@ public class IsInstanceOfNode : NodeBase
         TypeName.Value = "System.String";
     }
 
-    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
+    public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
         FlowExecutionContext? context,
         CancellationToken     cancellationToken
     )

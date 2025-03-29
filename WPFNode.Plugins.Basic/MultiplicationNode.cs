@@ -27,8 +27,8 @@ public class MultiplicationNode : NodeBase
     public OutputPort<double> Result { get; set; }
 
     public MultiplicationNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) { }
-    
-    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
+
+    public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
         var a = InputA.GetValueOrDefault(0.0);
         var b = InputB.GetValueOrDefault(0.0);
         Result.Value = a * b;

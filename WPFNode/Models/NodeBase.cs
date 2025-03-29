@@ -371,49 +371,11 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
     }
 
     /// <summary>
-    /// 노드의 레거시 실행 메서드 - 하위 호환성을 위해 유지됩니다.
-    /// 내부적으로 새로운 ExecuteAsyncFlow를 호출합니다.
-    /// </summary>
-    public virtual async Task ExecuteAsync(CancellationToken cancellationToken = default) {
-        Logger?.LogDebug("Executing node {NodeName} (legacy method)", Name);
-        // 기존 코드와의 호환성을 위해 ExecuteAsyncFlow 결과 소비
-        await foreach (var _ in ExecuteAsyncFlow(cancellationToken)) { }
-    }
-    
-    /// <summary>
-    /// 노드를 실행하고 활성화할 FlowOutPort를 yield return으로 순차적으로 반환합니다.
-    /// 이 메서드는 ProcessAsync를 호출하여 결과를 전달합니다.
-    /// </summary>
-    public virtual IAsyncEnumerable<IFlowOutPort> ExecuteAsyncFlow(
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
-    {
-        Logger?.LogDebug("Executing node {NodeName} with IAsyncEnumerable", Name);
-        
-        // ProcessAsync에서 반환된 IAsyncEnumerable을 그대로 전달
-        // 실행 컨텍스트가 없는 경우에는 null로 전달
-        return ProcessAsync(null, cancellationToken);
-    }
-    
-    /// <summary>
-    /// 노드를 실행하고 활성화할 FlowOutPort를 yield return으로 순차적으로 반환합니다.
-    /// 실행 컨텍스트를 활용하여 활성화된 FlowInPort 정보를 사용할 수 있습니다.
-    /// </summary>
-    public virtual IAsyncEnumerable<IFlowOutPort> ExecuteAsyncFlow(
-        Models.Execution.FlowExecutionContext context,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
-    {
-        Logger?.LogDebug("Executing node {NodeName} with context and IAsyncEnumerable", Name);
-        
-        // ProcessAsync에서 반환된 IAsyncEnumerable을 그대로 전달
-        return ProcessAsync(context, cancellationToken);
-    }
-
-    /// <summary>
     /// 노드의 실제 처리 로직을 구현합니다.
     /// 상속받은 클래스에서 반드시 구현해야 합니다.
     /// 이 메서드는 실행 중에 활성화할 FlowOutPort를 순차적으로 yield return해야 합니다.
     /// </summary>
-    protected abstract IAsyncEnumerable<IFlowOutPort> ProcessAsync(
+    public abstract IAsyncEnumerable<IFlowOutPort> ProcessAsync(
         Models.Execution.FlowExecutionContext? context,
         CancellationToken cancellationToken = default);
 

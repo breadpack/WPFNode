@@ -212,7 +212,7 @@ public class FlowExecutionEngine {
             _logger?.LogDebug("Executing node: {NodeId}", nodeId);
             
             // 노드 실행 및 FlowOutPort 즉시 처리 (컨텍스트 전달)
-            await foreach (var flowOutPort in node.ExecuteAsyncFlow(context, cancellationToken).ConfigureAwait(false))
+            await foreach (var flowOutPort in node.ProcessAsync(context, cancellationToken).ConfigureAwait(false))
             {
                 if (cancellationToken.IsCancellationRequested)
                     break;

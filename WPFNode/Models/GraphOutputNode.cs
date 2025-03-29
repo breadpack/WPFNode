@@ -32,7 +32,7 @@ public class GraphOutputNode<T> : NodeBase
 
     public InputPort<T> Input => _input;
 
-    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
+    public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
         if (_parentOutput != null)
         {
             _parentOutput.Value = _input.GetValueOrDefault();

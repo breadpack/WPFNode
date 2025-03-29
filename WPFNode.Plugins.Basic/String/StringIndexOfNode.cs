@@ -48,7 +48,7 @@ public class StringIndexOfNode : NodeBase
         StartIndex.Value = 0;
     }
 
-    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
+    public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
         FlowExecutionContext? context,
         CancellationToken     cancellationToken
     )

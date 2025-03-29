@@ -42,8 +42,8 @@ namespace WPFNode.Tests.Helpers
         {
             Name = "Collection Output";
         }
-        
-        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
+
+        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
         {
             // 모든 출력 포트에 동일한 데이터를 다양한 컬렉션 타입으로 설정
             OutputList.Value = SourceItems.ToList();
@@ -95,8 +95,8 @@ namespace WPFNode.Tests.Helpers
         {
             Name = "Collection Input";
         }
-        
-        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
+
+        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
         {
             // 모든 입력 포트로부터 데이터 수신 및 저장
             if (InputList.IsConnected)
@@ -155,8 +155,8 @@ namespace WPFNode.Tests.Helpers
         {
             Name = "Collection Transform";
         }
-        
-        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
+
+        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
         {
             var source = InputSource.GetValueOrDefault();
             
@@ -196,8 +196,8 @@ namespace WPFNode.Tests.Helpers
         {
             Name = "Collection Validation";
         }
-        
-        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
+
+        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
         {
             var collection = InputCollection.GetValueOrDefault();
             
@@ -233,7 +233,7 @@ namespace WPFNode.Tests.Helpers
 
         public ConstantNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) { }
 
-        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
+        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
             FlowExecutionContext? context,
             CancellationToken     cancellationToken
         )

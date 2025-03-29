@@ -5,7 +5,7 @@ using WPFNode.Interfaces;
 
 namespace WPFNode.Models;
 
-public class FlowOutPort : IFlowOutPort, IFlowNodePort, INotifyPropertyChanged
+public class FlowOutPort : IFlowOutPort, INotifyPropertyChanged
 {
     private readonly List<IConnection> _connections = new();
     private readonly int _index;
@@ -162,20 +162,5 @@ public class FlowOutPort : IFlowOutPort, IFlowNodePort, INotifyPropertyChanged
             Name = nameElement.GetString()!;
         if (element.TryGetProperty("IsVisible", out var visibleElement))
             IsVisible = visibleElement.GetBoolean();
-    }
-    
-    /// <summary>
-    /// 이 Flow 출력 포트를 실행하고 연결된 모든 Flow 입력 포트로 실행 흐름을 전달합니다.
-    /// </summary>
-    public void Execute()
-    {
-        // 연결된 모든 Flow 입력 포트로 실행 흐름 전달
-        foreach (var flowInPort in ConnectedFlowPorts)
-        {
-            if (flowInPort is IFlowNodePort flowNodePort)
-            {
-                flowNodePort.Execute();
-            }
-        }
     }
 }

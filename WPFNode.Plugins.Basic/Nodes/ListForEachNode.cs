@@ -49,8 +49,8 @@ namespace WPFNode.Plugins.Basic.Nodes
             _listInput = builder.Input("리스트", listType);
             _currentItem = builder.Output("현재 항목", elementType);
         }
-        
-        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
+
+        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
             FlowExecutionContext? context,
             CancellationToken cancellationToken = default)
         {

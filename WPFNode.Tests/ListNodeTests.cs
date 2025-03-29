@@ -33,8 +33,8 @@ namespace WPFNode.Tests
             : base(canvas, id)
         {
         }
-        
-        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
+
+        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
             FlowExecutionContext? context,
             CancellationToken cancellationToken)
         {
@@ -71,8 +71,8 @@ namespace WPFNode.Tests
             : base(canvas, id)
         {
         }
-        
-        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
+
+        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
             FlowExecutionContext? context,
             CancellationToken cancellationToken)
         {
@@ -107,8 +107,8 @@ namespace WPFNode.Tests
         {
             Name = "ListHashOutput";
         }
-        
-        protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
+
+        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
             FlowExecutionContext? context,
             CancellationToken cancellationToken = default)
         {

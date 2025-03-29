@@ -41,7 +41,7 @@ public class ToStringNode : NodeBase
         NullRepresentation.Value = "(null)";
     }
 
-    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
+    public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
         FlowExecutionContext? context,
         CancellationToken     cancellationToken
     )

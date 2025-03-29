@@ -98,7 +98,7 @@ public class SubCanvasNode : NodeBase
         return outputNode;
     }
 
-    protected override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
+    public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
         await _innerCanvas.ExecuteAsync(cancellationToken);
         yield return FlowOut;
     }

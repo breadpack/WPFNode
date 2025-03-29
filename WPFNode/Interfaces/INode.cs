@@ -21,12 +21,10 @@ public interface INode : INotifyPropertyChanged, IJsonSerializable
     IReadOnlyList<IFlowOutPort>  FlowOutPorts { get; }
     IReadOnlyList<INodeProperty> Properties  { get; }
     
-    Task ExecuteAsync(CancellationToken cancellationToken = default);
-    
-    /// <summary>
-    /// 노드를 실행하고 활성화할 FlowOutPort를 yield return으로 순차적으로 반환합니다.
-    /// </summary>
-    IAsyncEnumerable<IFlowOutPort> ExecuteAsyncFlow([EnumeratorCancellation] CancellationToken cancellationToken = default);
     bool CanExecuteCommand(string commandName, object? parameter = null);
     void ExecuteCommand(string commandName, object? parameter = null);
+
+    IAsyncEnumerable<IFlowOutPort> ProcessAsync(
+        Models.Execution.FlowExecutionContext? context,
+        CancellationToken                      cancellationToken = default);
 }
