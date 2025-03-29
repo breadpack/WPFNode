@@ -7,5 +7,4 @@ public interface IInputPort<T> : IInputPort {
 public interface IInputPort : IPort {
     bool        CanAcceptType(Type  type);
     IConnection Connect(IOutputPort source);
-    void        Disconnect();
 }

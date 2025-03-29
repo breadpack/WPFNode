@@ -100,11 +100,6 @@ public class TableOutputNode : NodeBase, IDisposable {
     private void ReconfigureInputPorts() {
         if (_targetType == null) return;
         
-        foreach(var property in _columnProperties)
-        {
-            // 기존 포트 제거
-            Remove(property);
-        }
         _columnProperties.Clear();
 
         // 타입의 public 프로퍼티들을 입력 포트로 생성

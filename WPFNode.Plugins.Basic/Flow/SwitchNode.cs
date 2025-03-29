@@ -110,24 +110,10 @@ public class SwitchNode : NodeBase {
         // 2. 케이스 프로퍼티 구성
         var targetCount = Math.Max(1, CaseCount?.Value ?? 3);
 
-        // 기존 Case 프로퍼티 수집
-        var existingProps = Properties
-                            .Where(p => p.Name.StartsWith("Case_"))
-                            .OrderBy(p => {
-                                // Case_0, Case_1 등으로 정렬하기 위한 인덱스 추출
-                                string indexStr = p.Name.Substring("Case_".Length);
-                                if (int.TryParse(indexStr, out int index))
-                                    return index;
-                                return int.MaxValue;
-                            })
-                            .ToList();
-
         // 필요한 수만큼 케이스 프로퍼티 생성/수정
         for (int i = 0; i < targetCount; i++) {
             // 기존 프로퍼티 사용 또는 새로 생성
-            var prop = i < existingProps.Count
-                           ? existingProps[i]
-                           : builder.Property<object>($"Case_{i}", $"케이스 {i}");
+            var prop = builder.Property<object>($"Case_{i}", $"케이스 {i}");
 
             // 비어있으면 기본값 설정
             if (prop.Value == null) {
@@ -144,11 +130,6 @@ public class SwitchNode : NodeBase {
                 var portName = $"Case {prop.Value}";
                 _flowOutPorts[prop.Name] = builder.FlowOut(portName);
             }
-        }
-
-        // 초과 프로퍼티 제거
-        for (int i = targetCount; i < existingProps.Count; i++) {
-            Remove(existingProps[i]);
         }
     }
 

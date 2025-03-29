@@ -15,4 +15,5 @@ public interface IPort : INotifyPropertyChanged, IJsonSerializable {
     void                       AddConnection(IConnection    connection);
     void                       RemoveConnection(IConnection connection);
     int                        GetPortIndex();
+    void                       Disconnect();
 }

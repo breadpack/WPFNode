@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -11,55 +12,130 @@ using Microsoft.Extensions.Logging;
 
 namespace WPFNode.Models;
 
+/// <summary>
+/// 모든 노드의 공통 기본 기능을 제공하는 추상 클래스입니다.
+/// </summary>
+
 public abstract class NodeBase : INode, INotifyPropertyChanged {
-    private            string              _id   = string.Empty;
-    private            string              _name = string.Empty;
-    private            string              _category = string.Empty;
-    private            string              _description = string.Empty;
-    private            double              _x;
-    private            double              _y;
-    private            bool                _isVisible   = true;
-    private readonly   List<IInputPort>    _inputPorts  = new();
-    private readonly   List<IOutputPort>   _outputPorts = new();
-    private readonly   List<IFlowInPort>   _flowInPorts = new();
-    private readonly   List<IFlowOutPort>  _flowOutPorts = new();
-    private readonly   List<INodeProperty> _properties  = new();
-    private            bool                _isInitialized;
-    private readonly   INodeCanvas         _canvas;
-    protected readonly ILogger?            Logger;
-
-    // DynamicNode에서 통합된 필드
-    private bool                _isReconfiguring   = false;
-    private List<IPort>         _dynamicPorts      = new();
-    private List<INodeProperty> _dynamicProperties = new();
+    // 기본 속성
+    private string     _id          = string.Empty;
+    private string     _name        = string.Empty;
+    private string     _category    = string.Empty;
+    private string     _description = string.Empty;
+    private double     _x;
+    private double     _y;
+    private bool       _isVisible   = true;
+    private bool       _isInitialized;
+    private bool       _isReconfiguring = false;
     
-    /// <summary>
-    /// 현재 구성 중 사용된 포트와 프로퍼티를 추적합니다.
-    /// </summary>
-    private HashSet<object>     _usedObjects = new();
+    // 포트 컬렉션
+    private readonly List<IInputPort>    _inputPorts   = new();
+    private readonly List<IOutputPort>   _outputPorts  = new();
+    private readonly List<IFlowInPort>   _flowInPorts  = new();
+    private readonly List<IFlowOutPort>  _flowOutPorts = new();
+    private readonly List<INodeProperty> _properties   = new();
+    
+    // 동적 요소 추적
+    private readonly HashSet<IPort>         _dynamicPorts      = new();
+    private readonly HashSet<INodeProperty> _dynamicProperties = new();
+    private readonly HashSet<object>        _usedObjects       = new();
+    
+    // 종속성
+    private readonly INodeCanvas _canvas;
+    protected readonly ILogger? Logger;
+    
+    // 이벤트 최적화를 위한 필드
+    private bool _isBatchUpdating;
+    private readonly HashSet<string> _pendingPropertyChanges = new();
+    
+    // 타입 정보 캐싱
+    private static readonly ConcurrentDictionary<Type, NodeTypeInfo> _typeInfoCache = new();
 
     /// <summary>
-    /// 노드가 현재 재구성 중인지 여부를 나타냅니다.
+    /// 기본 생성자입니다. JSON 직렬화에서 사용됩니다.
     /// </summary>
-    public bool IsReconfiguring => _isReconfiguring;
-
     [JsonConstructor]
     protected NodeBase(INodeCanvas canvas, Guid guid, ILogger? logger = null) {
         _canvas = canvas ?? throw new ArgumentNullException(nameof(canvas));
         Guid    = guid;
         Logger  = logger;
 
-        // 어트리뷰트에서 직접 값을 가져옴
-        var type            = GetType();
-        var nameAttr        = type.GetCustomAttribute<NodeNameAttribute>();
-        var categoryAttr    = type.GetCustomAttribute<NodeCategoryAttribute>();
-        var descriptionAttr = type.GetCustomAttribute<NodeDescriptionAttribute>();
+        // 타입 정보 캐시에서 기본 속성 정보 가져오기
+        var typeInfo = GetTypeInfo();
+        _name = typeInfo.Name;
+        _category = typeInfo.Category;
+        _description = typeInfo.Description;
 
-        _name        = nameAttr?.Name ?? type.Name;
-        _category    = categoryAttr?.Category ?? "Basic";
-        _description = descriptionAttr?.Description ?? string.Empty;
-
+        // 포트와 프로퍼티 초기화
         InitializeFromAttributes();
+    }
+    
+    /// <summary>
+    /// 현재 노드 타입의 캐시된 메타데이터 정보를 반환합니다.
+    /// </summary>
+    private NodeTypeInfo GetTypeInfo() {
+        var type = GetType();
+        return _typeInfoCache.GetOrAdd(type, t => new NodeTypeInfo(t));
+    }
+    
+    /// <summary>
+    /// 노드 타입에 대한 메타데이터를 캐싱하는 클래스입니다.
+    /// </summary>
+    private class NodeTypeInfo {
+        public string Name { get; }
+        public string Category { get; }
+        public string Description { get; }
+        public List<PropertyInfo> InputPortProperties { get; } = new();
+        public List<PropertyInfo> OutputPortProperties { get; } = new();
+        public List<PropertyInfo> FlowInPortProperties { get; } = new();
+        public List<PropertyInfo> FlowOutPortProperties { get; } = new();
+        public List<PropertyInfo> NodePropertyProperties { get; } = new();
+        
+        // 캐시된 모든 포트 관련 프로퍼티
+        private List<PropertyInfo>? _allPortRelatedProperties;
+        
+        public NodeTypeInfo(Type type) {
+            // 어트리뷰트와 프로퍼티 정보 한 번만 조회하여 저장
+            var nameAttr = type.GetCustomAttribute<NodeNameAttribute>();
+            var categoryAttr = type.GetCustomAttribute<NodeCategoryAttribute>();
+            var descAttr = type.GetCustomAttribute<NodeDescriptionAttribute>();
+            
+            Name = nameAttr?.Name ?? type.Name;
+            Category = categoryAttr?.Category ?? "Basic";
+            Description = descAttr?.Description ?? string.Empty;
+            
+            // 포트/프로퍼티 관련 프로퍼티 정보 분류
+            foreach (var prop in type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)) {
+                if (prop.GetCustomAttribute<NodeInputAttribute>() != null)
+                    InputPortProperties.Add(prop);
+                else if (prop.GetCustomAttribute<NodeOutputAttribute>() != null)
+                    OutputPortProperties.Add(prop);
+                else if (prop.GetCustomAttribute<NodeFlowInAttribute>() != null)
+                    FlowInPortProperties.Add(prop);
+                else if (prop.GetCustomAttribute<NodeFlowOutAttribute>() != null)
+                    FlowOutPortProperties.Add(prop);
+                else if (prop.GetCustomAttribute<NodePropertyAttribute>() != null)
+                    NodePropertyProperties.Add(prop);
+            }
+        }
+        
+        /// <summary>
+        /// 모든 포트 관련 프로퍼티를 반환합니다.
+        /// </summary>
+        public List<PropertyInfo> GetAllPortRelatedProperties() {
+            // 캐시된 값이 있으면 반환
+            if (_allPortRelatedProperties != null)
+                return _allPortRelatedProperties;
+                
+            // 모든 포트 관련 프로퍼티 수집
+            _allPortRelatedProperties = new List<PropertyInfo>();
+            _allPortRelatedProperties.AddRange(InputPortProperties);
+            _allPortRelatedProperties.AddRange(OutputPortProperties);
+            _allPortRelatedProperties.AddRange(FlowInPortProperties);
+            _allPortRelatedProperties.AddRange(FlowOutPortProperties);
+            
+            return _allPortRelatedProperties;
+        }
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -152,45 +228,35 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         return port;
     }
 
+    /// <summary>
+    /// 제네릭 타입의 노드 프로퍼티를 생성합니다.
+    /// </summary>
     internal NodeProperty<T> CreateProperty<T>(
         string  name,
         string  displayName,
         string? format           = null,
         bool    canConnectToPort = false
     ) {
-        if(_properties.Exists(p => p.Name == name))
-            throw new InvalidOperationException($"Property with name '{name}' already exists.");
-        
-        var property = new NodeProperty<T>(
-            name,
-            displayName,
-            this,
-            _inputPorts.Count,
-            format,
-            canConnectToPort);
-        
-        _properties.Add(property);
-
-        // 프로퍼티 변경 이벤트 구독
-        if (property is INotifyPropertyChanged notifyPropertyChanged) {
-            notifyPropertyChanged.PropertyChanged += (s, e) => {
-                if (e.PropertyName == nameof(INodeProperty.CanConnectToPort)) {
-                    UpdatePropertyPortVisibility(name, property);
-                }
-            };
-        }
-
-        // 항상 InputPort로 등록
-        if (property is IInputPort inputPort) {
-            _inputPorts.Add(inputPort);
-            OnPropertyChanged(nameof(InputPorts));
-        }
-
-        OnPropertyChanged(nameof(Properties));
-        return property;
+        return (NodeProperty<T>)CreatePropertyInternal(name, displayName, typeof(T), format, canConnectToPort);
     }
 
+    /// <summary>
+    /// 지정된 타입의 노드 프로퍼티를 생성합니다.
+    /// </summary>
     internal INodeProperty CreateProperty(
+        string  name,
+        string  displayName,
+        Type    type,
+        string? format           = null,
+        bool    canConnectToPort = false
+    ) {
+        return CreatePropertyInternal(name, displayName, type, format, canConnectToPort);
+    }
+
+    /// <summary>
+    /// 내부 프로퍼티 생성 로직. 중복 코드를 제거하기 위한 공통 메서드입니다.
+    /// </summary>
+    private INodeProperty CreatePropertyInternal(
         string  name,
         string  displayName,
         Type    type,
@@ -200,6 +266,7 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         if(_properties.Exists(p => p.Name == name && p.PropertyType == type))
             throw new InvalidOperationException($"Property with name '{name}' already exists.");
         
+        // 프로퍼티 인스턴스 생성
         var property = (INodeProperty)Activator.CreateInstance(
             typeof(NodeProperty<>).MakeGenericType(type),
             name, displayName, this, _inputPorts.Count, format, canConnectToPort)!;
@@ -210,7 +277,10 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         if (property is INotifyPropertyChanged notifyPropertyChanged) {
             notifyPropertyChanged.PropertyChanged += (s, e) => {
                 if (e.PropertyName == nameof(INodeProperty.CanConnectToPort)) {
-                    UpdatePropertyPortVisibility(name, property);
+                    // InputPort인 경우 InputPorts 변경 알림
+                    if (property is IInputPort) {
+                        OnPropertyChanged(nameof(InputPorts));
+                    }
                 }
             };
         }
@@ -223,12 +293,6 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
 
         OnPropertyChanged(nameof(Properties));
         return property;
-    }
-
-    private void UpdatePropertyPortVisibility(string propertyName, INodeProperty property) {
-        if (property is IInputPort inputPort) {
-            OnPropertyChanged(nameof(InputPorts));
-        }
     }
 
     internal void RemoveInputPort(IInputPort port) {
@@ -282,15 +346,59 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         OnPropertyChanged(nameof(Properties));
     }
 
+    /// <summary>
+    /// 프로퍼티 변경 이벤트를 발생시킵니다.
+    /// 일괄 업데이트 중이면 변경사항을 저장했다가 나중에 한 번에 처리합니다.
+    /// </summary>
     protected void OnPropertyChanged([CallerMemberName] string? propertyName = null) {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        if (propertyName == null) 
+            return;
+            
+        if (_isBatchUpdating) {
+            _pendingPropertyChanges.Add(propertyName);
+        }
+        else {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+    
+    /// <summary>
+    /// 여러 변경사항을 일괄 처리하기 위한 메서드입니다.
+    /// 액션 내에서 발생하는 모든 프로퍼티 변경 이벤트가 한 번에 처리됩니다.
+    /// </summary>
+    protected void BatchUpdate(Action action) {
+        if (_isBatchUpdating) {
+            // 이미 일괄 업데이트 중이면 바로 실행
+            action();
+            return;
+        }
+        
+        _isBatchUpdating = true;
+        _pendingPropertyChanges.Clear();
+        
+        try {
+            action();
+        }
+        finally {
+            _isBatchUpdating = false;
+            
+            // 모든 변경사항에 대한 이벤트 발생
+            foreach (var prop in _pendingPropertyChanges) {
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
+            }
+            
+            _pendingPropertyChanges.Clear();
+        }
     }
 
-    protected bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null) {
-        if (EqualityComparer<T>.Default.Equals(field, value)) return false;
+    /// <summary>
+    /// 필드 값을 설정하고 변경 시 프로퍼티 변경 이벤트를 발생시킵니다.
+    /// </summary>
+    protected void SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null) {
+        if (EqualityComparer<T>.Default.Equals(field, value))
+            return;
         field = value;
         OnPropertyChanged(propertyName);
-        return true;
     }
 
     public virtual bool CanExecuteCommand(string commandName, object? parameter = null) {
@@ -324,49 +432,45 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         return copy;
     }
 
-    private void RegisterInputPort(IInputPort port) {
+    /// <summary>
+    /// 모든 포트 타입을 등록하는 제네릭 메서드입니다.
+    /// </summary>
+    private void RegisterPort<T>(T port, List<T> collection, [CallerMemberName] string? propertyName = null) {
         if (port == null)
             throw new ArgumentNullException(nameof(port));
-        _inputPorts.Add(port);
-        OnPropertyChanged(nameof(InputPorts));
+        collection.Add(port);
+        OnPropertyChanged(propertyName);
     }
 
-    private void RegisterOutputPort(IOutputPort port) {
-        if (port == null)
-            throw new ArgumentNullException(nameof(port));
-        _outputPorts.Add(port);
-        OnPropertyChanged(nameof(OutputPorts));
-    }
-
-    internal void RemoveFlowInPort(IFlowInPort port) {
-        if (_flowInPorts.Contains(port)) {
+    /// <summary>
+    /// 모든 포트 타입을 제거하는 제네릭 메서드입니다.
+    /// </summary>
+    private void RemovePort<T>(T port, List<T> collection, [CallerMemberName] string? propertyName = null) where T : IPort {
+        if (collection.Contains(port)) {
             port.Disconnect();
-            _flowInPorts.Remove(port);
-            OnPropertyChanged(nameof(FlowInPorts));
+            collection.Remove(port);
+            OnPropertyChanged(propertyName);
         }
     }
+    
+    // 특정 포트 타입을 위한 래퍼 메서드들
+    private void RegisterInputPort(IInputPort port) => 
+        RegisterPort(port, _inputPorts, nameof(InputPorts));
 
-    internal void RemoveFlowOutPort(IFlowOutPort port) {
-        if (_flowOutPorts.Contains(port)) {
-            port.Disconnect();
-            _flowOutPorts.Remove(port);
-            OnPropertyChanged(nameof(FlowOutPorts));
-        }
-    }
+    private void RegisterOutputPort(IOutputPort port) => 
+        RegisterPort(port, _outputPorts, nameof(OutputPorts));
 
-    private void RegisterFlowInPort(IFlowInPort port) {
-        if (port == null)
-            throw new ArgumentNullException(nameof(port));
-        _flowInPorts.Add(port);
-        OnPropertyChanged(nameof(FlowInPorts));
-    }
+    private void RegisterFlowInPort(IFlowInPort port) => 
+        RegisterPort(port, _flowInPorts, nameof(FlowInPorts));
 
-    private void RegisterFlowOutPort(IFlowOutPort port) {
-        if (port == null)
-            throw new ArgumentNullException(nameof(port));
-        _flowOutPorts.Add(port);
-        OnPropertyChanged(nameof(FlowOutPorts));
-    }
+    private void RegisterFlowOutPort(IFlowOutPort port) => 
+        RegisterPort(port, _flowOutPorts, nameof(FlowOutPorts));
+
+    internal void RemoveFlowInPort(IFlowInPort port) => 
+        RemovePort(port, _flowInPorts, nameof(FlowInPorts));
+
+    internal void RemoveFlowOutPort(IFlowOutPort port) => 
+        RemovePort(port, _flowOutPorts, nameof(FlowOutPorts));
 
     protected void ClearPorts() {
         _inputPorts.Clear();
@@ -385,9 +489,14 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         }
     }
 
+    /// <summary>
+    /// 노드의 모든 포트와 프로퍼티를 초기화합니다.
+    /// </summary>
     protected void ResetNode() {
-        ClearPorts();
-        ClearProperties();
+        BatchUpdate(() => {
+            ClearPorts();
+            ClearProperties();
+        });
     }
 
     /// <summary>
@@ -978,68 +1087,54 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
     /// </summary>
     private void CleanupUnusedElements()
     {
-        // 제거할 동적 프로퍼티 목록 생성
-        var propsToRemove = _dynamicProperties
-            .Where(p => !_usedObjects.Contains(p))
-            .ToList();
-            
-        // 동적 프로퍼티 제거
-        foreach (var prop in propsToRemove)
-        {
-            RemoveProperty(prop);
-        }
+        // 제거할 요소들 식별
+        var unusedProperties = _dynamicProperties.Where(p => !_usedObjects.Contains(p)).ToList();
+        var unusedPorts = _dynamicPorts.Where(p => !_usedObjects.Contains(p)).ToList();
         
-        // 제거할 동적 입력 포트 목록 생성
-        var inputPortsToRemove = _dynamicPorts
-            .OfType<IInputPort>()
-            .Where(p => !_usedObjects.Contains(p))
-            .ToList();
-            
-        // 동적 입력 포트 제거
-        foreach (var port in inputPortsToRemove)
-        {
-            RemoveInputPort(port);
-        }
+        // 빠른 종료 조건
+        if (unusedProperties.Count == 0 && unusedPorts.Count == 0)
+            return;
         
-        // 제거할 동적 출력 포트 목록 생성
-        var outputPortsToRemove = _dynamicPorts
-            .OfType<IOutputPort>()
-            .Where(p => !_usedObjects.Contains(p))
-            .ToList();
+        // 일괄 업데이트 모드로 이벤트 최적화
+        BatchUpdate(() => {
+            // 사용되지 않는 동적 프로퍼티 제거
+            foreach (var prop in unusedProperties)
+            {
+                RemoveProperty(prop);
+            }
             
-        // 동적 출력 포트 제거
-        foreach (var port in outputPortsToRemove)
-        {
-            RemoveOutputPort(port);
-        }
-        
-        // 제거할 동적 FlowIn 포트 목록 생성
-        var flowInPortsToRemove = _dynamicPorts
-            .OfType<FlowInPort>()
-            .Where(p => !_usedObjects.Contains(p))
-            .ToList();
+            // 사용되지 않는 동적 포트 제거 (타입별로 처리)
+            foreach (var port in unusedPorts)
+            {
+                RemovePortByType(port);
+            }
             
-        // 동적 FlowIn 포트 제거
-        foreach (var port in flowInPortsToRemove)
+            // 동적 포트 및 프로퍼티 목록 정리
+            _dynamicPorts.RemoveWhere(p => !_usedObjects.Contains(p));
+            _dynamicProperties.RemoveWhere(p => !_usedObjects.Contains(p));
+        });
+    }
+    
+    /// <summary>
+    /// 포트 타입에 따라 적절한 제거 메서드를 호출합니다.
+    /// </summary>
+    private void RemovePortByType(IPort port)
+    {
+        switch (port)
         {
-            RemoveFlowInPort(port);
+            case FlowInPort flowInPort:
+                RemoveFlowInPort(flowInPort);
+                break;
+            case IInputPort inputPort:
+                RemoveInputPort(inputPort);
+                break;
+            case FlowOutPort flowOutPort:
+                RemoveFlowOutPort(flowOutPort);
+                break;
+            case IOutputPort outputPort:
+                RemoveOutputPort(outputPort);
+                break;
         }
-        
-        // 제거할 동적 FlowOut 포트 목록 생성
-        var flowOutPortsToRemove = _dynamicPorts
-            .OfType<FlowOutPort>()
-            .Where(p => !_usedObjects.Contains(p))
-            .ToList();
-            
-        // 동적 FlowOut 포트 제거
-        foreach (var port in flowOutPortsToRemove)
-        {
-            RemoveFlowOutPort(port);
-        }
-        
-        // 동적 포트 및 프로퍼티 목록 정리
-        _dynamicPorts.RemoveAll(p => !_usedObjects.Contains(p));
-        _dynamicProperties.RemoveAll(p => !_usedObjects.Contains(p));
     }
 
     /// <summary>
@@ -1098,13 +1193,11 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         }
         
         /// <summary>
-        /// 제네릭 타입의 입력 포트를 추가합니다.
+        /// 포트를 추가하는 공통 로직을 처리하는 내부 메서드입니다.
+        /// 기존 포트를 재사용하거나 새 포트를 생성합니다.
         /// </summary>
-        public InputPort<T> Input<T>(string name)
+        private T AddPortCommon<T>(T? existingPort, Func<T> createPort) where T : IPort
         {
-            // 기존 포트 검색
-            var existingPort = _node.InputPorts.OfType<InputPort<T>>().FirstOrDefault(p => p.Name == name);
-            
             if (existingPort != null)
             {
                 // 기존 포트가 있으면 사용된 것으로 표시하고 반환
@@ -1117,204 +1210,66 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
             }
             
             // 없으면 새로 생성하고 사용된 것으로 표시
-            var port = _node.AddInputPort<T>(name);
+            var port = createPort();
             _node._usedObjects.Add(port);
             _addedPorts.Add(port);
             return port;
         }
+
+        /// <summary>
+        /// 제네릭 타입의 입력 포트를 추가합니다.
+        /// </summary>
+        public InputPort<T> Input<T>(string name) =>
+            AddPortCommon(
+                _node.InputPorts.OfType<InputPort<T>>().FirstOrDefault(p => p.Name == name),
+                () => _node.AddInputPort<T>(name));
         
         /// <summary>
         /// 특정 타입의 입력 포트를 추가합니다.
         /// </summary>
-        public IInputPort Input(string name, Type type)
-        {
-            // 기존 포트 검색
-            var existingPort = _node.InputPorts.FirstOrDefault(p => p.Name == name && p.DataType == type);
-            
-            if (existingPort != null)
-            {
-                // 기존 포트가 있으면 사용된 것으로 표시하고 반환
-                _node._usedObjects.Add(existingPort);
-                
-                if (!_addedPorts.Contains(existingPort))
-                    _addedPorts.Add(existingPort);
-                    
-                return existingPort;
-            }
-            
-            // 없으면 새로 생성하고 사용된 것으로 표시
-            var port = _node.AddInputPort(name, type);
-            _node._usedObjects.Add(port);
-            _addedPorts.Add(port);
-            return port;
-        }
+        public IInputPort Input(string name, Type type) =>
+            AddPortCommon(
+                _node.InputPorts.FirstOrDefault(p => p.Name == name && p.DataType == type),
+                () => _node.AddInputPort(name, type));
         
         /// <summary>
         /// 제네릭 타입의 출력 포트를 추가합니다.
         /// </summary>
-        public OutputPort<T> Output<T>(string name)
-        {
-            // 기존 포트 검색
-            var existingPort = _node.OutputPorts.OfType<OutputPort<T>>().FirstOrDefault(p => p.Name == name);
-            
-            if (existingPort != null)
-            {
-                // 기존 포트가 있으면 사용된 것으로 표시하고 반환
-                _node._usedObjects.Add(existingPort);
-                
-                if (!_addedPorts.Contains(existingPort))
-                    _addedPorts.Add(existingPort);
-                    
-                return existingPort;
-            }
-            
-            // 없으면 새로 생성하고 사용된 것으로 표시
-            var port = _node.AddOutputPort<T>(name);
-            _node._usedObjects.Add(port);
-            _addedPorts.Add(port);
-            return port;
-        }
+        public OutputPort<T> Output<T>(string name) => 
+            AddPortCommon(
+                _node.OutputPorts.OfType<OutputPort<T>>().FirstOrDefault(p => p.Name == name),
+                () => _node.AddOutputPort<T>(name));
         
         /// <summary>
         /// 특정 타입의 출력 포트를 추가합니다.
         /// </summary>
-        public IOutputPort Output(string name, Type type)
-        {
-            // 기존 포트 검색
-            var existingPort = _node.OutputPorts.FirstOrDefault(p => p.Name == name && p.DataType == type);
-            
-            if (existingPort != null)
-            {
-                // 기존 포트가 있으면 사용된 것으로 표시하고 반환
-                _node._usedObjects.Add(existingPort);
-                
-                if (!_addedPorts.Contains(existingPort))
-                    _addedPorts.Add(existingPort);
-                    
-                return existingPort;
-            }
-            
-            // 없으면 새로 생성하고 사용된 것으로 표시
-            var port = _node.AddOutputPort(name, type);
-            _node._usedObjects.Add(port);
-            _addedPorts.Add(port);
-            return port;
-        }
+        public IOutputPort Output(string name, Type type) =>
+            AddPortCommon(
+                _node.OutputPorts.FirstOrDefault(p => p.Name == name && p.DataType == type),
+                () => _node.AddOutputPort(name, type));
         
         /// <summary>
         /// Flow 입력 포트를 추가합니다.
         /// </summary>
-        public FlowInPort FlowIn(string name)
-        {
-            // 기존 포트 검색
-            var existingPort = _node.FlowInPorts.OfType<FlowInPort>().FirstOrDefault(p => p.Name == name);
-            
-            if (existingPort != null)
-            {
-                // 기존 포트가 있으면 사용된 것으로 표시하고 반환
-                _node._usedObjects.Add(existingPort);
-                
-                if (!_addedPorts.Contains(existingPort))
-                    _addedPorts.Add(existingPort);
-                    
-                return existingPort;
-            }
-            
-            // 없으면 새로 생성하고 사용된 것으로 표시
-            var port = _node.AddFlowInPort(name);
-            _node._usedObjects.Add(port);
-            _addedPorts.Add(port);
-            return port;
-        }
+        public FlowInPort FlowIn(string name) =>
+            AddPortCommon(
+                _node.FlowInPorts.OfType<FlowInPort>().FirstOrDefault(p => p.Name == name),
+                () => _node.AddFlowInPort(name));
         
         /// <summary>
         /// Flow 출력 포트를 추가합니다.
         /// </summary>
-        public FlowOutPort FlowOut(string name)
-        {
-            // 기존 포트 검색
-            var existingPort = _node.FlowOutPorts.OfType<FlowOutPort>().FirstOrDefault(p => p.Name == name);
-            
-            if (existingPort != null)
-            {
-                // 기존 포트가 있으면 사용된 것으로 표시하고 반환
-                _node._usedObjects.Add(existingPort);
-                
-                if (!_addedPorts.Contains(existingPort))
-                    _addedPorts.Add(existingPort);
-                    
-                return existingPort;
-            }
-            
-            // 없으면 새로 생성하고 사용된 것으로 표시
-            var port = _node.AddFlowOutPort(name);
-            _node._usedObjects.Add(port);
-            _addedPorts.Add(port);
-            return port;
-        }
-        
+        public FlowOutPort FlowOut(string name) =>
+            AddPortCommon(
+                _node.FlowOutPorts.OfType<FlowOutPort>().FirstOrDefault(p => p.Name == name),
+                () => _node.AddFlowOutPort(name));
+
         /// <summary>
-        /// 프로퍼티를 추가합니다.
+        /// 일반 타입의 프로퍼티를 추가합니다.
         /// </summary>
-        public NodeProperty<T> Property<T>(string name, string displayName, 
-                                          string? format = null, 
-                                          bool canConnectToPort = false,
-                                          Action<T>? onValueChanged = null)
-        {
-            // 기존 프로퍼티 검색
-            var existingProp = _node.Properties.OfType<NodeProperty<T>>().FirstOrDefault(p => p.Name == name);
-            
-            if (existingProp != null)
-            {
-                // 기존 프로퍼티의 값을 저장
-                var existingValue = existingProp.Value;
-                var existingCanConnectToPort = existingProp.CanConnectToPort;
-                
-                // 값 변경 이벤트 핸들러 업데이트
-                if (onValueChanged != null)
-                {
-                    // 기존 이벤트 핸들러 제거
-                    existingProp.PropertyChanged -= (s, e) => {
-                        if (e.PropertyName == nameof(NodeProperty<T>.Value) && !_node._isReconfiguring)
-                            onValueChanged(existingProp.Value);
-                    };
-                    
-                    // 새로운 이벤트 핸들러 추가
-                    existingProp.PropertyChanged += (s, e) => {
-                        if (e.PropertyName == nameof(NodeProperty<T>.Value) && !_node._isReconfiguring)
-                            onValueChanged(existingProp.Value);
-                    };
-                }
-                
-                // 기존 값을 복원
-                existingProp.Value = existingValue;
-                existingProp.CanConnectToPort = canConnectToPort;
-                
-                // 사용된 것으로 표시
-                _node._usedObjects.Add(existingProp);
-                return existingProp;
-            }
-            
-            // 새로 생성하고 사용된 것으로 표시
-            var prop = _node.AddProperty<T>(name, displayName, format, canConnectToPort);
-            _node._usedObjects.Add(prop);
-            
-            // 값 변경 이벤트 연결 - 재구성 중이 아닐 때만 콜백 실행
-            if (onValueChanged != null)
-            {
-                prop.PropertyChanged += (s, e) => {
-                    if (e.PropertyName == nameof(NodeProperty<T>.Value) && !_node._isReconfiguring)
-                        onValueChanged(prop.Value);
-                };
-            }
-            
-            return prop;
-        }
-        
-        public INodeProperty Property(string name, string displayName, 
-                                          Type type, string? format = null, 
-                                          bool canConnectToPort = false)
-        {
+        public INodeProperty Property(string name, string  displayName, 
+                                      Type   type, string? format = null, 
+                                      bool   canConnectToPort = false) {
             // 기존 프로퍼티 검색
             var existingProp = _node.Properties.FirstOrDefault(p => p.Name == name && p.PropertyType == type);
             
@@ -1330,73 +1285,44 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
             _node._usedObjects.Add(prop);
             return prop;
         }
-        
-        /// <summary>
-        /// 프로퍼티를 가져옵니다.
-        /// </summary>
-        public NodeProperty<T>? GetProperty<T>(string name)
-        {
-            return _node.Properties.OfType<NodeProperty<T>>().FirstOrDefault(p => p.Name == name);
+
+        public NodeProperty<T> Property<T>(
+            string  name,
+            string  displayName,
+            string? format           = null,
+            bool    canConnectToPort = false
+        ) {
+            return (NodeProperty<T>)Property(name, displayName, typeof(T), format, canConnectToPort);
         }
-        
-        /// <summary>
-        /// 포트를 가져옵니다.
-        /// </summary>
-        public T? GetPort<T>(string name) where T : class, IPort
-        {
-            var allPorts = new List<IPort>();
-            allPorts.AddRange(_node.InputPorts);
-            allPorts.AddRange(_node.OutputPorts);
-            allPorts.AddRange(_node.FlowInPorts);
-            allPorts.AddRange(_node.FlowOutPorts);
-            
-            return allPorts.OfType<T>().FirstOrDefault(p => p.Name == name);
-        }
-        
-        /// <summary>
-        /// 노드의 모든 프로퍼티에 접근합니다.
-        /// </summary>
-        public IEnumerable<INodeProperty> Properties => _node.Properties;
     }
 
-    public InputPort<T> AddInputPort<T>(string name)
-    {
-        var port = CreateInputPort<T>(name);
-        _dynamicPorts.Add(port);
-        return port;
-    }
+    /// <summary>
+    /// 제네릭 타입이나 일반 타입으로 모든 종류의 포트를 추가할 수 있는 통합 메서드들입니다.
+    /// 코드 중복을 줄이고 가독성을 높이기 위해 내부 구현을 일관되게 유지합니다.
+    /// </summary>
+    public InputPort<T> AddInputPort<T>(string name) =>
+        AddPortInternal(CreateInputPort<T>(name));
 
-    public IInputPort AddInputPort(string name, Type type)
-    {
-        var port = CreateInputPort(name, type);
-        _dynamicPorts.Add(port);
-        return port;
-    }
+    public IInputPort AddInputPort(string name, Type type) =>
+        AddPortInternal(CreateInputPort(name, type));
 
-    public OutputPort<T> AddOutputPort<T>(string name)
-    {
-        var port = CreateOutputPort<T>(name);
-        _dynamicPorts.Add(port);
-        return port;
-    }
+    public OutputPort<T> AddOutputPort<T>(string name) =>
+        AddPortInternal(CreateOutputPort<T>(name));
 
-    public IOutputPort AddOutputPort(string name, Type type)
-    {
-        var port = CreateOutputPort(name, type);
-        _dynamicPorts.Add(port);
-        return port;
-    }
+    public IOutputPort AddOutputPort(string name, Type type) =>
+        AddPortInternal(CreateOutputPort(name, type));
 
-    public FlowInPort AddFlowInPort(string name)
-    {
-        var port = CreateFlowInPort(name);
-        _dynamicPorts.Add(port);
-        return port;
-    }
+    public FlowInPort AddFlowInPort(string name) =>
+        AddPortInternal(CreateFlowInPort(name));
 
-    public FlowOutPort AddFlowOutPort(string name)
+    public FlowOutPort AddFlowOutPort(string name) =>
+        AddPortInternal(CreateFlowOutPort(name));
+
+    /// <summary>
+    /// 포트를 추가하고 동적 포트로 등록하는 내부 도우미 메서드입니다.
+    /// </summary>
+    private T AddPortInternal<T>(T port) where T : IPort
     {
-        var port = CreateFlowOutPort(name);
         _dynamicPorts.Add(port);
         return port;
     }
@@ -1451,150 +1377,102 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         return property;
     }
 
-    public InputPort<T>? GetInputPort<T>(string name)
-    {
-        return InputPorts.OfType<InputPort<T>>().FirstOrDefault(p => p.Name == name);
-    }
-
-    public OutputPort<T>? GetOutputPort<T>(string name)
-    {
-        return OutputPorts.OfType<OutputPort<T>>().FirstOrDefault(p => p.Name == name);
-    }
-
     /// <summary>
-    /// 모든 포트를 제거합니다. 단, 특정 속성은 제외할 수 있습니다.
-    /// </summary>
-    /// <param name="excludePropertyNames">제외할 속성 이름 목록</param>
-    public void ClearPorts(params string[] excludePropertyNames)
-    {
-        // 제외할 속성 이름을 HashSet으로 변환
-        var excludeSet = new HashSet<string>(excludePropertyNames);
-        
-        // 제거할 속성 목록 생성 (제외 목록에 없는 속성만)
-        var propertiesToRemove = Properties
-            .Where(p => !excludeSet.Contains(p.Name))
-            .ToList();
-            
-        // 속성 제거
-        foreach (var prop in propertiesToRemove)
-        {
-            RemoveProperty(prop);
-        }
-        
-        // 출력 포트 제거
-        var outputPortsToRemove = OutputPorts.ToList();
-        foreach (var port in outputPortsToRemove)
-        {
-            RemoveOutputPort(port);
-        }
-        
-        // 입력 포트 제거 (속성이 아닌 입력 포트만)
-        var inputPortsToRemove = InputPorts
-            .Where(p => Properties.All(prop => prop != p))
-            .ToList();
-            
-        foreach (var port in inputPortsToRemove)
-        {
-            RemoveInputPort(port);
-        }
-        
-        // FlowOut 포트 제거
-        var flowOutPortsToRemove = FlowOutPorts.ToList();
-        foreach (var port in flowOutPortsToRemove)
-        {
-            RemoveFlowOutPort(port);
-        }
-        
-        // FlowIn 포트 제거
-        var flowInPortsToRemove = FlowInPorts.ToList();
-        foreach (var port in flowInPortsToRemove)
-        {
-            RemoveFlowInPort(port);
-        }
-        
-        // 동적 포트 및 프로퍼티 목록 초기화
-        _dynamicPorts.Clear();
-        _dynamicProperties.Clear();
-    }
-    
-    /// <summary>
-    /// 동적으로 추가된 포트와 프로퍼티만 제거합니다.
-    /// 어트리뷰트로 정의된 포트와 프로퍼티는 유지됩니다.
+    /// 동적으로 추가된 포트와 프로퍼티만 제거하고 어트리뷰트로 정의된 것들은 유지합니다.
     /// </summary>
     public void ClearDynamicPorts()
     {
-        var type = GetType();
+        var typeInfo = GetTypeInfo();
         
-        // 제거할 동적 포트 목록 생성
-        var dynamicPortsToRemove = _dynamicPorts.ToList();
+        // 어트리뷰트 기반 요소 식별
+        var attributeBasedPorts = GetAttributeBasedElements<IPort>(typeInfo.GetAllPortRelatedProperties());
+        var attributeBasedProps = GetAttributeBasedElements<INodeProperty>(typeInfo.NodePropertyProperties);
         
-        // 어트리뷰트로 정의된 포트는 유지하도록 필터링
-        dynamicPortsToRemove = dynamicPortsToRemove
-            .Where(port => 
+        // 제거할 요소 식별
+        var portsToRemove = _dynamicPorts.Where(p => !attributeBasedPorts.Contains(p)).ToList();
+        var propsToRemove = _dynamicProperties.Where(p => !attributeBasedProps.Contains(p)).ToList();
+        
+        // 빠른 종료 조건
+        if (portsToRemove.Count == 0 && propsToRemove.Count == 0)
+            return;
+        
+        // 일괄 업데이트 모드로 제거 실행
+        BatchUpdate(() => {
+            // 동적 포트 제거
+            foreach (var port in portsToRemove)
             {
-                // 어트리뷰트가 있는 포트는 제외
-                var propertyInfo = type.GetProperties()
-                    .FirstOrDefault(p => 
-                        (p.GetCustomAttribute<NodeInputAttribute>() != null && 
-                         p.GetValue(this) == port) ||
-                        (p.GetCustomAttribute<NodeOutputAttribute>() != null && 
-                         p.GetValue(this) == port) ||
-                        (p.GetCustomAttribute<NodeFlowInAttribute>() != null && 
-                         p.GetValue(this) == port) ||
-                        (p.GetCustomAttribute<NodeFlowOutAttribute>() != null && 
-                         p.GetValue(this) == port));
-                
-                // propertyInfo가 null이면 어트리뷰트가 없는 포트이므로 제거
-                return propertyInfo == null;
-            })
-            .ToList();
-        
-        // 동적 포트 제거
-        foreach (var port in dynamicPortsToRemove)
-        {
-            if (port is IInputPort inputPort)
-                Remove(inputPort);
-            else if (port is IOutputPort outputPort)
-                Remove(outputPort);
-            else if (port is FlowInPort flowInPort)
-                RemoveFlowInPort(flowInPort);
-            else if (port is FlowOutPort flowOutPort)
-                RemoveFlowOutPort(flowOutPort);
-        }
-        
-        // 제거할 동적 프로퍼티 목록 생성
-        var dynamicPropsToRemove = _dynamicProperties
-            .Where(prop => 
+                RemovePortByType(port);
+                _dynamicPorts.Remove(port);
+            }
+            
+            // 동적 프로퍼티 제거
+            foreach (var prop in propsToRemove)
             {
-                // 어트리뷰트가 있는 프로퍼티는 제외
-                var propertyInfo = type.GetProperty(prop.Name);
-                return propertyInfo?.GetCustomAttribute<NodePropertyAttribute>() == null;
-            })
-            .ToList();
-        
-        // 동적 프로퍼티 제거
-        foreach (var prop in dynamicPropsToRemove)
+                RemoveProperty(prop);
+                _dynamicProperties.Remove(prop);
+            }
+        });
+    }
+    
+    /// <summary>
+    /// 어트리뷰트로 정의된 요소들을 수집합니다.
+    /// </summary>
+    private HashSet<T> GetAttributeBasedElements<T>(IEnumerable<PropertyInfo> properties) where T : class
+    {
+        var elements = new HashSet<T>();
+        foreach (var prop in properties)
         {
-            Remove(prop);
+            var value = prop.GetValue(this);
+            if (value is T element)
+            {
+                elements.Add(element);
+            }
         }
-        
-        // 동적 포트 및 프로퍼티 목록 초기화
-        _dynamicPorts.Clear();
-        _dynamicProperties.Clear();
+        return elements;
     }
 
+    /// <summary>
+    /// 입력 포트를 제거합니다.
+    /// </summary>
     public void Remove(IInputPort port)
     {
-        // 메서드 내용 유지
+        if (port == null)
+            return;
+            
+        // 동적 포트 목록에서 제거
+        _dynamicPorts.Remove(port);
+        
+        // 실제 포트 제거는 RemoveInputPort 메서드 사용
+        RemoveInputPort(port);
     }
 
+    /// <summary>
+    /// 출력 포트를 제거합니다.
+    /// </summary>
     public void Remove(IOutputPort port)
     {
-        // 메서드 내용 유지
+        if (port == null)
+            return;
+            
+        // 동적 포트 목록에서 제거
+        _dynamicPorts.Remove(port);
+        
+        // 실제 포트 제거는 RemoveOutputPort 메서드 사용
+        RemoveOutputPort(port);
     }
 
+    /// <summary>
+    /// 노드 프로퍼티를 제거합니다.
+    /// </summary>
     public void Remove(INodeProperty property)
     {
-        // 메서드 내용 유지
+        if (property == null)
+            return;
+            
+        // 동적 프로퍼티 목록에서 제거
+        _dynamicProperties.Remove(property);
+        
+        // 실제 프로퍼티 제거는 RemoveProperty 메서드 사용
+        RemoveProperty(property);
     }
 }
