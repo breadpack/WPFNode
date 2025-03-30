@@ -394,6 +394,12 @@ public partial class NodeCanvasControl : Control, INodeCanvasControl
         DataContextChanged += OnDataContextChanged;
         Loaded += OnControlLoaded;
 
+        // 마우스 이벤트 핸들러 연결
+        MouseDown += OnMouseButtonDown;
+        MouseUp += OnMouseButtonUp;
+        MouseMove += OnMouseMove;
+        MouseWheel += OnMouseWheel;
+        
         // Initialize Commands
         CenterViewCommand = new RelayCommand(CenterView);
         ZoomToFitCommand = new RelayCommand(ZoomToFit);
@@ -758,11 +764,18 @@ public partial class NodeCanvasControl : Control, INodeCanvasControl
 
     private void OnMouseButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if(e.MiddleButton != MouseButtonState.Pressed) return;
-        
         Focus();
-        _lastMousePosition = e.GetPosition(this);
-
+        
+        if (e.MiddleButton == MouseButtonState.Pressed)
+        {
+            _lastMousePosition = e.GetPosition(this);
+            _isPanning = true;
+            Cursor = Cursors.Hand; // 패닝 중임을 시각적으로 표시
+            CaptureMouse();
+            e.Handled = true;
+            return;
+        }
+        
         // 포트 클릭 확인
         if (e.Source is PortControl portControl && portControl.ViewModel != null)
         {
@@ -813,7 +826,15 @@ public partial class NodeCanvasControl : Control, INodeCanvasControl
 
     private void OnMouseButtonUp(object sender, MouseButtonEventArgs e)
     {
-        if(e.MiddleButton != MouseButtonState.Released) return;
+        if (e.MiddleButton == MouseButtonState.Released && _isPanning)
+        {
+            _isPanning = false;
+            _lastMousePosition = null;
+            Cursor = Cursors.Arrow; // 커서 원래대로 복원
+            ReleaseMouseCapture();
+            e.Handled = true;
+            return;
+        }
         
         // 포트 연결 처리
         if (_dragStartPort != null && e.Source is PortControl portControl && portControl.ViewModel != null)
@@ -843,7 +864,7 @@ public partial class NodeCanvasControl : Control, INodeCanvasControl
 
     private void OnMouseMove(object sender, MouseEventArgs e)
     {
-        if (e.MiddleButton != MouseButtonState.Pressed || !_lastMousePosition.HasValue) return;
+        if (!_lastMousePosition.HasValue) return;
 
         var currentPosition = e.GetPosition(this);
         var delta = currentPosition - _lastMousePosition.Value;
@@ -866,7 +887,6 @@ public partial class NodeCanvasControl : Control, INodeCanvasControl
                 }
             }
             e.Handled = true;
-            return;
         }
         // 노드 드래그
         else if (_dragNode != null)
@@ -875,13 +895,12 @@ public partial class NodeCanvasControl : Control, INodeCanvasControl
             _dragNode.Model.Y += delta.Y;
             e.Handled = true;
         }
-        // 캔버스 드래그 (스크롤 조정)
-        else if (e.Source == this && _scrollViewer != null)
+        // 캔버스 팬(이동)
+        else if (_isPanning && _scrollViewer != null)
         {
-            // 스크롤 위치 조정
+            // 스크롤 위치 조정 - 마우스 이동 방향의 반대로 스크롤
             _scrollViewer.ScrollToHorizontalOffset(_scrollViewer.HorizontalOffset - delta.X);
             _scrollViewer.ScrollToVerticalOffset(_scrollViewer.VerticalOffset - delta.Y);
-            
             e.Handled = true;
         }
 
