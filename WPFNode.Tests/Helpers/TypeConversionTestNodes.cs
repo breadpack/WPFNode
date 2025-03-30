@@ -47,7 +47,7 @@ namespace WPFNode.Tests.Helpers
             base.Name = "StringConstructorInfo";
         }
 
-        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
+        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(IExecutionContext? context, CancellationToken cancellationToken)
         {
             // InputPort에서 값 가져오기
             var input = TypeInput.GetValueOrDefault();
@@ -107,7 +107,7 @@ namespace WPFNode.Tests.Helpers
             base.Name = "ImplicitConversionInfo";
         }
 
-        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
+        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(IExecutionContext? context, CancellationToken cancellationToken)
         {
             // InputPort에서 값 가져오기
             var input = TypeInput.GetValueOrDefault();
@@ -168,7 +168,7 @@ namespace WPFNode.Tests.Helpers
             base.Name = "ExplicitConversionToString";
         }
 
-        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
+        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(IExecutionContext? context, CancellationToken cancellationToken)
         {
             // InputPort에서 값 가져오기
             var input = TypeInput.GetValueOrDefault();
@@ -229,7 +229,7 @@ namespace WPFNode.Tests.Helpers
             base.Name = "StringTest";
         }
 
-        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
+        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(IExecutionContext? context, CancellationToken cancellationToken)
         {
             // InputPort에서 값 가져오기
             var input = Input.GetValueOrDefault();
@@ -284,7 +284,7 @@ namespace WPFNode.Tests.Helpers
             base.Name = "IntTest";
         }
 
-        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
+        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(IExecutionContext? context, CancellationToken cancellationToken)
         {
             // InputPort에서 값 가져오기
             var input = Input.GetValueOrDefault();

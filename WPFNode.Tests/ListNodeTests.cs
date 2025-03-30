@@ -35,7 +35,7 @@ namespace WPFNode.Tests
         }
 
         public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
-            FlowExecutionContext? context,
+            IExecutionContext? context,
             CancellationToken cancellationToken)
         {
             // Count 값만큼 출력 생성
@@ -73,7 +73,7 @@ namespace WPFNode.Tests
         }
 
         public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
-            FlowExecutionContext? context,
+            IExecutionContext? context,
             CancellationToken cancellationToken)
         {
             // Count 값만큼 출력 생성
@@ -109,7 +109,7 @@ namespace WPFNode.Tests
         }
 
         public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
-            FlowExecutionContext? context,
+            IExecutionContext? context,
             CancellationToken cancellationToken = default)
         {
             // 리스트의 HashCode를 출력

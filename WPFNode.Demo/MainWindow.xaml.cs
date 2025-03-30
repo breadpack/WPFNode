@@ -8,6 +8,7 @@ using WPFNode.Models;
 using WPFNode.ViewModels.Nodes;
 using WPFNode.Demo.Models;
 using WPFNode.Demo.ViewModels;
+using WPFNode.ViewModels;
 
 namespace WPFNode.Demo
 {

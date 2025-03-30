@@ -43,7 +43,7 @@ public class StringSubstringNode : NodeBase
     }
 
     public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
-        FlowExecutionContext? context,
+        IExecutionContext? context,
         CancellationToken     cancellationToken
     )
     {

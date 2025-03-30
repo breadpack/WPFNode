@@ -55,7 +55,7 @@ public class IfNode : NodeBase
     /// 조건에 따라 True 또는 False 포트를 반환합니다.
     /// </summary>
     public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
-        FlowExecutionContext? context,
+        IExecutionContext? context,
         CancellationToken     cancellationToken
     )
     {

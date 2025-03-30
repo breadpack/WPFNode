@@ -29,7 +29,7 @@ public class StringTrimNode : NodeBase
     }
 
     public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
-        FlowExecutionContext? context,
+        IExecutionContext? context,
         CancellationToken     cancellationToken
     )
     {

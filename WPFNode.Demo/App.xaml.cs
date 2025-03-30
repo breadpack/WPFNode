@@ -3,6 +3,7 @@ using System.Windows.Input;
 using WPFNode.Demo.Models;
 using WPFNode.Demo.Nodes;
 using WPFNode.Services;
+using WPFNode.ViewModels;
 
 namespace WPFNode.Demo;
 
@@ -15,6 +16,12 @@ public partial class App : Application
         };
         
         base.OnStartup(e);
+        
+        // ViewModel 서비스 초기화
+        ViewModelServices.Initialize();
+        
+        // WPF 서비스 초기화
+        WPFNodeServices.Initialize();
         
         // 노드 서비스 초기화
         NodeServices.Initialize("Plugins");
@@ -35,7 +42,8 @@ public partial class App : Application
     /// </summary>
     private void RegisterCustomNodes()
     {
-        var pluginService = NodeServices.PluginService;
+        // 통합 플러그인 서비스 사용 (Model + UI)
+        var pluginService = WPFNodeServices.ModelService;
         
         // 변환 노드
         pluginService.RegisterNodeType(typeof(IntToEmployeeNode));
@@ -49,6 +57,4 @@ public partial class App : Application
         pluginService.RegisterNodeType(typeof(IntVariableNode));
         pluginService.RegisterNodeType(typeof(StringVariableNode));
     }
-    
-    // 노드 타입들을 직접 등록 방식으로 변경하여 EnsureNodeTypesReferenced 메서드는 더 이상 필요 없습니다.
 }

@@ -23,7 +23,7 @@ namespace WPFNode.Demo.ViewModels;
 
 public partial class MainWindowViewModel : ObservableObject
 {
-    private readonly INodePluginService _pluginService;
+    private readonly INodeModelService _pluginService;
     private readonly INodeCommandService _commandService;
     private readonly MigrationService _migrationService;
     private readonly string _saveFilePath;
@@ -59,7 +59,7 @@ public partial class MainWindowViewModel : ObservableObject
 
     public MainWindowViewModel()
     {
-        _pluginService = NodeServices.PluginService;
+        _pluginService = NodeServices.ModelService;
         _commandService = NodeServices.CommandService;
         _saveFilePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -135,7 +135,7 @@ public partial class MainWindowViewModel : ObservableObject
 
     private void CreateNewCanvas()
     {
-        NodeCanvasViewModel = new NodeCanvasViewModel()
+        NodeCanvasViewModel = new NodeCanvasViewModel(new NodeCanvas())
         {
             Scale = 1.0,
             OffsetX = 0,

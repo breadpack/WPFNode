@@ -30,7 +30,7 @@ namespace WPFNode.Demo.Nodes
         {
         }
 
-        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
+        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(IExecutionContext? context, CancellationToken cancellationToken)
         {
             var json = JsonInput.GetValueOrDefault("{}");
             

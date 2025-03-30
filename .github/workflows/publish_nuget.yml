@@ -31,6 +31,15 @@ jobs:
     - name: Test
       run: dotnet test --verbosity normal
       
+    - name: Pack WPFNode.Abstracts
+      run: dotnet pack WPFNode.Abstracts\WPFNode.Abstracts.csproj --configuration Release --no-build --output ${{ github.workspace }}\nupkgs /p:Version=${{ env.VERSION }}
+    
+    - name: Pack WPFNode.Models
+      run: dotnet pack WPFNode.Models\WPFNode.Models.csproj --configuration Release --no-build --output ${{ github.workspace }}\nupkgs /p:Version=${{ env.VERSION }}
+      
+    - name: Pack WPFNode.ViewModels
+      run: dotnet pack WPFNode.ViewModels\WPFNode.ViewModels.csproj --configuration Release --no-build --output ${{ github.workspace }}\nupkgs /p:Version=${{ env.VERSION }}
+    
     - name: Pack WPFNode
       run: dotnet pack WPFNode\WPFNode.csproj --configuration Release --no-build --output ${{ github.workspace }}\nupkgs /p:Version=${{ env.VERSION }}
       
@@ -39,5 +48,8 @@ jobs:
       
     - name: Push to NuGet
       run: |
+        dotnet nuget push "${{ github.workspace }}\nupkgs\dev.breadpack.WPFNode.Abstracts.*.nupkg" --api-key ${{secrets.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        dotnet nuget push "${{ github.workspace }}\nupkgs\dev.breadpack.WPFNode.Models.*.nupkg" --api-key ${{secrets.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        dotnet nuget push "${{ github.workspace }}\nupkgs\dev.breadpack.WPFNode.ViewModels.*.nupkg" --api-key ${{secrets.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate
         dotnet nuget push "${{ github.workspace }}\nupkgs\dev.breadpack.WPFNode.*.nupkg" --api-key ${{secrets.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate
-        dotnet nuget push "${{ github.workspace }}\nupkgs\dev.breadpack.WPFNode.Plugins.Basic.*.nupkg" --api-key ${{secrets.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate 
+        dotnet nuget push "${{ github.workspace }}\nupkgs\dev.breadpack.WPFNode.Plugins.Basic.*.nupkg" --api-key ${{secrets.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate

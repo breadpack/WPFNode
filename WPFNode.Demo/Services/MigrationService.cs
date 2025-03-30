@@ -14,11 +14,11 @@ namespace WPFNode.Demo.Services
 {
     public class MigrationService
     {
-        private readonly INodePluginService _pluginService;
+        private readonly INodeModelService _pluginService;
         private readonly string _saveFolderPath;
         private readonly JsonSerializerOptions _jsonOptions;
 
-        public MigrationService(INodePluginService pluginService)
+        public MigrationService(INodeModelService pluginService)
         {
             _pluginService = pluginService;
             _saveFolderPath = Path.Combine(

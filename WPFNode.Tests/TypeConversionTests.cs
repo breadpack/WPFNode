@@ -44,7 +44,7 @@ public class TypeConversionTests
     /// </summary>
     private void RegisterTestNodes()
     {
-        var pluginService = WPFNode.Services.NodeServices.PluginService;
+        var pluginService = WPFNode.Services.NodeServices.ModelService;
         
         // 기본 노드 등록
         pluginService.RegisterNodeType(typeof(StartNode));

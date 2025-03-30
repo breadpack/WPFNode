@@ -25,29 +25,8 @@ namespace WPFNode.Tests.Serialization
                 builder.AddConsole();
             });
             _logger = loggerFactory.CreateLogger<DynamicNodeSerializationTests>();
-            
-            // 플러그인 서비스 초기화 - 테스트 전에 필요한 서비스 등록
-            InitializePluginService();
         }
-        
-        private void InitializePluginService()
-        {
-            // NodeServices가 이미 초기화되어 있고 PluginService가 null이 아니면 반환
-            if (NodeServices.PluginService != null)
-                return;
-                
-            // NodePluginService 인스턴스 생성
-            var pluginService = new NodePluginService();
-            
-            // CreateObjectNode 타입 직접 등록
-            pluginService.RegisterNodeType(typeof(CreateObjectNode));
-            
-            // NodeServices에 PluginService 설정
-            var field = typeof(NodeServices).GetField("_pluginService", 
-                BindingFlags.NonPublic | BindingFlags.Static);
-            field?.SetValue(null, pluginService);
-        }
-        
+
         /// <summary>
         /// TestPerson 타입에 대한 CreateObjectNode 인스턴스를 생성하고 기본 값을 설정합니다.
         /// </summary>

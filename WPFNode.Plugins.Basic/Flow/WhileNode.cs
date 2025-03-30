@@ -66,7 +66,7 @@ public class WhileNode : NodeBase
     /// <summary>
     /// 노드의 처리 로직을 구현합니다.
     /// </summary>
-    public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
+    public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(IExecutionContext? context, CancellationToken cancellationToken) {
         Logger?.LogDebug("Executing WhileNode");
         
         // 초기화

@@ -1,0 +1,40 @@
+﻿﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0-windows</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <UseWPF>true</UseWPF>
+        <IsPackable>true</IsPackable>
+        
+        <!-- NuGet 패키지 메타데이터 -->
+        <PackageId>dev.breadpack.WPFNode.ViewModels</PackageId>
+        <Version>0.1.0</Version>
+        <Authors>BreadPack</Authors>
+        <Company>BreadPack</Company>
+        <Description>WPFNode 프레임워크의 뷰모델 계층</Description>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageTags>wpf;node-editor;visual-programming;viewmodels;mvvm</PackageTags>
+        
+        <!-- 연락처 정보 -->
+        <PackageProjectUrl>https://github.com/breadpack/WPFNode</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/breadpack/WPFNode.git</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <None Include="..\README.md" Pack="true" PackagePath="\" />
+      <None Include="..\LICENSE" Pack="true" PackagePath="\" />
+    </ItemGroup>
+    
+    <ItemGroup>
+      <ProjectReference Include="..\WPFNode.Abstracts\WPFNode.Abstracts.csproj" />
+      <ProjectReference Include="..\WPFNode.Models\WPFNode.Models.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    </ItemGroup>
+
+</Project>

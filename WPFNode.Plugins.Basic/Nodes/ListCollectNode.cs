@@ -47,7 +47,7 @@ namespace WPFNode.Plugins.Basic.Nodes {
         }
 
         public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
-            FlowExecutionContext? context,
+            IExecutionContext? context,
             CancellationToken     cancellationToken = default
         ) {
             // 활성화된 Flow In 포트 확인

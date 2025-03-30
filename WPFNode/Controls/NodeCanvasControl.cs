@@ -5,32 +5,21 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using System.ComponentModel;
 using WPFNode.Interfaces;
+using WPFNodeCommand = WPFNode.Interfaces.ICommand;
 using WPFNode.Models;
 using WPFNode.Services;
-using WPFNode.Utilities;
 using WPFNode.ViewModels.Nodes;
 using NodeCanvasViewModel = WPFNode.ViewModels.Nodes.NodeCanvasViewModel;
 using IWpfCommand = System.Windows.Input.ICommand;
 using CommunityToolkit.Mvvm.Input;
 using System.Collections.Specialized;
+using System.Windows.Markup;
+using WPFNode.ViewModels;
 
 namespace WPFNode.Controls;
 
-public class ViewportChangedEventArgs : EventArgs
-{
-    public double Scale { get; }
-    public double OffsetX { get; }
-    public double OffsetY { get; }
-
-    public ViewportChangedEventArgs(double scale, double offsetX, double offsetY)
-    {
-        Scale = scale;
-        OffsetX = offsetX;
-        OffsetY = offsetY;
-    }
-}
-
-public class NodeCanvasControl : Control
+[ContentProperty("Content")]
+public partial class NodeCanvasControl : Control, INodeCanvasControl
 {
     private NodeViewModel?     _dragNode;
     private Point?             _lastMousePosition;
@@ -43,6 +32,14 @@ public class NodeCanvasControl : Control
     private readonly NodeCanvasStateManager _stateManager;
     private bool _isUpdatingLayout;
     private Point? _contextMenuPosition;
+    private bool _initialized = false;
+    private Point _panStart;
+    private Point _translateOffset;
+    private bool _isPanning;
+    private bool _isSelecting;
+    private bool _isMovingSelection;
+    private Rectangle? _selectionRectangle;
+    private Point _selectionStart;
 
     #region Dependency Properties
 
@@ -138,15 +135,107 @@ public class NodeCanvasControl : Control
         set => SetValue(ZoomSpeedProperty, value);
     }
 
-    #endregion
+    public static readonly DependencyProperty PluginServiceProperty =
+        DependencyProperty.Register(
+            nameof(PluginService),
+            typeof(INodeModelService),
+            typeof(NodeCanvasControl),
+            new PropertyMetadata(null));
 
-    public INodePluginService PluginService { get; }
-    public INodeCommandService CommandService { get; }
+    public static readonly DependencyProperty ContentProperty = 
+        DependencyProperty.Register(
+            "Content", 
+            typeof(object), 
+            typeof(NodeCanvasControl), 
+            new PropertyMetadata(null));
+            
+    public static readonly DependencyProperty ViewModelProperty = 
+        DependencyProperty.Register(
+            nameof(ViewModel), 
+            typeof(NodeCanvasViewModel), 
+            typeof(NodeCanvasControl), 
+            new PropertyMetadata(null, OnViewModelChangedCallback));
+            
+    public static readonly DependencyProperty ZoomFactorProperty = 
+        DependencyProperty.Register(
+            "ZoomFactor", 
+            typeof(double), 
+            typeof(NodeCanvasControl), 
+            new FrameworkPropertyMetadata(1.0, FrameworkPropertyMetadataOptions.AffectsRender, OnZoomFactorChangedCallback));
+            
+    public static readonly DependencyProperty MinZoomProperty = 
+        DependencyProperty.Register(
+            "MinZoom", 
+            typeof(double), 
+            typeof(NodeCanvasControl), 
+            new PropertyMetadata(0.1));
+            
+    public static readonly DependencyProperty MaxZoomProperty = 
+        DependencyProperty.Register(
+            "MaxZoom", 
+            typeof(double), 
+            typeof(NodeCanvasControl), 
+            new PropertyMetadata(2.0));
+
+    public static readonly DependencyProperty ModelServiceProperty =
+        DependencyProperty.Register(
+            nameof(ModelService),
+            typeof(INodeModelService),
+            typeof(NodeCanvasControl),
+            new PropertyMetadata(null));
+
+    public static readonly DependencyProperty CommandServiceProperty =
+        DependencyProperty.Register(
+            nameof(CommandService),
+            typeof(INodeCommandService),
+            typeof(NodeCanvasControl),
+            new PropertyMetadata(null));
+
+    public INodeCommandService   CommandService => DesignCommandService;
+    public INodeModelService     PluginService  => DesignPluginService;
+    public INodeCanvasViewModel? ViewModel      => DataContext as INodeCanvasViewModel;
+
+    private INodeCommandService DesignCommandService { get; set; }
+    private INodeModelService DesignPluginService { get; set; }
+
+    public object Content
+    {
+        get => GetValue(ContentProperty);
+        set => SetValue(ContentProperty, value);
+    }
+
+    public double ZoomFactor
+    {
+        get => (double)GetValue(ZoomFactorProperty);
+        set => SetValue(ZoomFactorProperty, value);
+    }
+
+    public double MinZoom
+    {
+        get => (double)GetValue(MinZoomProperty);
+        set => SetValue(MinZoomProperty, value);
+    }
+
+    public double MaxZoom
+    {
+        get => (double)GetValue(MaxZoomProperty);
+        set => SetValue(MaxZoomProperty, value);
+    }
+
+    public INodeModelService? ModelService {
+        get => (INodeModelService?)GetValue(ModelServiceProperty);
+        set => SetValue(ModelServiceProperty, value);
+    }
+
+    public INodeCommandService? NodeCommandService {
+        get => (INodeCommandService?)GetValue(CommandServiceProperty);
+        set => SetValue(CommandServiceProperty, value);
+    }
+
+    #endregion
 
     public bool IsDraggingPort => _dragStartPort != null;
     public NodePortViewModel? DraggingPort => _dragStartPort;
-
-    public INodeCanvasViewModel? ViewModel => DataContext as INodeCanvasViewModel;
 
     #region Events
     public event EventHandler<NodeViewModel>? NodeAdded;
@@ -159,6 +248,19 @@ public class NodeCanvasControl : Control
     public event EventHandler<ConnectionViewModel>? ConnectionSelected;
     public event EventHandler<ConnectionViewModel>? ConnectionDeselected;
     public event EventHandler<ViewportChangedEventArgs>? ViewportChanged;
+
+    private static void OnViewModelChangedCallback(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is NodeCanvasControl control)
+        {
+            control.OnDataContextChanged(control, e);
+        }
+    }
+
+    private static void OnZoomFactorChangedCallback(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        // 아직 구현되지 않음
+    }
 
     protected virtual void OnNodeAdded(NodeViewModel node)
     {
@@ -217,11 +319,10 @@ public class NodeCanvasControl : Control
             new FrameworkPropertyMetadata(typeof(NodeCanvasControl)));
     }
 
-    private class DesignTimeNodePluginService : INodePluginService 
+    private class DesignTimeNodeModelService : INodeModelService 
     {
         public IReadOnlyCollection<Type> NodeTypes                                    => new List<Type>();
         public IEnumerable<NodeMetadata> GetAllNodeMetadata()                         => Enumerable.Empty<NodeMetadata>();
-        public Style?                    FindNodeStyle(Type nodeType)                 => null;
         public IEnumerable<string>       GetCategories()                              => Enumerable.Empty<string>();
         public void                      LoadPlugins(string               pluginPath) { }
         public INode                     CreateNode(Type                  nodeType)   => throw new NotImplementedException();
@@ -233,23 +334,60 @@ public class NodeCanvasControl : Control
 
     private class DesignTimeNodeCommandService : INodeCommandService 
     {
-        public void RegisterNode(INode node) { }
-        public void UnregisterNode(Guid nodeId) { }
+        private readonly Stack<WPFNodeCommand> _undoStack = new();
+        private readonly Stack<WPFNodeCommand> _redoStack = new();
+        private bool _isExecuting;
+
+        public event EventHandler? CanUndoChanged;
+        public event EventHandler? CanRedoChanged;
+        public event EventHandler<string>? CommandExecuted;
+
+        public bool CanUndo => _undoStack.Count > 0;
+        public bool CanRedo => _redoStack.Count > 0;
+
+        // 기존 명령 실행 메서드
         public bool ExecuteCommand(Guid nodeId, string commandName, object? parameter = null) => false;
         public bool CanExecuteCommand(Guid nodeId, string commandName, object? parameter = null) => false;
+
+        // CommandManager 기능
+        public void Execute(WPFNodeCommand command)
+        {
+            // 디자인 모드에서는 아무 작업도 수행하지 않음
+        }
+
+        public void Undo()
+        {
+            // 디자인 모드에서는 아무 작업도 수행하지 않음
+        }
+
+        public void Redo()
+        {
+            // 디자인 모드에서는 아무 작업도 수행하지 않음
+        }
+
+        public void Clear()
+        {
+            // 디자인 모드에서는 아무 작업도 수행하지 않음
+        }
+
+        public void ExecuteNodeCommand(Guid nodeId, string commandName, object? parameter = null)
+        {
+            // 디자인 모드에서는 아무 작업도 수행하지 않음
+        }
     }
 
     public NodeCanvasControl()
     {
+        
         if (DesignerProperties.GetIsInDesignMode(this))
         {
-            PluginService = new DesignTimeNodePluginService();
-            CommandService = new DesignTimeNodeCommandService();
+            DesignPluginService  = new DesignTimeNodeModelService();
+            DesignCommandService = new DesignTimeNodeCommandService();
         }
         else
         {
-            PluginService = NodeServices.PluginService;
-            CommandService = NodeServices.CommandService;
+            DesignPluginService = NodeServices.ModelService;
+            DesignCommandService = NodeServices.CommandService;
         }
         
         _stateManager = new NodeCanvasStateManager(this);
@@ -418,35 +556,34 @@ public class NodeCanvasControl : Control
         }
     }
 
-    private void Initialize()
+    public void Initialize()
     {
-        Focusable = true;
-        Focus();
-        Background = Brushes.LightGray;
-        
-        // ContextMenu 설정
-        ContextMenu = new ContextMenu();
-        var addNodeMenuItem = new MenuItem { Header = "노드 추가" };
-        addNodeMenuItem.Click += OnAddNodeMenuItemClick;
-        var managePluginsMenuItem = new MenuItem { Header = "플러그인 관리" };
-        managePluginsMenuItem.Click += OnManagePluginsClick;
-        ContextMenu.Items.Add(addNodeMenuItem);
-        ContextMenu.Items.Add(new Separator());
-        ContextMenu.Items.Add(managePluginsMenuItem);
-        
-        // ContextMenu를 열 때 위치 저장
-        ContextMenuOpening += OnContextMenuOpening;
-        
-        // 마우스 이벤트 처리
-        MouseDown += OnMouseButtonDown;
-        MouseUp += OnMouseButtonUp;
-        MouseMove += OnMouseMove;
-        MouseWheel += OnMouseWheel;
+        if (_initialized) return;
+        _initialized = true;
 
-        // 키보드 이벤트 처리
-        KeyDown += OnKeyDown;
-
-        System.Diagnostics.Debug.WriteLine($"NodeCanvasControl created: {Width}x{Height}");
+        var viewModel = DataContext as INodeCanvasViewModel;
+        if (viewModel != null && DesignCommandService != null)
+        {
+            // Canvas 참조 설정
+            if (DesignCommandService is NodeCommandService nodeCommandService && _dragCanvas != null)
+            {
+                // 캔버스 뷰모델에 CommandService 설정
+                viewModel.Initialize(DesignCommandService);
+                
+                // NodeCommandService에 캔버스 설정
+                nodeCommandService.SetCanvas(viewModel.Model);
+            }
+            else
+            {
+                viewModel.Initialize(DesignCommandService);
+            }
+            
+            _initialized = true;
+        }
+        else
+        {
+            // 기본 서비스 설정은 이미 생성자에서 완료됨
+        }
     }
 
     public override void OnApplyTemplate()
@@ -881,13 +1018,6 @@ public class NodeCanvasControl : Control
             _searchPanel.Visibility = Visibility.Visible;
             _searchPanel.Focus();
         }
-    }
-
-    private void OnManagePluginsClick(object sender, RoutedEventArgs e)
-    {
-        if (PluginService == null) return;
-        var dialog = new NodePluginManagerDialog(PluginService);
-        dialog.ShowDialog();
     }
 
     private void OnAddNodeMenuItemClick(object sender, RoutedEventArgs e)

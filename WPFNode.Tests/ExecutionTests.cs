@@ -32,7 +32,7 @@ public class TrackingNode<T> : NodeBase
     {
     }
 
-    public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
+    public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(IExecutionContext? context, CancellationToken cancellationToken)
     {
         // 입력 값을 기록
         T value = InputValue.GetValueOrDefault();
@@ -72,7 +72,7 @@ public class CounterConditionNode : NodeBase
         _callCount = 0;
     }
 
-    public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
+    public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(IExecutionContext? context, CancellationToken cancellationToken)
     {
         // 호출 횟수가 MaxTrueCount 미만이면 true, 이상이면 false 반환
         bool condition = _callCount < MaxTrueCount;

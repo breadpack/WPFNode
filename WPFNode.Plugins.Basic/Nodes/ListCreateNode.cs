@@ -45,7 +45,7 @@ namespace WPFNode.Plugins.Basic.Nodes
         }
 
         public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
-            FlowExecutionContext? context,
+            IExecutionContext? context,
             CancellationToken cancellationToken = default)
         {
             var elementType = ElementType?.Value ?? typeof(object);

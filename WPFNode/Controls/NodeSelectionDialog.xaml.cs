@@ -7,11 +7,11 @@ namespace WPFNode.Controls
 {
     public partial class NodeSelectionDialog : Window
     {
-        private readonly INodePluginService _pluginService;
+        private readonly INodeModelService _pluginService;
         private readonly List<NodeCategoryItem> _allNodes;
         private NodeMetadata? _selectedNode;
 
-        public NodeSelectionDialog(INodePluginService pluginService)
+        public NodeSelectionDialog(INodeModelService pluginService)
         {
             InitializeComponent();
             _pluginService = pluginService;

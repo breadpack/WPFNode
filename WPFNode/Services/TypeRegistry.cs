@@ -1,13 +1,6 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Threading;
 using WPFNode.ViewModels.Nodes;
 
 namespace WPFNode.Services;
@@ -265,7 +258,7 @@ public class TypeRegistry
             .ToList();
             
         // 플러그인 타입과 어셈블리
-        var pluginTypes = NodeServices.PluginService.NodeTypes;
+        var pluginTypes = NodeServices.ModelService.NodeTypes;
         var pluginAssemblies = pluginTypes
             .Select(t => t.Assembly)
             .Distinct()

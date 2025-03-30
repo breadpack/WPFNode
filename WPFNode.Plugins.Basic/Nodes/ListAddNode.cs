@@ -49,7 +49,7 @@ namespace WPFNode.Plugins.Basic.Nodes
         }
 
         public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
-            FlowExecutionContext? context,
+            IExecutionContext? context,
             CancellationToken cancellationToken = default)
         {
             // InputPort<T>.GetValueOrDefault()를 사용하여 값 가져오기

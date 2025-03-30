@@ -91,7 +91,7 @@ public class ForNode : NodeBase
     /// 루프 실행 및 흐름 제어를 담당합니다.
     /// </summary>
     public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
-        FlowExecutionContext? context,
+        IExecutionContext? context,
         CancellationToken     cancellationToken
     )
     {

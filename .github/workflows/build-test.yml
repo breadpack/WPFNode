@@ -1,0 +1,41 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+  pull_request:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+        
+    - name: Restore dependencies
+      run: dotnet restore
+      
+    - name: Build
+      run: dotnet build --configuration Release --no-restore
+      
+    - name: Test
+      run: dotnet test --configuration Release --no-build --verbosity normal
+
+    - name: Verify NuGet Package Metadata
+      run: |
+        echo "Verifying NuGet package metadata..."
+        dotnet pack WPFNode\WPFNode.csproj --configuration Release --no-build --output ${{ github.workspace }}\nupkgs /p:Version=0.0.0-verify
+        dotnet pack WPFNode.Plugins.Basic\WPFNode.Plugins.Basic.csproj --configuration Release --no-build --output ${{ github.workspace }}\nupkgs /p:Version=0.0.0-verify
+        echo "Verification complete"

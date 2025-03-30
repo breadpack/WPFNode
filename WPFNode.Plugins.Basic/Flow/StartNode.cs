@@ -24,7 +24,7 @@ public class StartNode : NodeBase, IFlowEntry
     {
     }
 
-    public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
+    public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(IExecutionContext? context, CancellationToken cancellationToken) {
         // Start 노드는 특별한 처리 없이 다음 노드로 실행 흐름을 전달합니다.
         yield return FlowOut;
     }

@@ -51,7 +51,7 @@ namespace WPFNode.Plugins.Basic.Nodes
         }
 
         public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
-            FlowExecutionContext? context,
+            IExecutionContext? context,
             CancellationToken cancellationToken = default)
         {
             var listValue = ((dynamic)_listInput).GetValueOrDefault();

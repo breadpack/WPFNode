@@ -326,7 +326,7 @@ public class NodeControl : ContentControl, INodeControl
             viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
             // NodeServices를 통해 PluginService 접근
-            var style = NodeServices.PluginService.FindNodeStyle(viewModel.Model.GetType());
+            var style = WPFNodeServices.UIService.FindNodeStyle(viewModel.Model.GetType());
             if (style != null)
             {
                 // 스타일을 복제하여 사용

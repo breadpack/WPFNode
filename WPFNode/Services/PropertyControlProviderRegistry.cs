@@ -7,16 +7,16 @@ using WPFNode.Interfaces;
 
 namespace WPFNode.Services;
 
-public class PropertyControlProviderRegistry
+public static class PropertyControlProviderRegistry
 {
-    private readonly Dictionary<string, IPropertyControlProvider> _providers = new();
+    private static readonly Dictionary<string, IPropertyControlProvider> _providers = new();
     
-    public void RegisterProvider(IPropertyControlProvider provider)
+    public static void RegisterProvider(IPropertyControlProvider provider)
     {
         _providers[provider.ControlTypeId] = provider;
     }
     
-    public void RegisterProviders()
+    public static void RegisterProviders()
     {
         // 리플렉션을 통한 Provider 등록
         var providerTypes = AppDomain.CurrentDomain.GetAssemblies()
@@ -51,7 +51,7 @@ public class PropertyControlProviderRegistry
         }
     }
     
-    public IPropertyControlProvider? GetProvider(INodeProperty property)
+    public static IPropertyControlProvider? GetProvider(INodeProperty property)
     {
         return _providers.Values
             .Where(p => p.CanHandle(property))
@@ -59,7 +59,7 @@ public class PropertyControlProviderRegistry
             .FirstOrDefault();
     }
     
-    public FrameworkElement CreateControl(INodeProperty property)
+    public static FrameworkElement CreateControl(INodeProperty property)
     {
         var provider = GetProvider(property);
         return provider?.CreateControl(property) ?? new TextBox();

@@ -30,7 +30,7 @@ namespace WPFNode.Demo.Nodes
         {
         }
 
-        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken)
+        public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(IExecutionContext? context, CancellationToken cancellationToken)
         {
             var defaultVal = DefaultValue?.Value ?? "";
             // 입력 값을 출력 포트로 전달

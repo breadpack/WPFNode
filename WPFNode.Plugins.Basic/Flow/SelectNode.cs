@@ -70,7 +70,7 @@ public class SelectNode : NodeBase {
         }
     }
 
-    public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(FlowExecutionContext? context, CancellationToken cancellationToken) {
+    public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(IExecutionContext? context, CancellationToken cancellationToken) {
         var inputValue = GetInputValue();
         if (inputValue == null) {
             yield return HandleNoMatch();
