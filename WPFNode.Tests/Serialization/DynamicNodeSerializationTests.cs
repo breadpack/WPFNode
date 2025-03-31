@@ -227,7 +227,7 @@ namespace WPFNode.Tests.Serialization
             nameProperty.CanConnectToPort = false;
             
             // Act - 직렬화 및 역직렬화
-            var (_, deserializedNode) = SerializeAndDeserialize(canvas);
+            var (deserializedCanvas, deserializedNode) = SerializeAndDeserialize(canvas);
             
             // 타입 변경 시퀀스 테스트 (다양한 타입으로 변경)
             var desTypeProperty = deserializedNode.Properties.FirstOrDefault(p => p.DisplayName == "Target Type") as NodeProperty<Type>;

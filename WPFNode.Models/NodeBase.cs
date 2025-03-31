@@ -596,9 +596,6 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         writer.WriteStartArray("Properties");
         
         foreach (var property in Properties) {
-            if (_dynamicProperties.Contains(property))
-                continue;
-                
             writer.WriteStartObject();
             writer.WriteString("Key", property.Name);
             
