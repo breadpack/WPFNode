@@ -378,7 +378,6 @@ public partial class NodeCanvasControl : Control, INodeCanvasControl
 
     public NodeCanvasControl()
     {
-        
         if (DesignerProperties.GetIsInDesignMode(this))
         {
             DesignPluginService  = new DesignTimeNodeModelService();
@@ -399,6 +398,19 @@ public partial class NodeCanvasControl : Control, INodeCanvasControl
         MouseUp += OnMouseButtonUp;
         MouseMove += OnMouseMove;
         MouseWheel += OnMouseWheel;
+        
+        // 키보드 이벤트 핸들러 연결
+        KeyDown += OnKeyDown;
+        
+        // 컨텍스트 메뉴 초기화
+        var contextMenu = new ContextMenu();
+        var addNodeMenuItem = new MenuItem { Header = "노드 추가" };
+        addNodeMenuItem.Click += OnAddNodeMenuItemClick;
+        contextMenu.Items.Add(addNodeMenuItem);
+        ContextMenu = contextMenu;
+        
+        // 컨텍스트 메뉴 이벤트 핸들러 연결
+        ContextMenuOpening += OnContextMenuOpening;
         
         // Initialize Commands
         CenterViewCommand = new RelayCommand(CenterView);

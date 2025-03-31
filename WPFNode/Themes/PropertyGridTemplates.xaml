@@ -18,110 +18,46 @@
                 </Grid.RowDefinitions>
                 
                 <!-- 컨트롤 헤더 -->
-                <Grid Grid.Row="0" Margin="0,0,0,4">
+                <Grid Grid.Row="0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     
-                    <TextBlock Grid.Column="0" 
-                               Text="{Binding TotalItemCount, StringFormat=총 {0}개 항목}" 
-                               VerticalAlignment="Center" 
-                               FontWeight="Medium"/>
+                    <TextBlock Text="플래그 선택" 
+                               VerticalAlignment="Center"/>
                     
-                    <Button Grid.Column="1" 
-                            Content="모두 선택" 
-                            Command="{Binding SelectAllCommand}"
-                            Margin="4,0" 
-                            Padding="4,1"/>
-                    
-                    <Button Grid.Column="2" 
-                            Content="모두 해제" 
-                            Command="{Binding UnselectAllCommand}"
-                            Padding="4,1"/>
+                    <StackPanel Grid.Column="1" 
+                                Orientation="Horizontal" 
+                                Margin="4,0,0,0">
+                        <Button Content="전체 선택" 
+                                Command="{Binding SelectAllCommand}"
+                                Margin="0,0,4,0"
+                                Padding="4,2"/>
+                        <Button Content="전체 해제" 
+                                Command="{Binding UnselectAllCommand}"
+                                Padding="4,2"/>
+                    </StackPanel>
                 </Grid>
                 
                 <!-- 검색 -->
-                <TextBox Grid.Row="1" 
-                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" 
-                         Margin="0,0,0,4"
-                         Padding="4,2"
-                         BorderBrush="#AAA"
-                         BorderThickness="1"
-                         VerticalContentAlignment="Center">
-                    <TextBox.Style>
-                        <Style TargetType="TextBox">
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="TextBox">
-                                        <Border Background="{TemplateBinding Background}"
-                                                BorderBrush="{TemplateBinding BorderBrush}"
-                                                BorderThickness="{TemplateBinding BorderThickness}"
-                                                CornerRadius="2">
-                                            <Grid>
-                                                <TextBlock Text="검색..." 
-                                                           VerticalAlignment="Center"
-                                                           HorizontalAlignment="Left"
-                                                           Padding="{TemplateBinding Padding}"
-                                                           Foreground="Gray"
-                                                           Visibility="{TemplateBinding Text, Converter={StaticResource NullToVisibleConverter}}"/>
-                                                <ScrollViewer x:Name="PART_ContentHost" 
-                                                              Padding="{TemplateBinding Padding}"
-                                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
-                                            </Grid>
-                                        </Border>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </TextBox.Style>
-                </TextBox>
+                <TextBox Grid.Row="1"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Margin="0,4"
+                         Padding="4,2"/>
                 
-                <!-- 카테고리별 항목 목록 -->
+                <!-- 값 목록 -->
                 <ScrollViewer Grid.Row="2" 
                               MaxHeight="200" 
                               VerticalScrollBarVisibility="Auto" 
                               HorizontalScrollBarVisibility="Disabled">
-                    <ItemsControl ItemsSource="{Binding Categories}">
+                    <ItemsControl ItemsSource="{Binding EnumValues}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Expander Header="{Binding Name}" 
-                                          IsExpanded="{Binding IsExpanded, Mode=TwoWay}"
+                                <CheckBox Content="{Binding DisplayName}"
+                                          IsChecked="{Binding IsSelected}"
                                           Visibility="{Binding IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                          Margin="0,2">
-                                    <Expander.HeaderTemplate>
-                                        <DataTemplate>
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                
-                                                <TextBlock Grid.Column="0" 
-                                                           Text="{Binding Name, StringFormat={}{0}}"
-                                                           VerticalAlignment="Center"/>
-                                                
-                                                <TextBlock Grid.Column="1" 
-                                                           Text="{Binding VisibleCount, StringFormat=({0})}"
-                                                           VerticalAlignment="Center" 
-                                                           Margin="4,0,0,0" 
-                                                           Foreground="Gray"/>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </Expander.HeaderTemplate>
-                                    
-                                    <!-- 카테고리 내 항목 -->
-                                    <ItemsControl ItemsSource="{Binding Values}" Margin="10,2,0,2">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <CheckBox Content="{Binding DisplayName}" 
-                                                          IsChecked="{Binding IsSelected, Mode=TwoWay}" 
-                                                          Margin="0,2"/>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </Expander>
+                                          Margin="0,2"/>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
