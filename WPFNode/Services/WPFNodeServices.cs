@@ -36,7 +36,7 @@ public static class WPFNodeServices
     /// <summary>
     /// WPF UI 기능을 포함한 노드 플러그인 서비스
     /// </summary>
-    public static WPFNodePluginService CombinedPluginService => _combinedService.Value;
+    public static WPFNodePluginService ModelService => _combinedService.Value;
     
     /// <summary>
     /// UI 관련 노드 서비스

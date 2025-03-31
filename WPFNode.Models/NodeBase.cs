@@ -593,19 +593,23 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
     }
 
     protected void WritePropertyValues(Utf8JsonWriter writer) {
-        writer.WriteStartArray("PropertyValues");
+        writer.WriteStartArray("Properties");
         
         foreach (var property in Properties) {
-            if (property.Value == null && !property.PropertyType.IsValueType)
+            if (_dynamicProperties.Contains(property))
                 continue;
                 
             writer.WriteStartObject();
-            writer.WriteString("Name", property.Name);
+            writer.WriteString("Key", property.Name);
             
             // 값 직렬화
-            writer.WritePropertyName("Value");
-            JsonSerializer.Serialize(writer, property.Value, property.PropertyType, NodeCanvasJsonConverter.SerializerOptions);
+
+            if (property.Value != null || property.PropertyType.IsValueType) {
+                writer.WritePropertyName("Value");
+                JsonSerializer.Serialize(writer, property.Value, property.PropertyType, NodeCanvasJsonConverter.SerializerOptions);
+            }
             
+            writer.WriteBoolean("CanConnectToPort", property.CanConnectToPort);
             writer.WriteEndObject();
         }
         
@@ -805,14 +809,14 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
     }
 
     protected void ReadPropertyValues(JsonElement element, JsonSerializerOptions options) {
-        if (!element.TryGetProperty("PropertyValues", out var propertyValuesElement))
+        if (!element.TryGetProperty("Properties", out var propertyValuesElement))
             return;
             
         var elementsByName = new Dictionary<string, JsonElement>();
         
         // 모든 속성을 이름 기준으로 딕셔너리에 저장
         foreach (var propElement in propertyValuesElement.EnumerateArray()) {
-            if (propElement.TryGetProperty("Name", out var nameElement)) {
+            if (propElement.TryGetProperty("Key", out var nameElement)) {
                 var name = nameElement.GetString();
                 if (!string.IsNullOrEmpty(name)) {
                     elementsByName[name] = propElement;
@@ -825,15 +829,20 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         
         // 속성에 값 복원
         foreach (var property in propertiesToProcess) {
-            if (elementsByName.TryGetValue(property.Name, out var propElement) &&
-                propElement.TryGetProperty("Value", out var valueElement)) {
+            if (elementsByName.TryGetValue(property.Name, out var propElement)) {
                 
                 try {
-                    // 재구성 플래그가 설정되어 있어 ReconfigurePorts 호출 방지됨
-                    property.Value = JsonSerializer.Deserialize(
-                        valueElement.GetRawText(),
-                        property.PropertyType,
-                        options);
+                    if (propElement.TryGetProperty("Value", out var valueElement)) {
+                        // 재구성 플래그가 설정되어 있어 ReconfigurePorts 호출 방지됨
+                        property.Value = JsonSerializer.Deserialize(
+                            valueElement.GetRawText(),
+                            property.PropertyType,
+                            options);
+                    }
+
+                    if(propElement.TryGetProperty("CanConnectToPort", out var canConnectElement)) {
+                        property.CanConnectToPort = canConnectElement.GetBoolean();
+                    }
                 }
                 catch (Exception ex) {
                     Logger?.LogError(ex, $"{GetType().Name} 노드의 {property.Name} 속성 복원 중 오류");
@@ -975,18 +984,8 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         var valueType = propType.GetGenericArguments()[0];
             
         // 프로퍼티 생성
-
-        if (Activator.CreateInstance(
-                propType,
-                prop.Name,
-                attr.DisplayName ?? prop.Name,
-                this,
-                _inputPorts.Count,
-                attr.Format,
-                attr.CanConnectToPort) is not INodeProperty property)
-            return;
-            
-        _properties.Add(property);
+        var property = CreatePropertyInternal(prop.Name, attr.DisplayName ?? prop.Name, valueType, attr.Format, attr.CanConnectToPort);
+        
         prop.SetValue(this, property);
                 
         // OnValueChanged 처리
