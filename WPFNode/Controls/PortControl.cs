@@ -5,6 +5,8 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using WPFNode.Utilities;
 using WPFNode.ViewModels.Nodes;
+using System.Linq;
+using System.Collections.Generic;
 
 namespace WPFNode.Controls;
 
@@ -138,14 +140,32 @@ public abstract class PortControl : Control
             var currentPos = e.GetPosition(_dragCanvas);
             var portPos = GetConnectionPointCenter(_dragCanvas);
 
-            // 마우스 위치에서 가장 가까운 포트 찾기
-            var hitTestResult = VisualTreeHelper.HitTest(_dragCanvas, currentPos);
-            var targetPort = hitTestResult?.VisualHit?.GetParentOfType<PortControl>();
-            
-            // 현재 타겟 포트 저장 (자기 자신이 아닌 경우에만)
-            _lastTargetPort = (targetPort != this) ? targetPort : null;
-            
-            // 연결 가능 여부에 따라 라인 스타일 변경
+            PortControl? targetPort = null;
+            const double hitTolerance = 5.0; // Pixels around the cursor - adjust as needed
+            Rect hitArea = new Rect(currentPos.X - hitTolerance, currentPos.Y - hitTolerance,
+                                    hitTolerance * 2, hitTolerance * 2);
+            RectangleGeometry hitGeometry = new RectangleGeometry(hitArea);
+            GeometryHitTestParameters parameters = new GeometryHitTestParameters(hitGeometry);
+
+            HitTestResultCallback hitTestCallback = result =>
+            {
+                if (result.VisualHit is DependencyObject hitVisual)
+                {
+                    var potentialTarget = hitVisual as PortControl ?? hitVisual.GetParentOfType<PortControl>();
+                    
+                    if (potentialTarget != null && potentialTarget != this)
+                    {
+                        targetPort = potentialTarget;
+                        return HitTestResultBehavior.Stop;
+                    }
+                }
+                return HitTestResultBehavior.Continue;
+            };
+
+            VisualTreeHelper.HitTest(_dragCanvas, null, hitTestCallback, parameters);
+
+            _lastTargetPort = targetPort;
+
             UpdateConnectionLineStyle(_dragPath, targetPort);
 
             var pathGeometry = new PathGeometry();
