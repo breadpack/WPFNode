@@ -775,51 +775,56 @@ public partial class NodeCanvasControl : Control, INodeCanvasControl
             e.Handled = true;
             return;
         }
-        
-        // 포트 클릭 확인
-        if (e.Source is PortControl portControl && portControl.ViewModel != null)
-        {
-            _dragStartPort = portControl.ViewModel;
-            _dragLine = new Line
-            {
-                Stroke = Brushes.Gray,
-                StrokeThickness = 2,
-                StrokeDashArray = new DoubleCollection(new[] { 4d, 2d })
-            };
 
-            if (_dragCanvas != null)
+        // --- Start Improved Hit Test ---
+        if (_dragCanvas == null) return;
+
+        // Use VisualTreeHelper.HitTest to find the element at the click position
+        HitTestResult? hitResult = VisualTreeHelper.HitTest(_dragCanvas, e.GetPosition(_dragCanvas));
+        if (hitResult?.VisualHit is DependencyObject hitVisual)
+        {
+            // Check if the hit visual or its parent is a PortControl
+            var portControl = hitVisual as PortControl ?? GetParentOfType<PortControl>(hitVisual);
+            if (portControl != null && portControl.ViewModel != null)
             {
-                _dragCanvas.Children.Add(_dragLine);
-                var portPosition = portControl.TranslatePoint(new Point(6, 6), _dragCanvas);
-                if (_dragStartPort.IsInput)
-                {
-                    _dragLine.X2 = portPosition.X;
-                    _dragLine.Y2 = portPosition.Y;
-                }
-                else
-                {
-                    _dragLine.X1 = portPosition.X;
-                    _dragLine.Y1 = portPosition.Y;
-                }
+                // Port click handling is now primarily managed within PortControl itself.
+                // We don't initiate the drag line here anymore, as PortControl handles its own drag visuals.
+                // Simply capture the mouse to allow PortControl to handle further events.
+                CaptureMouse();
+                e.Handled = true;
+                return;
             }
-            CaptureMouse();
-            e.Handled = true;
-            return;
+
+            // Check if the hit visual or its parent is a NodeControl
+            var nodeControl = hitVisual as NodeControl ?? GetParentOfType<NodeControl>(hitVisual);
+            if (nodeControl != null && nodeControl.DataContext is NodeViewModel nodeViewModel)
+            {
+                _dragNode = nodeViewModel; // Set the node to be dragged
+                CaptureMouse();
+                e.Handled = true;
+                return;
+            }
         }
+        // --- End Improved Hit Test ---
+
+        // If nothing specific was hit (port or node), treat as canvas click
+        // This allows starting selection rectangles or clearing selection (if implemented)
+        // 포트 클릭 확인 (기존 코드 삭제)
+        // if (e.Source is PortControl portControl && portControl.ViewModel != null)
+        // { ... existing port click logic removed ... }
         
-        // 노드 클릭 확인
-        if (e.Source is NodeControl nodeControl && nodeControl.DataContext is NodeViewModel nodeViewModel)
+        // 노드 클릭 확인 (기존 코드 삭제)
+        // if (e.Source is NodeControl nodeControl && nodeControl.DataContext is NodeViewModel nodeViewModel)
+        // { ... existing node click logic removed ... }
+
+        // 캔버스 배경 클릭 (Source check might still be useful for specific canvas background interactions)
+        if (e.Source == this || e.Source == _dragCanvas) // Check if the direct source is the canvas itself
         {
-            _dragNode = nodeViewModel;
-            CaptureMouse();
-            e.Handled = true;
-            return;
-        }
-        
-        // 캔버스 배경 클릭
-        if (e.Source == this)
-        {
-            CaptureMouse();
+            // Clear selection or prepare for selection rectangle start
+            // ViewModel?.ClearSelectionCommand.Execute(null); // TODO: Add ClearSelectionCommand to INodeCanvasViewModel and implement it.
+            // Potentially start selection rectangle logic here if desired
+
+            CaptureMouse(); // Capture mouse for potential panning or selection rectangle
             e.Handled = true;
         }
     }
@@ -836,7 +841,10 @@ public partial class NodeCanvasControl : Control, INodeCanvasControl
             return;
         }
         
-        // 포트 연결 처리
+        // --- Start Cleanup ---
+        // Port connection logic is now handled entirely within PortControl's MouseLeftButtonUp
+        // based on the improved hit-testing during MouseMove. Remove redundant logic here.
+        /* 
         if (_dragStartPort != null && e.Source is PortControl portControl && portControl.ViewModel != null)
         {
             var endPort = portControl.ViewModel;
@@ -849,17 +857,39 @@ public partial class NodeCanvasControl : Control, INodeCanvasControl
                 ViewModel?.ConnectCommand.Execute((_dragStartPort, endPort));
             }
         }
+        */
 
+        // The drag line (_dragLine) is also managed and removed by PortControl now.
+        /*
         if (_dragLine != null && _dragCanvas != null)
         {
             _dragCanvas.Children.Remove(_dragLine);
             _dragLine = null;
         }
+        */
 
-        _dragStartPort = null;
+        // Reset drag states handled by NodeCanvasControl
         _dragNode = null;
         _lastMousePosition = null;
-        ReleaseMouseCapture();
+        // _dragStartPort should already be null if the drag ended correctly in PortControl, but reset just in case.
+        // _dragStartPort = null; // This state is managed by PortControl Start/EndPortDrag
+        
+        // Always release mouse capture on button up unless panning was just stopped
+        if (!_isPanning) 
+        {
+             ReleaseMouseCapture();
+        }
+        // Reset cursor if it was changed for panning (already handled in panning block)
+        // Cursor = Cursors.Arrow;
+        
+        // Note: We don't set e.Handled = true here unconditionally,
+        // as other controls might need to react to MouseUp.
+        // However, if a drag operation (_dragNode) was in progress, it should be handled.
+        if (_dragNode != null) // Check if we were dragging a node
+        {
+            e.Handled = true; 
+        } 
+        // --- End Cleanup ---
     }
 
     private void OnMouseMove(object sender, MouseEventArgs e)
@@ -1188,5 +1218,17 @@ public partial class NodeCanvasControl : Control, INodeCanvasControl
         return new Rect(minX, minY, maxX - minX, maxY - minY);
     }
 
+    #endregion
+
+    #region Private Helper Methods
+
+    // Helper method to find the first ancestor of a given type
+    private T? GetParentOfType<T>(DependencyObject? element) where T : DependencyObject
+    {
+        if (element == null) return null;
+        if (element is T t) return t;
+        return GetParentOfType<T>(VisualTreeHelper.GetParent(element));
+    }
+    
     #endregion
 }

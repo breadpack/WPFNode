@@ -9,11 +9,21 @@
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type local:ConnectionControl}">
                     <Canvas Panel.ZIndex="3">
+                        <!-- 히트 테스트용 투명한 경로 -->
+                        <Path x:Name="PART_HitTestPath"
+                              Data="{Binding Data, ElementName=PART_Path}"
+                              Stroke="Transparent"
+                              StrokeThickness="20"
+                              Fill="Transparent"
+                              IsHitTestVisible="True"
+                              Panel.ZIndex="4"/>
+
                         <!-- 메인 연결선 -->
                         <Path x:Name="PART_Path"
                               Stroke="{TemplateBinding Foreground}"
                               StrokeThickness="2"
-                              Panel.ZIndex="3">
+                              Panel.ZIndex="3"
+                              IsHitTestVisible="False">
                             <Path.Data>
                                 <PathGeometry>
                                     <PathGeometry.Figures>
@@ -37,7 +47,8 @@
                               Fill="{TemplateBinding Foreground}"
                               Stroke="{TemplateBinding Foreground}"
                               StrokeThickness="2"
-                              Panel.ZIndex="3">
+                              Panel.ZIndex="3"
+                              IsHitTestVisible="False">
                             <Path.Data>
                                 <PathGeometry>
                                     <PathFigure StartPoint="0,0">
