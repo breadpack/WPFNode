@@ -17,7 +17,7 @@ namespace WPFNode.Plugins.Basic.String;
 /// <summary>
 /// 문자열 형식 지정 노드
 /// </summary>
-[NodeName("문자열 형식 지정")]
+[NodeName("String.Format")]
 [NodeCategory("문자열")]
 [NodeDescription("형식 지정 문자열({0}, {1} 등)을 사용하여 문자열을 생성합니다.")]
 public class StringFormatNode : NodeBase {
