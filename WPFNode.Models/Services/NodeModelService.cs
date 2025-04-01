@@ -34,13 +34,25 @@ public class NodeModelService : INodeModelService
     {
         try
         {
+            Assembly.Load("WPFNode.Plugins.Basic");
+            
             var assemblies = AppDomain.CurrentDomain.GetAssemblies()
                 .Where(IsValidAssembly)
                 .ToList();
 
+            _logger?.LogInformation("도메인에서 {Count}개의 어셈블리 발견", assemblies.Count);
+
             foreach (var assembly in assemblies)
             {
-                LoadNodesFromAssembly(assembly);
+                try
+                {
+                    LoadNodesFromAssembly(assembly);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "어셈블리 {Assembly} 처리 중 오류 발생", assembly.FullName);
+                    // 계속 진행
+                }
             }
         }
         catch (Exception ex)
@@ -63,9 +75,8 @@ public class NodeModelService : INodeModelService
                 assembly.FullName?.StartsWith("Microsoft.") == true)
                 return false;
 
-            // WPFNode 관련 어셈블리만 포함
-            var assemblyName = assembly.GetName().Name;
-            return assemblyName?.StartsWith("WPFNode") == true;
+            // 외부 플러그인 DLL도 허용
+            return true;
         }
         catch (Exception ex)
         {
@@ -84,19 +95,23 @@ public class NodeModelService : INodeModelService
                 .Where(IsValidNodeType)
                 .ToList();
 
+            if (nodeTypes.Count > 0)
+            {
+                _logger?.LogInformation("어셈블리 {Assembly}에서 {Count}개의 노드 타입 발견", 
+                    assembly.GetName().Name, nodeTypes.Count);
+            }
+
             foreach (var nodeType in nodeTypes)
             {
                 try
                 {
                     RegisterNodeType(nodeType);
+                    _logger?.LogInformation("노드 타입 등록: {NodeType}", nodeType.FullName);
                 }
                 catch (Exception ex)
                 {
                     _logger?.LogError(ex, LoggerMessages.NodeTypeRegistrationFailed, nodeType.FullName);
-                    throw new NodePluginException(
-                        $"노드 타입 등록 실패: {nodeType.FullName}", 
-                        assembly.Location, 
-                        ex);
+                    // 예외 던지지 않고 계속 진행
                 }
             }
         }
@@ -104,18 +119,12 @@ public class NodeModelService : INodeModelService
         {
             _logger?.LogError(ex, LoggerMessages.AssemblyTypeLoadFailed, assembly.FullName);
             LogLoaderExceptions(ex);
-            throw new NodePluginException(
-                $"어셈블리 타입 로드 실패: {assembly.FullName}", 
-                assembly.Location, 
-                ex);
+            // 예외 던지지 않고 계속 진행
         }
         catch (Exception ex) when (ex is not NodePluginException)
         {
             _logger?.LogError(ex, LoggerMessages.AssemblyProcessingError, assembly.FullName);
-            throw new NodePluginException(
-                $"어셈블리 처리 중 오류 발생: {assembly.FullName}", 
-                assembly.Location, 
-                ex);
+            // 예외 던지지 않고 계속 진행
         }
     }
 
@@ -136,17 +145,48 @@ public class NodeModelService : INodeModelService
         
         try
         {
-            var hasValidConstructor = type.GetConstructor(Type.EmptyTypes) != null ||
-                                    type.GetConstructor(new[] { typeof(INodeCanvas), typeof(Guid) }) != null;
+            // 생성자 검증 조건 개선
+            bool hasValidConstructor = HasValidConstructor(type);
             
             return typeof(INode).IsAssignableFrom(type) && 
-                   !type.IsInterface && 
-                   !type.IsAbstract &&
+                   type is { IsInterface: false, IsAbstract: false } &&
                    hasValidConstructor;
         }
         catch (Exception ex)
         {
             _logger?.LogWarning(ex, "타입 유효성 검사 중 오류 발생: {Type}", type.FullName);
+            return false;
+        }
+    }
+
+    // 생성자 검증 개선 메서드 추가
+    private bool HasValidConstructor(Type type)
+    {
+        try
+        {
+            // 기본 생성자 또는 (INodeCanvas, Guid) 생성자 확인
+            var hasDefaultCtor = type.GetConstructor(Type.EmptyTypes) != null;
+            var hasCanvasGuidCtor = type.GetConstructor(new[] { typeof(INodeCanvas), typeof(Guid) }) != null;
+            
+            // 다른 가능한 생성자 패턴 확인
+            if (hasDefaultCtor || hasCanvasGuidCtor)
+                return true;
+                
+            // 모든 생성자 검사
+            var constructors = type.GetConstructors();
+            foreach (var ctor in constructors)
+            {
+                // 다른 유효한 생성자 패턴이 있는지 확인
+                var parameters = ctor.GetParameters();
+                if (parameters.Length <= 2)  // 매개변수가 2개 이하인 생성자도 허용
+                    return true;
+            }
+            
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "생성자 유효성 검사 중 오류 발생: {Type}", type.FullName);
             return false;
         }
     }
@@ -159,25 +199,33 @@ public class NodeModelService : INodeModelService
             return;
         }
 
+        var failedPlugins = new List<string>();
+
         foreach (var dllFile in Directory.GetFiles(pluginPath, "*.dll"))
         {
             try
             {
                 var assembly = Assembly.LoadFrom(dllFile);
-                if (IsValidAssembly(assembly))
-                {
-                    LoadNodesFromAssembly(assembly);
-                    LoadNodePlugins(assembly);
-                }
+                _logger?.LogInformation("플러그인 로드 시도: {PluginPath}", dllFile);
+                
+                // 플러그인 로드 방식 개선: IsValidAssembly 검사 제거
+                LoadNodesFromAssembly(assembly);
+                
+                // LoadNodePlugins 호출 제거 (중복 작업 방지)
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, LoggerMessages.ExternalPluginLoadFailed, dllFile);
-                throw new NodePluginException(
-                    $"외부 플러그인 어셈블리 로드 실패: {dllFile}", 
-                    pluginPath, 
-                    ex);
+                failedPlugins.Add(Path.GetFileName(dllFile));
+                // 예외 발생 시 계속 진행
             }
+        }
+
+        if (failedPlugins.Count > 0)
+        {
+            _logger?.LogWarning("다음 플러그인 로드 실패 ({Count}개): {FailedPlugins}", 
+                failedPlugins.Count, 
+                string.Join(", ", failedPlugins));
         }
     }
     
