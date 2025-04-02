@@ -171,7 +171,7 @@ namespace WPFNode.Tests
             consoleWriteNode.OutPort.Connect(completionTrackingNode.FlowIn);
             
             // 데이터 연결
-            Canvas_ConnectNodePorts(canvas, collectTestNode, "Value", listCollectNode, "항목");
+            Canvas_ConnectNodePorts(canvas, collectTestNode, "Value", listCollectNode, "Element");
             Canvas_ConnectNodePorts(canvas, listCollectNode, "리스트", consoleWriteNode, "Text");
             Canvas_ConnectNodePorts(canvas, completionConstant, "Result", completionTrackingNode, "Value");
 
@@ -287,7 +287,7 @@ namespace WPFNode.Tests
             // 항목 연결
             Canvas_ConnectNodePorts(canvas, constNode1, "Result", listAddNode1, "항목");
             Canvas_ConnectNodePorts(canvas, constNode2, "Result", listAddNode2, "항목");
-            Canvas_ConnectNodePorts(canvas, forEachNode, "현재 항목", itemTrackingNode, "Value");
+            Canvas_ConnectNodePorts(canvas, forEachNode, "Element", itemTrackingNode, "Value");
             Canvas_ConnectNodePorts(canvas, completionValue, "Result", completeTrackingNode, "Value");
 
             // 5. 실행
@@ -409,8 +409,8 @@ namespace WPFNode.Tests
 
             // 6. 결과 확인
             // HashCode가 동일한지 확인 (참조 유지 검증)
-            var addNodeHashCode = listAddNode.OutputPorts[0].Value.GetHashCode();
-            var clearNodeHashCode = listClearNode.OutputPorts[0].Value.GetHashCode();
+            var addNodeHashCode = listAddNode.OutputPorts[0].Value?.GetHashCode() ?? 0;
+            var clearNodeHashCode = listClearNode.OutputPorts[0].Value?.GetHashCode() ?? 0;
             
             _logger.LogInformation($"ListAddNode 결과 HashCode: {addNodeHashCode}");
             _logger.LogInformation($"ListClearNode 결과 HashCode: {clearNodeHashCode}");

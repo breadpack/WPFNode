@@ -56,5 +56,8 @@ public partial class App : Application
         pluginService.RegisterNodeType(typeof(EmployeeVariableNode));
         pluginService.RegisterNodeType(typeof(IntVariableNode));
         pluginService.RegisterNodeType(typeof(StringVariableNode));
+        
+        pluginService.RegisterNodeType(typeof(GenericPropertyDisplayNode));
+        pluginService.RegisterNodeType(typeof(GenericPropertySourceNode));
     }
 }

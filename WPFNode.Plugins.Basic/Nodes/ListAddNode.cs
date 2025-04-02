@@ -78,7 +78,7 @@ namespace WPFNode.Plugins.Basic.Nodes
         {
             // ListInput (GenericInputPort) 에서 값을 가져옴
             // GetValueOrDefault(Type) 사용, IList로 캐스팅
-            var listValue = ListInput?.GetValueOrDefault(typeof(IList));
+            var listValue = ListInput.Value;
 
             if (listValue is not IList list)
             {

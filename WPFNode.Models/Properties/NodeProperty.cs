@@ -2,6 +2,10 @@ using System.Text.Json;
 using WPFNode.Interfaces;
 using WPFNode.Models.Serialization;
 using WPFNode.Utilities;
+using System.Reflection; // Added for MemberInfo
+using WPFNode.Attributes; // Added for NodePropertyAttribute
+using System;
+using TypeExtensions = WPFNode.Utilities.TypeExtensions; // Added for Exception
 
 namespace WPFNode.Models.Properties;
 
@@ -132,5 +136,40 @@ public class NodeProperty<T> : InputPort<T>, INodeProperty {
         
         // 부모 클래스의 ReadJson 호출
         base.ReadJson(element, options);
+    }
+
+    /// <summary>
+    /// Attribute 및 노드 정보를 기반으로 프로퍼티를 초기화합니다.
+    /// </summary>
+    public virtual void Initialize(INode node, NodePropertyAttribute attribute, MemberInfo memberInfo)
+    {
+        // OnValueChanged 콜백 설정
+        if (!string.IsNullOrEmpty(attribute.OnValueChanged))
+        {
+            var method = node.GetType().GetMethod(attribute.OnValueChanged,
+                                                  BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.IgnoreCase);
+
+            if (method != null && method.GetParameters().Length == 0)
+            {
+                PropertyChanged += (s, e) => {
+                    if (e.PropertyName == nameof(Value))
+                    {
+                        try
+                        {
+                            method.Invoke(node, null);
+                        }
+                        catch (Exception ex)
+                        {
+                            // 로깅 필요
+                            System.Diagnostics.Debug.WriteLine($"Error invoking OnValueChanged callback '{attribute.OnValueChanged}': {ex.Message}");
+                        }
+                    }
+                };
+            }
+            else
+            {
+                 System.Diagnostics.Debug.WriteLine($"Warning: OnValueChanged callback method '{attribute.OnValueChanged}' not found or signature mismatch in node '{node.GetType().Name}'. Expected 'void MethodName()'.");
+            }
+        }
     }
 }

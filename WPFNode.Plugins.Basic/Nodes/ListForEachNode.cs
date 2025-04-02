@@ -1,7 +1,4 @@
-using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.Threading;
 using WPFNode.Attributes;
 using WPFNode.Models; // Assuming GenericInputPort is here
 using WPFNode.Models.Execution;
@@ -60,10 +57,10 @@ namespace WPFNode.Plugins.Basic.Nodes
             Type elementType = typeof(object); // 기본값
 
             // ListInput의 현재 결정된 타입을 확인하고 요소 타입 추출
-            if (ListInput != null && ListInput.CurrentResolvedType != null && ListInput.CurrentResolvedType != typeof(object))
+            if (ListInput.CurrentResolvedType != null && ListInput.CurrentResolvedType != typeof(object))
             {
                 var listType = ListInput.CurrentResolvedType;
-                elementType = listType.GetElementType() ?? typeof(object); // 요소 타입 추출
+                elementType = TypeExtensions.GetElementType(listType) ?? typeof(object); // 요소 타입 추출
                 Logger?.LogDebug($"ListInput 타입({listType.Name}) 기반. CurrentItem Type: {elementType.Name} 사용.");
             }
             else
@@ -72,7 +69,7 @@ namespace WPFNode.Plugins.Basic.Nodes
             }
 
             // NodeBuilder를 사용하여 CurrentItem Output 포트를 동적으로 정의/재정의
-            _currentItem = builder.Output("현재 항목", elementType);
+            _currentItem = builder.Output("Element", elementType);
         }
 
         public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
