@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 
 namespace WPFNode.Extensions;
@@ -78,5 +79,67 @@ public static class TypeExtensions
         }
 
         return null; // IDictionary<,>를 구현하지 않음
+    }
+
+    /// <summary>
+    /// 메서드의 사용자 친화적인 이름을 반환합니다.
+    /// </summary>
+    /// <param name="methodInfo">메서드 정보</param>
+    /// <returns>사용자 친화적인 메서드 이름 (파라미터 타입 포함)</returns>
+    public static string GetUserFriendlyName(this MethodInfo methodInfo)
+    {
+        if (methodInfo == null)
+            return "null";
+
+        var parameters = methodInfo.GetParameters();
+        if (parameters.Length == 0)
+            return $"{methodInfo.Name}()";
+
+        var paramNames = parameters.Select(p => $"{p.ParameterType.GetUserFriendlyName()} {p.Name}");
+        return $"{methodInfo.Name}({string.Join(", ", paramNames)})";
+    }
+    
+    /// <summary>
+    /// 메서드의 사용자 친화적인 시그니처를 반환합니다.
+    /// </summary>
+    /// <param name="methodInfo">메서드 정보</param>
+    /// <returns>반환 타입을 포함한 사용자 친화적인 메서드 시그니처</returns>
+    public static string GetUserFriendlySignature(this MethodInfo methodInfo)
+    {
+        if (methodInfo == null)
+            return "null";
+
+        var returnTypeName = methodInfo.ReturnType.GetUserFriendlyName();
+        var methodName = methodInfo.GetUserFriendlyName();
+        
+        return $"{returnTypeName} {methodName}";
+    }
+    
+    /// <summary>
+    /// PropertyInfo의 사용자 친화적인 이름을 반환합니다.
+    /// </summary>
+    /// <param name="propertyInfo">프로퍼티 정보</param>
+    /// <returns>사용자 친화적인 프로퍼티 이름 (타입 포함)</returns>
+    public static string GetUserFriendlyName(this PropertyInfo propertyInfo)
+    {
+        if (propertyInfo == null)
+            return "null";
+            
+        var typeName = propertyInfo.PropertyType.GetUserFriendlyName();
+        return $"{typeName} {propertyInfo.Name}";
+    }
+    
+    /// <summary>
+    /// FieldInfo의 사용자 친화적인 이름을 반환합니다.
+    /// </summary>
+    /// <param name="fieldInfo">필드 정보</param>
+    /// <returns>사용자 친화적인 필드 이름 (타입 포함)</returns>
+    public static string GetUserFriendlyName(this FieldInfo fieldInfo)
+    {
+        if (fieldInfo == null)
+            return "null";
+            
+        var typeName = fieldInfo.FieldType.GetUserFriendlyName();
+        return $"{typeName} {fieldInfo.Name}";
     }
 }
