@@ -325,8 +325,6 @@ public class FlowExecutionEngine {
         foreach (var inputPort in node.InputPorts)
         {
             // Flow 포트는 값 계산이 필요없으므로 제외
-            if (inputPort is IFlowInPort) continue;
-            
             foreach (var connection in inputPort.Connections)
             {
                 if (connection.Source.Node is NodeBase sourceNode)

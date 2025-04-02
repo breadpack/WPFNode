@@ -7,6 +7,7 @@ using WPFNode.Models;
 using WPFNode.Models.Execution;
 using WPFNode.Plugins.Basic.Object;
 using WPFNode.Plugins.Basic.Flow;
+using WPFNode.Plugins.Basic.Primitives; // Added for ConstantNode
 using WPFNode.Tests.Helpers;
 using Xunit;
 
@@ -57,10 +58,9 @@ public class DictionaryNodeTests
         var keyNode = _canvas.CreateNode<ConstantNode<string>>();
         var valueNode = _canvas.CreateNode<ConstantNode<int>>();
 
+        // DictionaryCreateNode는 타입 프로퍼티를 유지한다고 가정 (리팩토링 대상 아님)
         createNode.KeyType.Value = typeof(string);
         createNode.ValueType.Value = typeof(int);
-        addNode.KeyType.Value = typeof(string);
-        addNode.ValueType.Value = typeof(int);
         keyNode.Value.Value = "key1";
         valueNode.Value.Value = 42;
 
@@ -89,11 +89,11 @@ public class DictionaryNodeTests
         // 이름으로 포트 찾기
         var dictOutputPort = createNode.OutputPorts.FirstOrDefault(p => p.Name == "Dictionary");
         var dictInputPort = addNode.InputPorts.FirstOrDefault(p => p.Name == "Dictionary");
+        _canvas.Connect(dictOutputPort, dictInputPort);
+        
         var keyInputPort = addNode.InputPorts.FirstOrDefault(p => p.Name == "Key");
         var valueInputPort = addNode.InputPorts.FirstOrDefault(p => p.Name == "Value");
         
-        // 데이터 포트 연결
-        _canvas.Connect(dictOutputPort, dictInputPort);
         _canvas.Connect(keyNode.Result, keyInputPort);
         _canvas.Connect(valueNode.Result, valueInputPort);
 
@@ -118,12 +118,15 @@ public class DictionaryNodeTests
         var keyNode = _canvas.CreateNode<ConstantNode<string>>();
         var valueNode = _canvas.CreateNode<ConstantNode<int>>();
 
+        // DictionaryCreateNode는 타입 프로퍼티를 유지한다고 가정
         createNode.KeyType.Value = typeof(string);
         createNode.ValueType.Value = typeof(int);
-        addNode.KeyType.Value = typeof(string);
-        addNode.ValueType.Value = typeof(int);
-        getNode.KeyType.Value = typeof(string);
-        getNode.ValueType.Value = typeof(int);
+        // addNode의 타입 설정 제거
+        // addNode.KeyType.Value = typeof(string);
+        // addNode.ValueType.Value = typeof(int);
+        // getNode의 타입 설정 제거
+        // getNode.KeyType.Value = typeof(string);
+        // getNode.ValueType.Value = typeof(int);
         keyNode.Value.Value = "key1";
         valueNode.Value.Value = 42;
 
@@ -135,16 +138,18 @@ public class DictionaryNodeTests
         // 이름으로 포트 찾기 및 연결
         var createDictOut = createNode.OutputPorts.FirstOrDefault(p => p.Name == "Dictionary");
         var addDictIn = addNode.InputPorts.FirstOrDefault(p => p.Name == "Dictionary");
+        _canvas.Connect(createDictOut, addDictIn);
+        
         var addKeyIn = addNode.InputPorts.FirstOrDefault(p => p.Name == "Key");
         var addValueIn = addNode.InputPorts.FirstOrDefault(p => p.Name == "Value");
-        var addDictOut = addNode.OutputPorts.FirstOrDefault(p => p.Name == "Updated");
-        var getDictIn = getNode.InputPorts.FirstOrDefault(p => p.Name == "Dictionary");
-        var getKeyIn = getNode.InputPorts.FirstOrDefault(p => p.Name == "Key");
-        
-        _canvas.Connect(createDictOut, addDictIn);
         _canvas.Connect(keyNode.Result, addKeyIn);
         _canvas.Connect(valueNode.Result, addValueIn);
+        
+        var addDictOut = addNode.OutputPorts.FirstOrDefault(p => p.Name == "Updated");
+        var getDictIn = getNode.InputPorts.FirstOrDefault(p => p.Name == "Dictionary");
         _canvas.Connect(addDictOut, getDictIn);
+        
+        var getKeyIn = getNode.InputPorts.FirstOrDefault(p => p.Name == "Key");
         _canvas.Connect(keyNode.Result, getKeyIn);
 
         await _canvas.ExecuteAsync(_cancellationToken);
@@ -165,12 +170,15 @@ public class DictionaryNodeTests
         var keyNode = _canvas.CreateNode<ConstantNode<string>>();
         var valueNode = _canvas.CreateNode<ConstantNode<int>>();
 
+        // DictionaryCreateNode는 타입 프로퍼티를 유지한다고 가정
         createNode.KeyType.Value = typeof(string);
         createNode.ValueType.Value = typeof(int);
-        addNode.KeyType.Value = typeof(string);
-        addNode.ValueType.Value = typeof(int);
-        containsNode.KeyType.Value = typeof(string);
-        containsNode.ValueType.Value = typeof(int);
+        // addNode의 타입 설정 제거
+        // addNode.KeyType.Value = typeof(string);
+        // addNode.ValueType.Value = typeof(int);
+        // containsNode의 타입 설정 제거
+        // containsNode.KeyType.Value = typeof(string);
+        // containsNode.ValueType.Value = typeof(int);
         keyNode.Value.Value = "key1";
         valueNode.Value.Value = 42;
 
@@ -182,16 +190,18 @@ public class DictionaryNodeTests
         // 이름으로 포트 찾기 및 연결
         var createDictOut = createNode.OutputPorts.FirstOrDefault(p => p.Name == "Dictionary");
         var addDictIn = addNode.InputPorts.FirstOrDefault(p => p.Name == "Dictionary");
+        _canvas.Connect(createDictOut, addDictIn);
+        
         var addKeyIn = addNode.InputPorts.FirstOrDefault(p => p.Name == "Key");
         var addValueIn = addNode.InputPorts.FirstOrDefault(p => p.Name == "Value");
-        var addDictOut = addNode.OutputPorts.FirstOrDefault(p => p.Name == "Updated");
-        var containsDictIn = containsNode.InputPorts.FirstOrDefault(p => p.Name == "Dictionary");
-        var containsKeyIn = containsNode.InputPorts.FirstOrDefault(p => p.Name == "Key");
-        
-        _canvas.Connect(createDictOut, addDictIn);
         _canvas.Connect(keyNode.Result, addKeyIn);
         _canvas.Connect(valueNode.Result, addValueIn);
+        
+        var addDictOut = addNode.OutputPorts.FirstOrDefault(p => p.Name == "Updated");
+        var containsDictIn = containsNode.InputPorts.FirstOrDefault(p => p.Name == "Dictionary");
         _canvas.Connect(addDictOut, containsDictIn);
+        
+        var containsKeyIn = containsNode.InputPorts.FirstOrDefault(p => p.Name == "Key");
         _canvas.Connect(keyNode.Result, containsKeyIn);
 
         await _canvas.ExecuteAsync(_cancellationToken);
@@ -213,12 +223,15 @@ public class DictionaryNodeTests
         var keyNode = _canvas.CreateNode<ConstantNode<string>>();
         var valueNode = _canvas.CreateNode<ConstantNode<int>>();
 
+        // DictionaryCreateNode는 타입 프로퍼티를 유지한다고 가정
         createNode.KeyType.Value = typeof(string);
         createNode.ValueType.Value = typeof(int);
-        addNode.KeyType.Value = typeof(string);
-        addNode.ValueType.Value = typeof(int);
-        removeNode.KeyType.Value = typeof(string);
-        removeNode.ValueType.Value = typeof(int);
+        // addNode의 타입 설정 제거
+        // addNode.KeyType.Value = typeof(string);
+        // addNode.ValueType.Value = typeof(int);
+        // removeNode의 타입 설정 제거
+        // removeNode.KeyType.Value = typeof(string);
+        // removeNode.ValueType.Value = typeof(int);
         keyNode.Value.Value = "key1";
         valueNode.Value.Value = 42;
 
@@ -230,16 +243,18 @@ public class DictionaryNodeTests
         // 이름으로 포트 찾기 및 연결
         var createDictOut = createNode.OutputPorts.FirstOrDefault(p => p.Name == "Dictionary");
         var addDictIn = addNode.InputPorts.FirstOrDefault(p => p.Name == "Dictionary");
+        _canvas.Connect(createDictOut, addDictIn);
+        
         var addKeyIn = addNode.InputPorts.FirstOrDefault(p => p.Name == "Key");
         var addValueIn = addNode.InputPorts.FirstOrDefault(p => p.Name == "Value");
-        var addDictOut = addNode.OutputPorts.FirstOrDefault(p => p.Name == "Updated");
-        var removeDictIn = removeNode.InputPorts.FirstOrDefault(p => p.Name == "Dictionary");
-        var removeKeyIn = removeNode.InputPorts.FirstOrDefault(p => p.Name == "Key");
-        
-        _canvas.Connect(createDictOut, addDictIn);
         _canvas.Connect(keyNode.Result, addKeyIn);
         _canvas.Connect(valueNode.Result, addValueIn);
+        
+        var addDictOut = addNode.OutputPorts.FirstOrDefault(p => p.Name == "Updated");
+        var removeDictIn = removeNode.InputPorts.FirstOrDefault(p => p.Name == "Dictionary");
         _canvas.Connect(addDictOut, removeDictIn);
+        
+        var removeKeyIn = removeNode.InputPorts.FirstOrDefault(p => p.Name == "Key");
         _canvas.Connect(keyNode.Result, removeKeyIn);
 
         await _canvas.ExecuteAsync(_cancellationToken);
@@ -265,14 +280,18 @@ public class DictionaryNodeTests
         var keyNode2 = _canvas.CreateNode<ConstantNode<string>>();
         var valueNode2 = _canvas.CreateNode<ConstantNode<int>>();
 
+        // DictionaryCreateNode는 타입 프로퍼티를 유지한다고 가정
         createNode.KeyType.Value = typeof(string);
         createNode.ValueType.Value = typeof(int);
-        addNode1.KeyType.Value = typeof(string);
-        addNode1.ValueType.Value = typeof(int);
-        addNode2.KeyType.Value = typeof(string);
-        addNode2.ValueType.Value = typeof(int);
-        forEachNode.KeyType.Value = typeof(string);
-        forEachNode.ValueType.Value = typeof(int);
+        // addNode1의 타입 설정 제거
+        // addNode1.KeyType.Value = typeof(string);
+        // addNode1.ValueType.Value = typeof(int);
+        // addNode2의 타입 설정 제거
+        // addNode2.KeyType.Value = typeof(string);
+        // addNode2.ValueType.Value = typeof(int);
+        // forEachNode의 타입 설정 제거
+        // forEachNode.KeyType.Value = typeof(string);
+        // forEachNode.ValueType.Value = typeof(int);
         keyNode1.Value.Value = "key1";
         valueNode1.Value.Value = 42;
         keyNode2.Value.Value = "key2";
@@ -288,25 +307,25 @@ public class DictionaryNodeTests
         var createDictOut = createNode.OutputPorts.FirstOrDefault(p => p.Name == "Dictionary");
         
         var add1DictIn = addNode1.InputPorts.FirstOrDefault(p => p.Name == "Dictionary");
+        _canvas.Connect(createDictOut, add1DictIn);
+        
         var add1KeyIn = addNode1.InputPorts.FirstOrDefault(p => p.Name == "Key");
         var add1ValueIn = addNode1.InputPorts.FirstOrDefault(p => p.Name == "Value");
-        var add1DictOut = addNode1.OutputPorts.FirstOrDefault(p => p.Name == "Updated");
-        
-        var add2DictIn = addNode2.InputPorts.FirstOrDefault(p => p.Name == "Dictionary");
-        var add2KeyIn = addNode2.InputPorts.FirstOrDefault(p => p.Name == "Key");
-        var add2ValueIn = addNode2.InputPorts.FirstOrDefault(p => p.Name == "Value");
-        var add2DictOut = addNode2.OutputPorts.FirstOrDefault(p => p.Name == "Updated");
-        
-        var forEachDictIn = forEachNode.InputPorts.FirstOrDefault(p => p.Name == "Dictionary");
-        
-        _canvas.Connect(createDictOut, add1DictIn);
         _canvas.Connect(keyNode1.Result, add1KeyIn);
         _canvas.Connect(valueNode1.Result, add1ValueIn);
         
+        var add1DictOut = addNode1.OutputPorts.FirstOrDefault(p => p.Name == "Updated");
+        
+        var add2DictIn = addNode2.InputPorts.FirstOrDefault(p => p.Name == "Dictionary");
         _canvas.Connect(add1DictOut, add2DictIn);
+        
+        var add2KeyIn = addNode2.InputPorts.FirstOrDefault(p => p.Name == "Key");
+        var add2ValueIn = addNode2.InputPorts.FirstOrDefault(p => p.Name == "Value");
         _canvas.Connect(keyNode2.Result, add2KeyIn);
         _canvas.Connect(valueNode2.Result, add2ValueIn);
         
+        var add2DictOut = addNode2.OutputPorts.FirstOrDefault(p => p.Name == "Updated");
+        var forEachDictIn = forEachNode.InputPorts.FirstOrDefault(p => p.Name == "Dictionary");
         _canvas.Connect(add2DictOut, forEachDictIn);
 
         await _canvas.ExecuteAsync(_cancellationToken);
@@ -353,12 +372,15 @@ public class DictionaryNodeTests
         var valueNode = _canvas.CreateNode<ConstantNode<int>>();
         var defaultValueNode = _canvas.CreateNode<ConstantNode<int>>();
 
+        // DictionaryCreateNode는 타입 프로퍼티를 유지한다고 가정
         createNode.KeyType.Value = typeof(string);
         createNode.ValueType.Value = typeof(int);
-        addNode.KeyType.Value = typeof(string);
-        addNode.ValueType.Value = typeof(int);
-        getOrDefaultNode.KeyType.Value = typeof(string);
-        getOrDefaultNode.ValueType.Value = typeof(int);
+        // addNode의 타입 설정 제거
+        // addNode.KeyType.Value = typeof(string);
+        // addNode.ValueType.Value = typeof(int);
+        // getOrDefaultNode의 타입 설정 제거
+        // getOrDefaultNode.KeyType.Value = typeof(string);
+        // getOrDefaultNode.ValueType.Value = typeof(int);
         keyNode.Value.Value = "key1";
         valueNode.Value.Value = 42;
         defaultValueNode.Value.Value = 0;
@@ -372,18 +394,20 @@ public class DictionaryNodeTests
         var createDictOut = createNode.OutputPorts.FirstOrDefault(p => p.Name == "Dictionary");
         
         var addDictIn = addNode.InputPorts.FirstOrDefault(p => p.Name == "Dictionary");
+        _canvas.Connect(createDictOut, addDictIn);
+        
         var addKeyIn = addNode.InputPorts.FirstOrDefault(p => p.Name == "Key");
         var addValueIn = addNode.InputPorts.FirstOrDefault(p => p.Name == "Value");
+        _canvas.Connect(keyNode.Result, addKeyIn);
+        _canvas.Connect(valueNode.Result, addValueIn);
+        
         var addDictOut = addNode.OutputPorts.FirstOrDefault(p => p.Name == "Updated");
         
         var getOrDefaultDictIn = getOrDefaultNode.InputPorts.FirstOrDefault(p => p.Name == "Dictionary");
+        _canvas.Connect(addDictOut, getOrDefaultDictIn);
+        
         var getOrDefaultKeyIn = getOrDefaultNode.InputPorts.FirstOrDefault(p => p.Name == "Key");
         var getOrDefaultValueIn = getOrDefaultNode.InputPorts.FirstOrDefault(p => p.Name == "DefaultValue");
-        
-        _canvas.Connect(createDictOut, addDictIn);
-        _canvas.Connect(keyNode.Result, addKeyIn);
-        _canvas.Connect(valueNode.Result, addValueIn);
-        _canvas.Connect(addDictOut, getOrDefaultDictIn);
         _canvas.Connect(keyNode.Result, getOrDefaultKeyIn);
         _canvas.Connect(defaultValueNode.Result, getOrDefaultValueIn);
 
@@ -393,4 +417,4 @@ public class DictionaryNodeTests
         var valueOut = getOrDefaultNode.OutputPorts.FirstOrDefault(p => p.Name == "Value");
         Assert.Equal(42, valueOut.Value);
     }
-} 
+}

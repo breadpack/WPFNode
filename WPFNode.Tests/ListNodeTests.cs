@@ -154,8 +154,9 @@ namespace WPFNode.Tests
 
             // 3. 노드 설정
             collectTestNode.CountProperty.Value = 5; // 5개의 값을 생성
-            listCollectNode.ElementType.Value = typeof(int);
-            
+            // listCollectNode의 타입 설정 제거 (GenericInputPort 사용 가정)
+            // listCollectNode.ElementType.Value = typeof(int);
+
             // Flow가 완료된 후 검증하기 위한 TrackingNode 추가
             var completionTrackingNode = canvas.CreateNode<TrackingNode<int>>(300, 100);
             
@@ -204,10 +205,12 @@ namespace WPFNode.Tests
             var trackingNode = canvas.CreateNode<TrackingNode<List<int>>>(300, 0);
 
             // 3. 노드 설정
+            // ListCreateNode는 타입 프로퍼티 유지
             listCreateNode.ElementType.Value = typeof(int);
-            listAddNode.ElementType.Value = typeof(int);
-            listAddNode2.ElementType.Value = typeof(int);
-            
+            // listAddNode, listAddNode2의 타입 설정 제거
+            // listAddNode.ElementType.Value = typeof(int);
+            // listAddNode2.ElementType.Value = typeof(int);
+
             // 상수 노드 값 수동 설정
             constNode.Value.Value = 42;
 
@@ -253,10 +256,12 @@ namespace WPFNode.Tests
             var completeTrackingNode = canvas.CreateNode<TrackingNode<int>>(500, 100);
 
             // 3. 노드 설정
+            // ListCreateNode는 타입 프로퍼티 유지
             listCreateNode.ElementType.Value = typeof(int);
-            listAddNode1.ElementType.Value = typeof(int);
-            listAddNode2.ElementType.Value = typeof(int);
-            forEachNode.ElementType.Value = typeof(int);
+            // listAddNode1, listAddNode2, forEachNode의 타입 설정 제거
+            // listAddNode1.ElementType.Value = typeof(int);
+            // listAddNode2.ElementType.Value = typeof(int);
+            // forEachNode.ElementType.Value = typeof(int);
 
             // 상수 노드 값 설정
             constNode1.Value.Value = 10;
@@ -316,10 +321,12 @@ namespace WPFNode.Tests
             var consoleWriteNode = canvas.CreateNode<ConsoleWriteNode>(400, 0);
 
             // 3. 노드 설정
+            // ListCreateNode는 타입 프로퍼티 유지
             listCreateNode.ElementType.Value = typeof(int);
-            listAddNode1.ElementType.Value = typeof(int);
-            listAddNode2.ElementType.Value = typeof(int);
-            listRemoveNode.ElementType.Value = typeof(int);
+            // listAddNode1, listAddNode2, listRemoveNode의 타입 설정 제거
+            // listAddNode1.ElementType.Value = typeof(int);
+            // listAddNode2.ElementType.Value = typeof(int);
+            // listRemoveNode.ElementType.Value = typeof(int);
             constNode1.Value.Value = 10;
             constNode2.Value.Value = 20;
 
@@ -376,9 +383,11 @@ namespace WPFNode.Tests
             var consoleWriteNode = canvas.CreateNode<ConsoleWriteNode>(400, 0);
 
             // 3. 노드 설정
+            // ListCreateNode는 타입 프로퍼티 유지
             listCreateNode.ElementType.Value = typeof(int);
-            listAddNode.ElementType.Value = typeof(int);
-            listClearNode.ElementType.Value = typeof(int);
+            // listAddNode, listClearNode의 타입 설정 제거
+            // listAddNode.ElementType.Value = typeof(int);
+            // listClearNode.ElementType.Value = typeof(int);
             constNode.Value.Value = 42;
 
             // 4. 노드 연결

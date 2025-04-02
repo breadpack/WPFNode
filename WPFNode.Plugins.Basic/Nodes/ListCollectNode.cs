@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Printing;
 using System.Threading;
 using WPFNode.Attributes;
 using WPFNode.Models;
@@ -21,10 +22,9 @@ namespace WPFNode.Plugins.Basic.Nodes {
         [NodeFlowOut]
         public IFlowOutPort FlowOut { get; set; }
 
-        [NodeProperty("요소 타입", OnValueChanged = nameof(ElementType_Changed))]
-        public NodeProperty<Type> ElementType { get; set; }
-
-        private IInputPort  _itemInput;
+        [NodeInput("Element", ConnectionStateChangedCallback = nameof(ElementType_Changed))]
+        public GenericInputPort  ItemInput { get; set; }
+        
         private IOutputPort _listOutput;
         private object      _collectedList;
 
@@ -38,10 +38,9 @@ namespace WPFNode.Plugins.Basic.Nodes {
         }
 
         protected override void Configure(NodeBuilder builder) {
-            var elementType = ElementType?.Value ?? typeof(object);
+            var elementType = ItemInput.ConnectedType ?? typeof(object);
             var listType    = typeof(List<>).MakeGenericType(elementType);
 
-            _itemInput     = builder.Input("항목", elementType);
             _listOutput    = builder.Output("리스트", listType);
             _collectedList = Activator.CreateInstance(listType)!;
         }
@@ -60,7 +59,7 @@ namespace WPFNode.Plugins.Basic.Nodes {
             }
             else if (activeFlowInPort == AddFlowIn) {
                 // Add 포트가 활성화된 경우 항목 추가
-                var itemValue = ((dynamic)_itemInput).GetValueOrDefault();
+                var itemValue = ItemInput.Value;
 
                 // 항목 추가 전 디버그 출력
                 System.Diagnostics.Debug.WriteLine($"ListCollectNode: 항목 추가 중 - {itemValue}, 타입: {(itemValue != null ? itemValue.GetType().Name : "null")}");

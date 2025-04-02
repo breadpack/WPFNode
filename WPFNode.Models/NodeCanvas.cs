@@ -181,6 +181,16 @@ public partial class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         OnNodeRemoved(node);
     }
 
+    public IConnection Connect(IPort source, IPort target) {
+        if(source is IOutputPort outputPort && target is IInputPort inputPort) {
+            return Connect(outputPort, inputPort);
+        }
+        if(source is IFlowOutPort flowOutPort && target is IFlowInPort flowInPort) {
+            return Connect(flowOutPort, flowInPort);
+        }
+        throw new NodeConnectionException("소스와 타겟 포트가 서로 호환되지 않습니다.", source, target);
+    }
+
     public IConnection Connect(IOutputPort source, IInputPort target)
     {
         if (source == null || target == null)
@@ -188,6 +198,22 @@ public partial class NodeCanvas : INodeCanvas, INotifyPropertyChanged
 
         if (!source.CanConnectTo(target))
             throw new NodeConnectionException("포트 간 연결이 불가능합니다.", source, target);
+
+        var connection = new Connection(this, source, target);
+        source.AddConnection(connection);
+        target.AddConnection(connection);
+        
+        // 캔버스의 연결 목록에 추가
+        _connections.Add(connection);
+        OnConnectionAdded(connection);
+        OnPropertyChanged(nameof(Connections));
+        
+        return connection;
+    }
+
+    public IConnection Connect(IFlowOutPort source, IFlowInPort target) {
+        if (source == null || target == null)
+            throw new NodeConnectionException("소스 또는 타겟 포트가 null입니다.");
 
         var connection = new Connection(this, source, target);
         source.AddConnection(connection);
@@ -399,34 +425,38 @@ public partial class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         return node;
     }
 
-    public IConnection ConnectWithId(Guid id, IPort source, IPort target)
-    {
-        if (source is not IOutputPort outputPort)
-            throw new NodeConnectionException("소스는 출력 포트여야 합니다.", source, target);
-        if (target is not IInputPort inputPort)
-            throw new NodeConnectionException("타겟은 입력 포트여야 합니다.", source, target);
-        if (!outputPort.CanConnectTo(inputPort))
+    public IConnection ConnectWithId(Guid id, IPort source, IPort target) {
+        if(source is IOutputPort outputPort && target is IInputPort inputPort) {
+            return ConnectWithId(id, outputPort, inputPort);
+        }
+        if(source is IFlowOutPort flowOutPort && target is IFlowInPort flowInPort) {
+            return ConnectWithId(id, flowOutPort, flowInPort);
+        }
+        throw new NodeConnectionException("소스와 타겟 포트가 서로 호환되지 않습니다.", source, target);
+    }
+
+    public IConnection ConnectWithId(Guid id, IOutputPort source, IInputPort target) {
+        if (!source.CanConnectTo(target))
             throw new NodeConnectionException("포트를 연결할 수 없습니다.", source, target);
+
+        return _ConnectionWithId(id, source, target);
+    }
+
+    public IConnection ConnectWithId(Guid id, IFlowOutPort source, IFlowInPort target) {
+        return _ConnectionWithId(id, source, target);
+    }
+
+    private IConnection _ConnectionWithId(Guid id, IPort source, IPort target) {
         if (source.Node == null || target.Node == null)
             throw new NodeConnectionException("포트는 노드에 연결되어 있어야 합니다.", source, target);
 
-        var sourcePortId = new PortId(
-            source.Node.Guid,
-            false,
-            outputPort.Name);
-            
-        var targetPortId = new PortId(
-            target.Node.Guid,
-            true,
-            inputPort.Name);
-
         // 중복 연결 체크
-        if (_connections.Any(c => c.SourcePortId == sourcePortId && c.TargetPortId == targetPortId))
-        {
-            throw new NodeConnectionException("이미 연결되어 있는 포트입니다.", source, target);
+        var connection = FindConnection(source.Id, target.Id);
+        if (connection != null) {
+            return connection;
         }
 
-        var connection = new Connection(id, this, outputPort, inputPort);
+        connection = new Connection(id, this, source, target);
         source.AddConnection(connection);
         target.AddConnection(connection);
         _connections.Add(connection);

@@ -1,92 +1,129 @@
 using System;
+using System.Collections; // Added for IDictionary
 using System.Collections.Generic;
 using System.Threading;
 using WPFNode.Attributes;
 using WPFNode.Interfaces;
-using WPFNode.Models;
+using WPFNode.Models; // Assuming GenericInputPort is here
 using WPFNode.Models.Execution;
-using WPFNode.Models.Properties;
+// using WPFNode.Models.Properties; // NodeProperty<Type> is removed
+using WPFNode.Utilities;            // Keep this if other utilities are used
+using WPFNode.Extensions;           // Keep this for GetDictionaryKeyValueTypes
+using Microsoft.Extensions.Logging; // Added for logging
 
 namespace WPFNode.Plugins.Basic.Object;
 
 [NodeName("Dictionary.GetOrDefault")]
 [NodeDescription("Dictionary에서 키에 해당하는 값을 가져옵니다. 키가 없는 경우 기본값을 반환합니다.")]
 [NodeCategory("컬렉션")]
-public class DictionaryGetOrDefaultNode : NodeBase
-{
+public class DictionaryGetOrDefaultNode : NodeBase {
     [NodeFlowIn]
-    public IFlowInPort FlowIn { get; set; }
-    
+    public IFlowInPort FlowIn { get; private set; }
+
     [NodeFlowOut("Success")]
-    public IFlowOutPort SuccessOut { get; set; }
-    
+    public IFlowOutPort SuccessOut { get; private set; }
+
     [NodeFlowOut("Failure")]
-    public IFlowOutPort FailureOut { get; set; }
-    
-    [NodeProperty("Key Type", OnValueChanged = nameof(TypeChanged))]
-    public NodeProperty<Type> KeyType { get; set; }
-    
-    [NodeProperty("Value Type", OnValueChanged = nameof(TypeChanged))]
-    public NodeProperty<Type> ValueType { get; set; }
-    
-    private IInputPort _dictionaryInput;
+    public IFlowOutPort FailureOut { get; private set; }
+
+    // KeyType, ValueType properties are removed
+
+    // DictionaryInput: GenericInputPort 타입으로 선언.
+    [NodeInput("Dictionary", ConnectionStateChangedCallback = nameof(DictionaryInput_ConnectionChanged))]
+    public GenericInputPort DictionaryInput { get; private set; }
+
+    // KeyInput, DefaultValueInput, ValueOutput: Configure에서 동적으로 관리됨.
     private IInputPort _keyInput;
     private IInputPort _defaultValueInput;
+
     private IOutputPort _valueOutput;
-    private IOutputPort _keyExistsOutput;
-    
-    public DictionaryGetOrDefaultNode(INodeCanvas canvas, Guid guid) : base(canvas, guid)
-    {
-        Name = "Dictionary.GetOrDefault";
-        Description = "Dictionary에서 키에 해당하는 값을 가져옵니다. 키가 없는 경우 기본값을 반환합니다.";
+
+    // KeyExistsOutput: bool 타입으로 고정.
+    [NodeOutput("Contains")]
+    public OutputPort<bool> KeyExistsOutput { get; private set; }
+
+    public DictionaryGetOrDefaultNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) {
+        Name        = "Dictionary.GetOrDefault";
+        Description = "Dictionary에서 키에 해당하는 값을 가져옵니다. 키가 없는 경우 기본값을 반환합니다. Dictionary 입력 타입에 따라 키/값/기본값 타입을 자동으로 결정합니다.";
     }
-    
-    private void TypeChanged()
-    {
-        ReconfigurePorts();
+
+    // DictionaryInput의 연결 상태 또는 타입이 변경될 때 호출될 콜백 메서드
+    private void DictionaryInput_ConnectionChanged(IInputPort port) {
+        Logger?.LogDebug($"DictionaryInput 포트 상태 변경됨 (연결 또는 타입).");
+        ReconfigurePorts(); // KeyInput, DefaultValueInput, ValueOutput 재구성을 위해 호출
     }
-    
-    protected override void Configure(NodeBuilder builder)
-    {
-        var keyType = KeyType?.Value ?? typeof(object);
-        var valueType = ValueType?.Value ?? typeof(object);
-        var dictType = typeof(Dictionary<,>).MakeGenericType(keyType, valueType);
-        
-        _dictionaryInput = builder.Input("Dictionary", dictType);
-        _keyInput = builder.Input("Key", keyType);
-        _defaultValueInput = builder.Input("DefaultValue", valueType);
-        _valueOutput = builder.Output("Value", valueType);
-        _keyExistsOutput = builder.Output("Contains", typeof(bool));
+
+    // Configure 메서드는 동적으로 관리해야 하는 포트만 정의
+    protected override void Configure(NodeBuilder builder) {
+        // DictionaryInput, KeyExistsOutput 등 Attribute로 정의된 포트는 builder로 다시 정의하지 않음.
+
+        // KeyInput, DefaultValueInput, ValueOutput의 타입을 결정
+        Type keyType   = typeof(object); // 기본값
+        Type valueType = typeof(object); // 기본값
+
+        // DictionaryInput의 현재 결정된 타입을 확인하고 Key/Value 타입 추출
+        if (DictionaryInput.CurrentResolvedType != null && DictionaryInput.CurrentResolvedType != typeof(object)) {
+            var dictType = DictionaryInput.CurrentResolvedType;
+            // 유틸리티 함수를 사용하여 Key/Value 타입 추출 시도 (using WPFNode.Extensions; 필요)
+            (keyType, valueType) = dictType.GetDictionaryKeyValueTypes() ?? (typeof(object), typeof(object));
+            Logger?.LogDebug($"DictionaryInput 타입({dictType.Name}) 기반. KeyType: {keyType.Name}, ValueType: {valueType.Name} 사용.");
+        }
+        else {
+            Logger?.LogDebug("DictionaryInput 타입 불명확. KeyType: object, ValueType: object 사용.");
+        }
+
+        // NodeBuilder를 사용하여 KeyInput, DefaultValueInput, ValueOutput을 동적으로 정의/재정의
+        _keyInput          = builder.Input("Key", keyType);
+        _defaultValueInput = builder.Input("DefaultValue", valueType); // DefaultValue도 ValueType과 동일하게
+        _valueOutput       = builder.Output("Value", valueType);
     }
-    
+
     public override async IAsyncEnumerable<IFlowOutPort> ProcessAsync(
         IExecutionContext? context,
-        CancellationToken cancellationToken = default)
-    {
-        var dictionary = ((dynamic)_dictionaryInput).GetValueOrDefault();
-        var key = ((dynamic)_keyInput).GetValueOrDefault();
-        var defaultValue = ((dynamic)_defaultValueInput).GetValueOrDefault();
-        
-        if (dictionary == null)
+        CancellationToken  cancellationToken = default
+    ) {
+        var     dictionaryValue = DictionaryInput.Value;
+        var     key             = _keyInput.Value;
+        var     defaultValue    = _defaultValueInput.Value; // 기본값 가져오기
+        bool    keyExists       = false;
+        object? foundValue      = defaultValue; // 기본값을 초기값으로 설정
+
+        if (dictionaryValue is IDictionary dictionary && key != null) // IDictionary 인터페이스 및 non-null key로 작업
         {
-            ((dynamic)_valueOutput).Value = defaultValue;
-            ((dynamic)_keyExistsOutput).Value = false;
-            yield return FailureOut;
-            yield break;
+            try {
+                keyExists = dictionary.Contains(key);
+                if (keyExists) {
+                    foundValue = dictionary[key]; // 키가 존재하면 실제 값 사용
+                    Logger?.LogDebug($"Dictionary에서 키 '{key}'에 해당하는 값 '{foundValue}'을(를) 찾았습니다.");
+                }
+                else {
+                    Logger?.LogDebug($"Dictionary에 키 '{key}'이(가) 존재하지 않아 기본값 '{defaultValue}'을(를) 사용합니다.");
+                    // foundValue는 이미 defaultValue로 초기화됨
+                }
+            }
+            catch (Exception ex) // Contains 또는 인덱서 접근 시 예외 발생 가능성
+            {
+                Logger?.LogError(ex, $"Dictionary GetOrDefault 작업 중 오류 발생: {ex.Message}");
+                keyExists  = false;
+                foundValue = defaultValue; // 오류 시 기본값 사용
+            }
         }
-        
-        if (key == null)
-        {
-            ((dynamic)_valueOutput).Value = defaultValue;
-            ((dynamic)_keyExistsOutput).Value = false;
-            yield return FailureOut;
-            yield break;
+        else {
+            if (dictionaryValue == null) Logger?.LogWarning("DictionaryInput 값이 null입니다. 기본값을 사용합니다.");
+            if (key == null) Logger?.LogWarning("KeyInput 값이 null입니다. 기본값을 사용합니다.");
+            if (dictionaryValue != null && !(dictionaryValue is IDictionary)) Logger?.LogError("DictionaryInput 값이 IDictionary가 아닙니다. 기본값을 사용합니다.");
+            keyExists  = false;
+            foundValue = defaultValue; // 유효하지 않은 입력 시 기본값 사용
         }
-        
-        var keyExists = dictionary.ContainsKey(key);
-        ((dynamic)_valueOutput).Value = keyExists ? dictionary[key] : defaultValue;
-        ((dynamic)_keyExistsOutput).Value = keyExists;
-        
-        yield return keyExists ? SuccessOut : FailureOut;
+
+        // 결과 Output 설정
+        KeyExistsOutput.Value = keyExists; // KeyExistsOutput은 OutputPort<bool> 타입이므로 .Value 사용
+        _valueOutput.Value    = foundValue;
+
+        // 키 존재 여부에 따라 Flow 출력 (Get과 동일하게)
+        if (keyExists)
+            yield return SuccessOut;
+        else
+            yield return FailureOut;
     }
-} 
+}

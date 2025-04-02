@@ -1,5 +1,8 @@
+using System; // Added for Type
+using System.Collections.Generic; // Added for Dictionary, IReadOnlyList
 using System.ComponentModel;
 using System.Text.Json;
+using System.Text.Json.Serialization; // Added for JsonIgnore
 using WPFNode.Interfaces;
 using WPFNode.Utilities;
 using WPFNode.Exceptions;
@@ -11,6 +14,7 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
     protected readonly int                               _index;
     protected          bool                              _isVisible = true;
     protected          IConnection?                      _connection;
+    private            Type?                             _connectedType; // Cache for ConnectedType
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -25,6 +29,12 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
     public Type   DataType    => typeof(T);
     public bool   IsInput     => true;
     public bool   IsConnected => _connection != null;
+
+    /// <summary>
+    /// 연결된 OutputPort의 데이터 타입입니다. 연결되지 않은 경우 null입니다.
+    /// </summary>
+    [JsonIgnore] // 직렬화에서 제외
+    public Type? ConnectedType => _connectedType;
 
     public bool IsVisible {
         get => _isVisible;
@@ -130,7 +140,7 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
     /// 컬렉션의 참조 일관성을 유지하기 위해 사용됩니다.
     /// </summary>
     protected object? GetValueWithoutConversion() {
-        if (_connection?.Source is not { } outputPort)
+        if (_connection?.Source is not IOutputPort { } outputPort)
             return null;
             
         return outputPort.Value;
@@ -143,9 +153,11 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
         else
             System.Diagnostics.Debug.WriteLine(message);
     }
+
+    public object? Value => GetValueOrDefault();
     
     public virtual T? GetValueOrDefault(T? defaultValue = default) {
-        if (_connection?.Source is not { } outputPort || outputPort.Value == null)
+        if (_connection?.Source is not IOutputPort { } outputPort || outputPort.Value == null)
             return defaultValue;
         
         var sourceValue = outputPort.Value;
@@ -509,8 +521,10 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
         _connection?.Disconnect();
 
         _connection = connection;
+        _connectedType = connection?.Source?.DataType; // 연결 시 ConnectedType 업데이트
         OnPropertyChanged(nameof(Connections));
         OnPropertyChanged(nameof(IsConnected));
+        OnPropertyChanged(nameof(ConnectedType)); // ConnectedType 변경 알림
     }
 
     public void RemoveConnection(IConnection connection) {
@@ -521,8 +535,14 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
 
         if (_connection == connection) {
             _connection = null;
+            var previousConnectedType = _connectedType;
+            _connectedType = null; // 연결 해제 시 ConnectedType 업데이트
             OnPropertyChanged(nameof(Connections));
             OnPropertyChanged(nameof(IsConnected));
+            // 타입이 실제로 변경되었을 때만 알림 (null -> null 방지)
+            if (previousConnectedType != null) {
+                OnPropertyChanged(nameof(ConnectedType)); // ConnectedType 변경 알림
+            }
         }
     }
 
@@ -562,6 +582,13 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
 
     protected virtual void OnPropertyChanged(string propertyName) {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    /// <summary>
+    /// 포트 초기화 로직. InputPort<T>는 기본적으로 할 일이 없습니다.
+    /// </summary>
+    public virtual void Initialize() {
+        // 기본 구현은 비어 있음
     }
 
     public void WriteJson(Utf8JsonWriter writer) {

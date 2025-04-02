@@ -128,12 +128,12 @@ namespace WPFNode.Demo.Nodes
                 var newPort = OutputPorts.FirstOrDefault(p => p.Name == portName);
                 var targetPort = connection.Target;
                 
-                if (newPort != null && targetPort != null)
+                if (newPort != null && targetPort is IInputPort inputPort)
                 {
                     try
                     {
                         // 새로운 포트와 타겟 포트 연결
-                        newPort.Connect(targetPort);
+                        newPort.Connect(inputPort);
                     }
                     catch (Exception ex)
                     {

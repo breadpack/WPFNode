@@ -23,6 +23,10 @@ public class FlowInPort : IFlowInPort, INotifyPropertyChanged
     public PortId Id => new(Node.Guid, true, Name);
     public string Name { get; set; }
     public Type DataType => typeof(void); // Flow 포트는 타입이 없음을 void로 표현
+    /// <summary>
+    /// Flow 포트는 특정 데이터 타입을 전달하지 않으므로 항상 null을 반환합니다.
+    /// </summary>
+    public Type? ConnectedType => null;
     public bool IsInput => true;
     public bool IsConnected => _connection != null;
     public bool IsVisible
@@ -85,7 +89,7 @@ public class FlowInPort : IFlowInPort, INotifyPropertyChanged
         }
     }
 
-    public IConnection Connect(IOutputPort source)
+    public IConnection Connect(IFlowOutPort source)
     {
         if (source == null)
             throw new NodeConnectionException("소스 포트가 null입니다.");
@@ -127,6 +131,13 @@ public class FlowInPort : IFlowInPort, INotifyPropertyChanged
     protected virtual void OnPropertyChanged(string propertyName)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    /// <summary>
+    /// 포트 초기화 로직. FlowInPort는 기본적으로 할 일이 없습니다.
+    /// </summary>
+    public virtual void Initialize() {
+        // 기본 구현은 비어 있음
     }
 
     public void WriteJson(Utf8JsonWriter writer)

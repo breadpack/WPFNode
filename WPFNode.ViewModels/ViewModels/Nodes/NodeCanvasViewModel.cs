@@ -147,10 +147,10 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
 
         foreach (var connection in sourceCanvas.Connections) {
             var sourcePort = _canvas.Nodes
-                                    .SelectMany(n => n.OutputPorts.Concat(n.FlowOutPorts))
+                                    .SelectMany(n => n.OutputPorts.Cast<IPort>().Concat(n.FlowOutPorts))
                                     .FirstOrDefault(p => p.Id == connection.SourcePortId);
             var targetPort = _canvas.Nodes
-                                    .SelectMany(n => n.InputPorts.Concat(n.FlowInPorts))
+                                    .SelectMany(n => n.InputPorts.Cast<IPort>().Concat(n.FlowInPorts))
                                     .FirstOrDefault(p => p.Id == connection.TargetPortId);
 
             if (sourcePort != null && targetPort != null) {
@@ -340,10 +340,10 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
 
         // 새 연결 생성
         var sourcePort = _canvas.Nodes
-                                .SelectMany(n => n.OutputPorts.Concat(n.FlowOutPorts))
+                                .SelectMany(n => n.OutputPorts.Cast<IPort>().Concat(n.FlowOutPorts))
                                 .FirstOrDefault(p => p.Id == ports.source.Id);
         var targetPort = _canvas.Nodes
-                                .SelectMany(n => n.InputPorts.Concat(n.FlowInPorts))
+                                .SelectMany(n => n.InputPorts.Cast<IPort>().Concat(n.FlowInPorts))
                                 .FirstOrDefault(p => p.Id == ports.target.Id);
 
         if (sourcePort != null && targetPort != null) {

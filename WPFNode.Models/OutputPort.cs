@@ -137,6 +137,13 @@ public class OutputPort<T> : IOutputPort, INotifyPropertyChanged {
     protected virtual void OnPropertyChanged(string propertyName) {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
+
+    /// <summary>
+    /// 포트 초기화 로직. OutputPort<T>는 기본적으로 할 일이 없습니다.
+    /// </summary>
+    public virtual void Initialize() {
+        // 기본 구현은 비어 있음
+    }
     
     /// <summary>
     /// 값의 참조가 동일하더라도 내용이 변경되었을 때 알림을 전파하는 메서드입니다.

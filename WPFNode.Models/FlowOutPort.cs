@@ -70,13 +70,10 @@ public class FlowOutPort : IFlowOutPort, INotifyPropertyChanged
         return true;
     }
 
-    public IConnection Connect(IInputPort target)
+    public IConnection Connect(IFlowInPort target)
     {
         if (target == null)
             throw new NodeConnectionException("타겟 포트가 null입니다.");
-
-        if (!(target is IFlowInPort))
-            throw new NodeConnectionException("Flow Out 포트는 Flow In 포트만 연결할 수 있습니다.", this, target);
 
         if (target.Node == Node)
             throw new NodeConnectionException("같은 노드의 포트와는 연결할 수 없습니다.", this, target);
@@ -144,6 +141,13 @@ public class FlowOutPort : IFlowOutPort, INotifyPropertyChanged
     protected virtual void OnPropertyChanged(string propertyName)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    /// <summary>
+    /// 포트 초기화 로직. FlowOutPort는 기본적으로 할 일이 없습니다.
+    /// </summary>
+    public virtual void Initialize() {
+        // 기본 구현은 비어 있음
     }
 
     public void WriteJson(Utf8JsonWriter writer)

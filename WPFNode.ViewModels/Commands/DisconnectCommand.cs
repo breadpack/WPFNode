@@ -6,8 +6,8 @@ namespace WPFNode.Commands;
 public class DisconnectCommand : ICommand {
     private readonly NodeCanvas  _canvas;
     private readonly IConnection _connection;
-    private readonly IOutputPort _source;
-    private readonly IInputPort  _target;
+    private readonly IPort       _source;
+    private readonly IPort       _target;
 
     public string Description => "포트 연결 해제";
 

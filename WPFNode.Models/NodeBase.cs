@@ -1,14 +1,16 @@
 using System.Collections.Concurrent;
 using System.ComponentModel;
+using System.Linq; // Added for OfType
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using WPFNode.Attributes;
 using WPFNode.Interfaces;
-using WPFNode.Models.Properties;
+using WPFNode.Models.Properties; // Assuming NodeProperty is here
 using WPFNode.Models.Serialization;
 using Microsoft.Extensions.Logging;
+using System.Collections.Generic; // Added for List, Dictionary, HashSet
 
 namespace WPFNode.Models;
 
@@ -50,6 +52,10 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
     
     // 타입 정보 캐싱
     private static readonly ConcurrentDictionary<Type, NodeTypeInfo> _typeInfoCache = new();
+    // 연결 상태 변경 콜백 캐시 (유지)
+    private readonly Dictionary<IPort, MethodInfo> _connectionStateChangedCallbacks = new();
+    // IDisposable 포트 추적 (선택적, Dispose 호출 위해)
+    private readonly List<IDisposable> _disposablePorts = new();
 
     /// <summary>
     /// 기본 생성자입니다. JSON 직렬화에서 사용됩니다.
@@ -298,7 +304,15 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
     internal void RemoveInputPort(IInputPort port) {
         if (_inputPorts.Contains(port)) {
             port.Disconnect();
-            _inputPorts.Remove(port);
+            // 이벤트 구독 해제 및 Dispose 호출
+            port.PropertyChanged -= HandlePortConnectionStateChanged; // 'port' 변수 사용
+            _connectionStateChangedCallbacks.Remove(port); // 'port' 변수 사용
+            if (port is IDisposable disposablePort) // 'port' 변수 사용
+            {
+                disposablePort.Dispose();
+                _disposablePorts.Remove(disposablePort);
+            }
+            _inputPorts.Remove(port); // 'port' 변수 사용
             OnPropertyChanged(nameof(InputPorts));
         }
     }
@@ -332,16 +346,24 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         if (!_properties.Contains(property))
             return;
         
-        // 프로퍼티가 InputPort인 경우 연결 해제
+        // 프로퍼티가 InputPort인 경우 연결 해제 및 이벤트 구독 해제
         if (property is IInputPort inputPort && _inputPorts.Contains(inputPort)) {
             if (inputPort.IsConnected) {
                 inputPort.Disconnect();
             }
+            // 이벤트 구독 해제 및 Dispose 호출
+            inputPort.PropertyChanged -= HandlePortConnectionStateChanged; // 'inputPort' 변수 사용 (if 블록 내에서 유효)
+            _connectionStateChangedCallbacks.Remove(inputPort); // 'inputPort' 변수 사용
+            if (inputPort is IDisposable disposablePropertyPort) // 'inputPort' 변수 사용
+            {
+                disposablePropertyPort.Dispose();
+                _disposablePorts.Remove(disposablePropertyPort);
+            }
 
-            _inputPorts.Remove(inputPort);
+            _inputPorts.Remove(inputPort); // Also remove from _inputPorts if it's there
             OnPropertyChanged(nameof(InputPorts));
         }
-        
+
         _properties.Remove(property);
         OnPropertyChanged(nameof(Properties));
     }
@@ -904,24 +926,68 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
     
     private void InitializeInputPort(PropertyInfo prop, NodeInputAttribute attr)
     {
-        // InputPort<T> 타입 확인 및 생성
+        IInputPort? port = null;
         var propType = prop.PropertyType;
-        if (propType.IsGenericType && propType.GetGenericTypeDefinition() == typeof(InputPort<>))
+        var portIndex = _inputPorts.Count;
+        var portName = attr.DisplayName ?? prop.Name;
+
+        // 프로퍼티 타입에 따라 포트 생성
+        if (propType == typeof(GenericInputPort))
         {
-            var valueType = propType.GetGenericArguments()[0];
-            var portIndex = _inputPorts.Count;
-            
-            // Activator.CreateInstance를 사용하여 포트 생성
-            var port = Activator.CreateInstance(
-                propType, 
-                attr.DisplayName ?? prop.Name,
-                this,
-                portIndex) as IInputPort;
-                
-            if (port != null)
+            // GenericInputPort 생성
+            port = new GenericInputPort(portName, this, portIndex);
+        }
+        else if (propType.IsGenericType && propType.GetGenericTypeDefinition() == typeof(InputPort<>))
+        {
+            // InputPort<T> 생성
+            port = Activator.CreateInstance(propType, portName, this, portIndex) as IInputPort;
+        }
+        else if (typeof(IInputPort).IsAssignableFrom(propType) && !propType.IsInterface && !propType.IsAbstract)
+        {
+             // IInputPort를 구현하는 다른 커스텀 타입 (생성자 시그니처가 맞아야 함)
+             try
+             {
+                 port = Activator.CreateInstance(propType, portName, this, portIndex) as IInputPort;
+             }
+             catch (Exception ex)
+             {
+                 Logger?.LogError(ex, $"커스텀 InputPort 타입 '{propType.Name}' 생성 실패. 생성자 시그니처(string name, INode node, int index)를 확인하세요.");
+             }
+        }
+        else
+        {
+             Logger?.LogError($"NodeInputAttribute: 프로퍼티 '{prop.Name}'의 타입 '{propType.Name}'은 유효한 InputPort 타입이 아닙니다.");
+             return;
+        }
+
+        if (port != null)
+        {
+            RegisterInputPort(port);
+            prop.SetValue(this, port); // 프로퍼티에 설정
+
+            // IDisposable 추적
+            if (port is IDisposable disposablePort)
             {
-                RegisterInputPort(port);
-                prop.SetValue(this, port); // 프로퍼티에 설정
+                _disposablePorts.Add(disposablePort);
+            }
+
+            // ConnectionStateChangedCallback 처리 (모든 IInputPort에 공통 적용)
+            if (!string.IsNullOrEmpty(attr.ConnectionStateChangedCallback))
+            {
+                var callbackMethod = GetType().GetMethod(attr.ConnectionStateChangedCallback,
+                                                         BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                if (callbackMethod != null &&
+                    callbackMethod.GetParameters().Length == 1 &&
+                    callbackMethod.GetParameters()[0].ParameterType == typeof(IInputPort))
+                {
+                    _connectionStateChangedCallbacks[port] = callbackMethod;
+                    // PropertyChanged 이벤트 구독
+                    port.PropertyChanged += HandlePortConnectionStateChanged;
+                }
+                else
+                {
+                    Logger?.LogWarning($"NodeInputAttribute: 메서드 '{attr.ConnectionStateChangedCallback}'를 찾을 수 없거나 시그니처가 'void MethodName(IInputPort port)'가 아닙니다.");
+                }
             }
         }
     }
@@ -1001,6 +1067,34 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
                 };
             }
         }
+
+        // ConnectionStateChangedCallback 처리 (프로퍼티가 InputPort인 경우)
+        if (property is IInputPort inputPortProperty) // 타입만 확인
+        {
+             // IDisposable 추적
+             if (inputPortProperty is IDisposable disposablePropertyPort && !_disposablePorts.Contains(disposablePropertyPort))
+             {
+                 _disposablePorts.Add(disposablePropertyPort);
+             }
+
+             if (!string.IsNullOrEmpty(attr.ConnectionStateChangedCallback))
+             {
+                 var callbackMethod = GetType().GetMethod(attr.ConnectionStateChangedCallback,
+                                                          BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                 if (callbackMethod != null &&
+                     callbackMethod.GetParameters().Length == 1 &&
+                     callbackMethod.GetParameters()[0].ParameterType == typeof(IInputPort))
+                 {
+                     _connectionStateChangedCallbacks[inputPortProperty] = callbackMethod;
+                     // PropertyChanged 이벤트 구독
+                     inputPortProperty.PropertyChanged += HandlePortConnectionStateChanged;
+                 }
+                 else
+                 {
+                     Logger?.LogWarning($"NodePropertyAttribute: 메서드 '{attr.ConnectionStateChangedCallback}'를 찾을 수 없거나 시그니처가 'void MethodName(IInputPort port)'가 아닙니다.");
+                 }
+             }
+        }
     }
 
     /// <summary>
@@ -1017,9 +1111,12 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
             // 노드 구성 (이벤트 핸들러, 포트 설정 등)
             ConfigureNode();
             
+            // 모든 포트 구성 완료 후 각 포트의 Initialize 호출
+            InitializeAllPorts();
+
             // 초기화 완료 표시
             _isInitialized = true;
-            
+
             Logger?.LogDebug($"{GetType().Name} 노드 초기화 완료");
         }
         catch (Exception ex)
@@ -1470,5 +1567,57 @@ public abstract class NodeBase : INode, INotifyPropertyChanged {
         
         // 실제 프로퍼티 제거는 RemoveProperty 메서드 사용
         RemoveProperty(property);
+    }
+
+    /// <summary>
+    /// 노드에 등록된 모든 포트의 Initialize 메서드를 호출합니다.
+    /// </summary>
+    private void InitializeAllPorts()
+    {
+        InitializePorts(_inputPorts);
+        InitializePorts(_outputPorts);
+        InitializePorts(_flowInPorts);
+        InitializePorts(_flowOutPorts);
+    }
+
+    private void InitializePorts(IEnumerable<IPort> ports) {
+        foreach(var port in ports.Distinct()) InitializePort(port);
+    }
+
+    private void InitializePort(IPort port) {
+        try
+        {
+            port.Initialize();
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, $"포트 '{port.Name}' 초기화 중 오류 발생");
+        }
+    }
+
+    /// <summary>
+    /// InputPort의 PropertyChanged 이벤트를 처리하여 연결 상태 변경 콜백을 호출합니다.
+    /// </summary>
+    private void HandlePortConnectionStateChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        // ConnectedType 속성 변경 시에만 처리
+        if (e.PropertyName != nameof(IInputPort.ConnectedType))
+            return;
+
+        if (sender is IInputPort port && _connectionStateChangedCallbacks.TryGetValue(port, out var callbackMethod))
+        {
+            // 재구성 중이 아닐 때만 콜백 호출
+            if (!_isReconfiguring)
+            {
+                try
+                {
+                    callbackMethod.Invoke(this, new object[] { port });
+                }
+                catch (Exception ex)
+                {
+                    Logger?.LogError(ex, $"ConnectionStateChangedCallback '{callbackMethod.Name}' 실행 중 오류 발생");
+                }
+            }
+        }
     }
 }

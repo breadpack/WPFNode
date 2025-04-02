@@ -15,8 +15,14 @@ public class Connection : IConnection
         : this(Guid.NewGuid(), canvas, source, target)
     {
     }
+    
+    [JsonConstructor]
+    public Connection(NodeCanvas canvas, IFlowOutPort source, IFlowInPort target)
+        : this(Guid.NewGuid(), canvas, source, target)
+    {
+    }
 
-    public Connection(Guid guid, NodeCanvas nodeCanvas, IOutputPort source, IInputPort target)
+    public Connection(Guid guid, NodeCanvas nodeCanvas, IPort source, IPort target)
     {
         if (source == null)
             throw new NodeConnectionException("소스 포트가 null입니다.");
@@ -41,10 +47,10 @@ public class Connection : IConnection
     public Guid Guid { get; }
     
     [JsonPropertyName("source")]
-    public IOutputPort Source { get; }
+    public IPort Source { get; }
     
     [JsonPropertyName("target")]
-    public IInputPort Target { get; }
+    public IPort Target { get; }
 
     [JsonPropertyName("sourcePortId")]
     public PortId SourcePortId { get; }
