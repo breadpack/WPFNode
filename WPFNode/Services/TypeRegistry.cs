@@ -13,6 +13,16 @@ public class TypeRegistry
     private static TypeRegistry? _instance;
     private static readonly object _lockObject = new();
 
+    // 필터링 설정을 위한 컬렉션
+    private static readonly HashSet<string> _excludedAssemblyPrefixes = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly HashSet<string> _excludedTypeFullNames = new(StringComparer.OrdinalIgnoreCase);
+    
+    // 기본 시스템 어셈블리 (항상 제외됨)
+    private static readonly HashSet<string> _systemAssemblies = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "mscorlib", "System", "System.Core", "WindowsBase", "PresentationCore", "PresentationFramework"
+    };
+
     // 싱글톤 인스턴스
     public static TypeRegistry Instance
     {
@@ -27,6 +37,14 @@ public class TypeRegistry
             }
             return _instance;
         }
+    }
+
+    // 정적 생성자 - 기본 필터 설정
+    static TypeRegistry()
+    {
+        // 기본적으로 문제가 되는 것으로 알려진 어셈블리/타입에 대한 기본 필터 설정
+        // 이 필터는 사용자가 나중에 IncludeAssemblyPrefix 또는 ResetFilters로 제거할 수 있음
+        ExcludeAssemblyPrefix("UnityEngine");
     }
 
     // 전체 타입 컬렉션
@@ -188,8 +206,16 @@ public class TypeRegistry
         // 관련성 점수 계산 및 정렬 (Best fit 우선)
         return resultSet
             .Select(t => new { Type = t, Score = CalculateRelevanceScore(t, terms) })
-            .OrderByDescending(item => item.Score) // 점수 내림차순 (높은 점수가 먼저)
-            .ThenBy(item => item.Type.Name) // 동일 점수는 이름 오름차순
+            .OrderByDescending(item => item.Score)      // 점수 내림차순 (높은 점수가 먼저)
+            .ThenBy(item => {
+                try {
+                    return item.Type.Name;
+                }
+                catch (Exception ex) {
+                    System.Diagnostics.Debug.WriteLine($"정렬 중 오류 발생: {ex.Message}");
+                    return string.Empty; // 예외 발생 시 기본값
+                }
+            }) // 동일 점수는 이름 오름차순
             .Select(item => item.Type)
             .ToList();
     }
@@ -203,41 +229,48 @@ public class TypeRegistry
     private int CalculateRelevanceScore(Type type, string[] searchTerms)
     {
         int score = 0;
-        string typeName = type.Name.ToLowerInvariant();
-        string fullName = type.FullName?.ToLowerInvariant() ?? "";
-        
-        foreach (var term in searchTerms)
-        {
-            // 1. 정확한 타입 이름 일치 (최고 우선순위)
-            if (typeName.Equals(term, StringComparison.OrdinalIgnoreCase))
-                score += 100;
-                
-            // 2. 타입 이름이 검색어로 시작 (접두사 매칭)
-            else if (typeName.StartsWith(term, StringComparison.OrdinalIgnoreCase))
-                score += 75;
-                
-            // 3. 단어 단위 일치 (타입 이름 내 단어가 검색어와 일치)
-            else if (SplitPascalCase(type.Name).Any(word => 
-                     word.Equals(term, StringComparison.OrdinalIgnoreCase)))
-                score += 50;
-                
-            // 4. 타입 이름에 검색어 포함 (부분 문자열)
-            else if (typeName.Contains(term, StringComparison.OrdinalIgnoreCase))
-                score += 25;
-                
-            // 5. 네임스페이스에 검색어 포함
-            if (fullName.Contains(term, StringComparison.OrdinalIgnoreCase))
-                score += 15;
-                
-            // 6. 약어 매칭 (대문자만 모았을 때 검색어와 일치)
-            string acronym = string.Concat(type.Name.Where(char.IsUpper)).ToLowerInvariant();
-            if (acronym.Equals(term, StringComparison.OrdinalIgnoreCase))
-                score += 40;
+        try {
+            string typeName = type.Name.ToLowerInvariant();
+            string fullName = type.FullName?.ToLowerInvariant() ?? "";
+
+            foreach (var term in searchTerms) {
+                // 1. 정확한 타입 이름 일치 (최고 우선순위)
+                if (typeName.Equals(term, StringComparison.OrdinalIgnoreCase))
+                    score += 100;
+
+                // 2. 타입 이름이 검색어로 시작 (접두사 매칭)
+                else if (typeName.StartsWith(term, StringComparison.OrdinalIgnoreCase))
+                    score += 75;
+
+                // 3. 단어 단위 일치 (타입 이름 내 단어가 검색어와 일치)
+                else if (SplitPascalCase(type.Name)
+                         .Any(word =>
+                                  word.Equals(term, StringComparison.OrdinalIgnoreCase)))
+                    score += 50;
+
+                // 4. 타입 이름에 검색어 포함 (부분 문자열)
+                else if (typeName.Contains(term, StringComparison.OrdinalIgnoreCase))
+                    score += 25;
+
+                // 5. 네임스페이스에 검색어 포함
+                if (fullName.Contains(term, StringComparison.OrdinalIgnoreCase))
+                    score += 15;
+
+                // 6. 약어 매칭 (대문자만 모았을 때 검색어와 일치)
+                string acronym = string.Concat(type.Name.Where(char.IsUpper)).ToLowerInvariant();
+                if (acronym.Equals(term, StringComparison.OrdinalIgnoreCase))
+                    score += 40;
+            }
+
+            // 보너스: 짧은 타입 이름에 약간의 가중치 부여 (동일 점수일 때 간단한 이름 우선)
+            score += Math.Max(0, 10 - typeName.Length);
         }
-        
-        // 보너스: 짧은 타입 이름에 약간의 가중치 부여 (동일 점수일 때 간단한 이름 우선)
-        score += Math.Max(0, 10 - typeName.Length);
-        
+        catch (Exception ex) {
+            System.Diagnostics.Debug.WriteLine($"CalculateRelevanceScore 오류: {ex.Message}");
+            // 예외 발생 시 기본 점수 0 반환
+            score = 0;
+        }
+
         return score;
     }
 
@@ -279,11 +312,6 @@ public class TypeRegistry
     /// </summary>
     private void LoadAllTypes(CancellationToken token)
     {
-        // 시스템 어셈블리 캐싱
-        var systemAssemblies = new HashSet<string> {
-            "mscorlib", "System", "System.Core", "WindowsBase", "PresentationCore", "PresentationFramework"
-        };
-        
         // 결과 저장용 컬렉션
         var allTypes = new List<Type>();
         var pluginTypesList = new List<Type>();
@@ -300,61 +328,36 @@ public class TypeRegistry
                     var pluginAssemblies = pluginTypes
                         .Where(t => t != null) // null 체크 추가
                         .Select(t => t.Assembly)
-                        .Where(a => a != null) // null 체크 추가
+                        .Where(a => a != null && !ShouldExcludeAssembly(a)) // 제외 어셈블리 필터링
                         .Distinct()
                         .ToHashSet();
                     
                     // 플러그인 타입 직접 추가 (확실히 포함되도록)
-                    pluginTypesList.AddRange(pluginTypes.Where(t => t != null)); // null 체크 추가
-                    allTypes.AddRange(pluginTypes.Where(t => t != null)); // null 체크 추가
+                    pluginTypesList.AddRange(pluginTypes.Where(t => t != null && !ShouldExcludeType(t))); // 제외 타입 필터링
+                    allTypes.AddRange(pluginTypes.Where(t => t != null && !ShouldExcludeType(t))); // 제외 타입 필터링
                     
                     // 추가로 플러그인 어셈블리의 모든 타입 포함
                     foreach (var assembly in pluginAssemblies)
                     {
                         if (token.IsCancellationRequested) break;
                         
-                        try
-                        {
-                            var types = assembly.GetTypes().ToList();
-                            // 중복 제거하며 추가
-                            var newPluginTypes = types.Except(pluginTypesList).ToList();
-                            pluginTypesList.AddRange(newPluginTypes);
-                            
-                            // 전체 타입에도 추가
-                            var newAllTypes = types.Except(allTypes).ToList();
-                            allTypes.AddRange(newAllTypes);
-                        }
-                        catch (ReflectionTypeLoadException ex)
-                        {
-                            // 로드할 수 있는 타입만 추가
-                            if (ex.Types != null)
-                            {
-                                var validTypes = ex.Types.Where(t => t != null).ToList();
-                                pluginTypesList.AddRange(validTypes.Except(pluginTypesList));
-                                allTypes.AddRange(validTypes.Except(allTypes));
-                            }
-                            
-                            // 로더 예외 세부 정보 기록
-                            if (ex.LoaderExceptions != null)
-                            {
-                                foreach (var loaderEx in ex.LoaderExceptions.Where(le => le != null))
-                                {
-                                    System.Diagnostics.Debug.WriteLine($"플러그인 어셈블리 {assembly.GetName().Name} 타입 로드 예외: {loaderEx.Message}");
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"플러그인 어셈블리 {assembly.GetName().Name} 처리 중 예외 발생: {ex.Message}");
-                            // 개별 어셈블리 처리 실패는 무시하고 계속 진행
-                        }
+                        // 안전하게 타입 로드 (개별 타입 단위로 실패 허용)
+                        var types = GetTypesFromAssemblySafely(assembly);
+                        
+                        // 중복 제거하며 추가
+                        var newPluginTypes = types.Except(pluginTypesList).ToList();
+                        pluginTypesList.AddRange(newPluginTypes);
+                        
+                        // 전체 타입에도 추가
+                        var newAllTypes = types.Except(allTypes).ToList();
+                        allTypes.AddRange(newAllTypes);
                     }
                     
                     try
                     {
                         // 필요한 어셈블리만 필터링 - 시스템 어셈블리 제외, 플러그인 어셈블리 제외(이미 처리됨)
                         var assemblies = AppDomain.CurrentDomain.GetAssemblies()
-                            .Where(a => a != null && !systemAssemblies.Contains(a.GetName().Name) && !pluginAssemblies.Contains(a))
+                            .Where(a => a != null && !ShouldExcludeAssembly(a) && !pluginAssemblies.Contains(a))
                             .ToList();
                             
                         // 이제 나머지 어셈블리 처리
@@ -362,39 +365,12 @@ public class TypeRegistry
                         {
                             if (token.IsCancellationRequested) break;
                             
-                            try
-                            {
-                                // GetTypes() 호출 - 각 어셈블리에 대해 한 번만 수행
-                                var types = assembly.GetTypes()
-                                    .ToList();
-                                
-                                // 중복 제거하며 타입 정보 추가
-                                var newTypes = types.Except(allTypes).ToList();
-                                allTypes.AddRange(newTypes);
-                            }
-                            catch (ReflectionTypeLoadException ex)
-                            {
-                                // 로드할 수 있는 타입만 추가
-                                if (ex.Types != null)
-                                {
-                                    var validTypes = ex.Types.Where(t => t != null).ToList();
-                                    allTypes.AddRange(validTypes.Except(allTypes));
-                                }
-                                
-                                // 로더 예외 세부 정보 기록
-                                if (ex.LoaderExceptions != null)
-                                {
-                                    foreach (var loaderEx in ex.LoaderExceptions.Where(le => le != null))
-                                    {
-                                        System.Diagnostics.Debug.WriteLine($"어셈블리 {assembly.GetName().Name} 타입 로드 예외: {loaderEx.Message}");
-                                    }
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"어셈블리 {assembly.GetName().Name} 처리 중 예외 발생: {ex.Message}");
-                                // 개별 어셈블리 처리 실패는 무시하고 계속 진행
-                            }
+                            // 안전하게 타입 로드 (개별 타입 단위로 실패 허용)
+                            var types = GetTypesFromAssemblySafely(assembly);
+                            
+                            // 중복 제거하며 타입 정보 추가
+                            var newTypes = types.Except(allTypes).ToList();
+                            allTypes.AddRange(newTypes);
                         }
                     }
                     catch (Exception ex)
@@ -406,14 +382,14 @@ public class TypeRegistry
                 {
                     System.Diagnostics.Debug.WriteLine("NodeServices.ModelService.NodeTypes가 null입니다.");
                     // 플러그인 타입을 로드할 수 없는 경우 일반 어셈블리 로드로 대체
-                    LoadAssembliesWithoutPlugins(token, systemAssemblies, allTypes);
+                    LoadAssembliesWithoutPlugins(token, allTypes);
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"NodeServices.ModelService.NodeTypes 접근 중 예외 발생: {ex.Message}");
                 // NodeServices.ModelService.NodeTypes 접근 실패 시 일반 어셈블리 로드로 대체
-                LoadAssembliesWithoutPlugins(token, systemAssemblies, allTypes);
+                LoadAssembliesWithoutPlugins(token, allTypes);
             }
         }
         catch (Exception ex)
@@ -433,12 +409,12 @@ public class TypeRegistry
     /// <summary>
     /// 플러그인 없이 어셈블리에서 타입을 로드합니다.
     /// </summary>
-    private void LoadAssembliesWithoutPlugins(CancellationToken token, HashSet<string> systemAssemblies, List<Type> allTypes)
+    private void LoadAssembliesWithoutPlugins(CancellationToken token, List<Type> allTypes)
     {
         try
         {
             var assemblies = AppDomain.CurrentDomain.GetAssemblies()
-                .Where(a => a != null && !systemAssemblies.Contains(a.GetName().Name))
+                .Where(a => a != null && !ShouldExcludeAssembly(a))
                 .ToList();
                 
             // 이제 나머지 어셈블리 처리
@@ -638,29 +614,50 @@ public class TypeRegistry
     {
         var result = new HashSet<Type>();
         
-        // 1. 정확한 단어 매칭 (가장 높은 우선순위)
-        if (_wordToTypesIndex.TryGetValue(term, out var wordMatches))
-            result.UnionWith(wordMatches.Intersect(sourceTypes));
-        
-        // 2. 접두사 매칭
-        if (_prefixToTypesIndex.TryGetValue(term, out var prefixMatches))
-            result.UnionWith(prefixMatches.Intersect(sourceTypes));
-        
-        // 3. 네임스페이스 매칭
-        if (_namespaceToTypesIndex.TryGetValue(term, out var nsMatches))
-            result.UnionWith(nsMatches.Intersect(sourceTypes));
-        
-        // 4. 약어 매칭 - 모든 검색어에 대해 시도 (대문자 검색어만 제한하지 않음)
-        if (_acronymToTypesIndex.TryGetValue(term.ToLowerInvariant(), out var acronymMatches))
-            result.UnionWith(acronymMatches.Intersect(sourceTypes));
-        
-        // 모든 인덱스에서 찾지 못한 경우 부분 문자열 검색
-        if (result.Count == 0)
+        try
         {
-            // 부분 문자열 검색은 비용이 크므로 마지막 수단으로만 사용
-            result.UnionWith(sourceTypes.Where(t => 
-                t.Name.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                (t.Namespace?.IndexOf(term, StringComparison.OrdinalIgnoreCase) ?? -1) >= 0));
+            // 1. 정확한 단어 매칭 (가장 높은 우선순위)
+            if (_wordToTypesIndex.TryGetValue(term, out var wordMatches))
+                result.UnionWith(wordMatches.Intersect(sourceTypes));
+            
+            // 2. 접두사 매칭
+            if (_prefixToTypesIndex.TryGetValue(term, out var prefixMatches))
+                result.UnionWith(prefixMatches.Intersect(sourceTypes));
+            
+            // 3. 네임스페이스 매칭
+            if (_namespaceToTypesIndex.TryGetValue(term, out var nsMatches))
+                result.UnionWith(nsMatches.Intersect(sourceTypes));
+            
+            // 4. 약어 매칭 - 모든 검색어에 대해 시도 (대문자 검색어만 제한하지 않음)
+            if (_acronymToTypesIndex.TryGetValue(term.ToLowerInvariant(), out var acronymMatches))
+                result.UnionWith(acronymMatches.Intersect(sourceTypes));
+            
+            // 모든 인덱스에서 찾지 못한 경우 부분 문자열 검색
+            if (result.Count == 0)
+            {
+                // 부분 문자열 검색은 비용이 크므로 마지막 수단으로만 사용
+                foreach (var type in sourceTypes)
+                {
+                    try
+                    {
+                        if (type.Name.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                            (type.Namespace?.IndexOf(term, StringComparison.OrdinalIgnoreCase) ?? -1) >= 0)
+                        {
+                            result.Add(type);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"타입 '{type}' 검색 중 예외: {ex.Message}");
+                        // 개별 타입 예외는 무시하고 계속 진행
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"후보 타입 검색 중 예외 발생: {ex.Message}");
+            // 검색 실패 시 빈 결과 반환
         }
         
         return result;
@@ -801,14 +798,9 @@ public class TypeRegistry
             var allTypes = new List<Type>();
             var rootNodes = new List<NamespaceTypeNode>();
             
-            // 기본 시스템 어셈블리 제외
-            var systemAssemblies = new HashSet<string> {
-                "mscorlib", "System", "System.Core", "WindowsBase", "PresentationCore", "PresentationFramework"
-            };
-            
             // 안전하게 접근 가능한 어셈블리만 처리
             var assemblies = AppDomain.CurrentDomain.GetAssemblies()
-                .Where(a => a != null && !systemAssemblies.Contains(a.GetName().Name))
+                .Where(a => a != null && !ShouldExcludeAssembly(a))
                 .ToList();
                 
             foreach (var assembly in assemblies)
@@ -828,10 +820,22 @@ public class TypeRegistry
                         }
                     }
                     
-                    // 안전하게 타입 추가
-                    if (types.Length > 0)
+                    // 안전하게 타입 추가 - 필터링 적용
+                    foreach (var type in types)
                     {
-                        allTypes.AddRange(types);
+                        if (type == null || ShouldExcludeType(type))
+                            continue;
+                            
+                        try
+                        {
+                            // 간단한 접근성 테스트
+                            var name = type.Name;
+                            allTypes.Add(type);
+                        }
+                        catch
+                        {
+                            // 개별 타입 예외는 무시
+                        }
                     }
                 }
                 catch
@@ -895,5 +899,246 @@ public class TypeRegistry
             System.Diagnostics.Debug.WriteLine($"백업 초기화 중 오류 발생: {ex.Message}");
             throw; // 백업 초기화도 실패하면 다시 예외 발생
         }
+    }
+
+    // 샘플 사용법:
+    // 애플리케이션 시작 시 필터 설정
+    // TypeRegistry.ExcludeAssemblyPrefix("UnityEngine");
+    // TypeRegistry.ExcludeTypeFullName("System.Windows.Forms");
+    //
+    // 필터 해제
+    // TypeRegistry.IncludeAssemblyPrefix("UnityEngine");
+    // TypeRegistry.ResetFilters(); // 모든 필터 초기화
+    
+    /// <summary>
+    /// 어셈블리에서 안전하게 타입을 로드합니다. 문제가 있는 개별 타입은 건너뜁니다.
+    /// </summary>
+    private List<Type> GetTypesFromAssemblySafely(Assembly assembly)
+    {
+        var loadedTypes = new List<Type>();
+        
+        try
+        {
+            // 어셈블리 필터링 확인
+            if (ShouldExcludeAssembly(assembly))
+                return loadedTypes;
+                
+            // 먼저 일반적인 방법으로 시도
+            try
+            {
+                var types = assembly.GetTypes();
+                
+                // 모든 타입을 하나씩 검증
+                foreach (var type in types)
+                {
+                    if (type == null) continue;
+                    
+                    try
+                    {
+                        // 타입 필터링 확인
+                        if (ShouldExcludeType(type))
+                            continue;
+                            
+                        // 타입 유효성 확인을 위한 간단한 접근 테스트
+                        var name = type.Name;
+                        var ns = type.Namespace;
+                        
+                        // 문제가 없는 타입만 추가
+                        loadedTypes.Add(type);
+                    }
+                    catch (TypeLoadException tex)
+                    {
+                        // 형식 로드 실패 - 로그만 남기고 계속 진행
+                        System.Diagnostics.Debug.WriteLine($"타입 '{type}' 로드 실패: {tex.Message}");
+                    }
+                    catch (BadImageFormatException bex)
+                    {
+                        // 잘못된 이미지 형식 - 로그만 남기고 계속 진행
+                        System.Diagnostics.Debug.WriteLine($"타입 '{type}' 형식 오류: {bex.Message}");
+                    }
+                    catch (Exception ex)
+                    {
+                        // 기타 타입별 예외 - 로그만 남기고 계속 진행
+                        System.Diagnostics.Debug.WriteLine($"타입 '{type}' 처리 중 예외: {ex.Message}");
+                    }
+                }
+                
+                return loadedTypes;
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                // 일부 타입만 로드 가능한 경우
+                System.Diagnostics.Debug.WriteLine($"어셈블리 '{assembly.GetName().Name}' 타입 로드 부분 실패");
+                
+                // 로더 예외 세부 정보 기록
+                if (ex.LoaderExceptions != null)
+                {
+                    foreach (var loaderEx in ex.LoaderExceptions.Where(le => le != null).Take(3)) // 처음 몇 개만 로깅
+                    {
+                        System.Diagnostics.Debug.WriteLine($"로더 예외: {loaderEx.Message}");
+                    }
+                }
+                
+                // 로드 가능한 타입들은 하나씩 검증하여 추가
+                if (ex.Types != null)
+                {
+                    foreach (var type in ex.Types)
+                    {
+                        if (type == null) continue;
+                        
+                        try
+                        {
+                            // 타입 필터링 확인
+                            if (ShouldExcludeType(type))
+                                continue;
+                                
+                            // 타입 유효성 확인을 위한 간단한 접근 테스트
+                            var name = type.Name;
+                            var ns = type.Namespace;
+                            
+                            // 문제가 없는 타입만 추가
+                            loadedTypes.Add(type);
+                        }
+                        catch
+                        {
+                            // 개별 타입 검증 실패는 무시
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // 어셈블리 전체 로드 실패 - 어셈블리 정보만 로깅
+                System.Diagnostics.Debug.WriteLine($"어셈블리 '{assembly.GetName().Name}' 타입 로드 중 예외: {ex.Message}");
+                
+                // 대체 방식으로 로드 시도 - 리플렉션으로 타입 목록 접근
+                try
+                {
+                    var moduleTypes = assembly.GetModules()
+                        .Where(m => m != null)
+                        .SelectMany(m => {
+                            try { return m.GetTypes(); } 
+                            catch { return Array.Empty<Type>(); }
+                        })
+                        .Where(t => t != null);
+                    
+                    // 개별 타입 검증
+                    foreach (var type in moduleTypes)
+                    {
+                        try
+                        {
+                            // 타입 필터링 확인
+                            if (ShouldExcludeType(type))
+                                continue;
+                                
+                            var name = type.Name;
+                            loadedTypes.Add(type);
+                        }
+                        catch
+                        {
+                            // 문제 있는 타입은 무시
+                        }
+                    }
+                }
+                catch
+                {
+                    // 대체 방식도 실패하면 빈 목록 반환
+                }
+            }
+        }
+        catch
+        {
+            // 최상위 예외처리 - 어셈블리에서 타입을 전혀 로드할 수 없는 경우
+            System.Diagnostics.Debug.WriteLine($"어셈블리 '{assembly.GetName().Name}'에서 타입을 로드할 수 없음");
+        }
+        
+        return loadedTypes;
+    }
+
+    /// <summary>
+    /// 특정 어셈블리 접두사를 제외 목록에 추가합니다.
+    /// </summary>
+    /// <param name="assemblyPrefix">제외할 어셈블리 접두사</param>
+    public static void ExcludeAssemblyPrefix(string assemblyPrefix)
+    {
+        if (!string.IsNullOrWhiteSpace(assemblyPrefix))
+        {
+            _excludedAssemblyPrefixes.Add(assemblyPrefix);
+        }
+    }
+    
+    /// <summary>
+    /// 특정 어셈블리 접두사를 제외 목록에서 제거합니다.
+    /// </summary>
+    /// <param name="assemblyPrefix">제외 목록에서 제거할 어셈블리 접두사</param>
+    public static void IncludeAssemblyPrefix(string assemblyPrefix)
+    {
+        if (!string.IsNullOrWhiteSpace(assemblyPrefix))
+        {
+            _excludedAssemblyPrefixes.Remove(assemblyPrefix);
+        }
+    }
+    
+    /// <summary>
+    /// 특정 타입 전체 이름을 제외 목록에 추가합니다.
+    /// </summary>
+    /// <param name="typeFullName">제외할 타입의 전체 이름</param>
+    public static void ExcludeTypeFullName(string typeFullName)
+    {
+        if (!string.IsNullOrWhiteSpace(typeFullName))
+        {
+            _excludedTypeFullNames.Add(typeFullName);
+        }
+    }
+    
+    /// <summary>
+    /// 특정 타입 전체 이름을 제외 목록에서 제거합니다.
+    /// </summary>
+    /// <param name="typeFullName">제외 목록에서 제거할 타입의 전체 이름</param>
+    public static void IncludeTypeFullName(string typeFullName)
+    {
+        if (!string.IsNullOrWhiteSpace(typeFullName))
+        {
+            _excludedTypeFullNames.Remove(typeFullName);
+        }
+    }
+
+    /// <summary>
+    /// 어셈블리를 제외해야 하는지 확인합니다.
+    /// </summary>
+    /// <param name="assembly">검사할 어셈블리</param>
+    /// <returns>제외해야 하면 true, 그렇지 않으면 false</returns>
+    private bool ShouldExcludeAssembly(Assembly assembly)
+    {
+        // 기본 시스템 어셈블리는 항상 제외
+        if (_systemAssemblies.Contains(assembly.GetName().Name))
+            return true;
+        
+        // 어셈블리 이름이 제외 목록의 접두사로 시작하는지 확인
+        string assemblyName = assembly.FullName ?? string.Empty;
+        return _excludedAssemblyPrefixes.Any(prefix => 
+            !string.IsNullOrEmpty(prefix) && assemblyName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+    }
+    
+    /// <summary>
+    /// 타입을 제외해야 하는지 확인합니다.
+    /// </summary>
+    /// <param name="type">검사할 타입</param>
+    /// <returns>제외해야 하면 true, 그렇지 않으면 false</returns>
+    private bool ShouldExcludeType(Type type)
+    {
+        // 타입 이름이 제외 목록에 있는지 확인
+        string typeFullName = type.FullName ?? string.Empty;
+        return _excludedTypeFullNames.Any(excluded => 
+            !string.IsNullOrEmpty(excluded) && typeFullName.StartsWith(excluded, StringComparison.OrdinalIgnoreCase));
+    }
+    
+    /// <summary>
+    /// 현재 설정된 모든 필터를 초기화합니다.
+    /// </summary>
+    public static void ResetFilters()
+    {
+        _excludedAssemblyPrefixes.Clear();
+        _excludedTypeFullNames.Clear();
     }
 }
