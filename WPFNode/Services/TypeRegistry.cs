@@ -632,25 +632,21 @@ public class TypeRegistry
             if (_acronymToTypesIndex.TryGetValue(term.ToLowerInvariant(), out var acronymMatches))
                 result.UnionWith(acronymMatches.Intersect(sourceTypes));
             
-            // 모든 인덱스에서 찾지 못한 경우 부분 문자열 검색
-            if (result.Count == 0)
+            // 부분 문자열 검색은 비용이 크므로 마지막 수단으로만 사용
+            foreach (var type in sourceTypes)
             {
-                // 부분 문자열 검색은 비용이 크므로 마지막 수단으로만 사용
-                foreach (var type in sourceTypes)
+                try
                 {
-                    try
+                    if (type.Name.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        (type.Namespace?.IndexOf(term, StringComparison.OrdinalIgnoreCase) ?? -1) >= 0)
                     {
-                        if (type.Name.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                            (type.Namespace?.IndexOf(term, StringComparison.OrdinalIgnoreCase) ?? -1) >= 0)
-                        {
-                            result.Add(type);
-                        }
+                        result.Add(type);
                     }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"타입 '{type}' 검색 중 예외: {ex.Message}");
-                        // 개별 타입 예외는 무시하고 계속 진행
-                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"타입 '{type}' 검색 중 예외: {ex.Message}");
+                    // 개별 타입 예외는 무시하고 계속 진행
                 }
             }
         }
