@@ -254,7 +254,7 @@ public class TypeRegistry
         
         // 필요한 어셈블리만 필터링
         var assemblies = AppDomain.CurrentDomain.GetAssemblies()
-            .Where(a => !a.IsDynamic && !systemAssemblies.Contains(a.GetName().Name))
+            .Where(a => !systemAssemblies.Contains(a.GetName().Name))
             .ToList();
             
         // 플러그인 타입과 어셈블리
