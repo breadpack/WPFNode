@@ -190,11 +190,11 @@ public class TypeRegistry
                 score += 50;
                 
             // 4. 타입 이름에 검색어 포함 (부분 문자열)
-            else if (typeName.Contains(term))
+            else if (typeName.Contains(term, StringComparison.OrdinalIgnoreCase))
                 score += 25;
                 
             // 5. 네임스페이스에 검색어 포함
-            if (fullName.Contains(term))
+            if (fullName.Contains(term, StringComparison.OrdinalIgnoreCase))
                 score += 15;
                 
             // 6. 약어 매칭 (대문자만 모았을 때 검색어와 일치)
@@ -252,48 +252,93 @@ public class TypeRegistry
             "mscorlib", "System", "System.Core", "WindowsBase", "PresentationCore", "PresentationFramework"
         };
         
-        // 필요한 어셈블리만 필터링
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies()
-            .Where(a => !systemAssemblies.Contains(a.GetName().Name))
-            .ToList();
-            
-        // 플러그인 타입과 어셈블리
-        var pluginTypes = NodeServices.ModelService.NodeTypes;
-        var pluginAssemblies = pluginTypes
-            .Select(t => t.Assembly)
-            .Distinct()
-            .ToHashSet();
-        
         // 결과 저장용 컬렉션
         var allTypes = new List<Type>();
         var pluginTypesList = new List<Type>();
         
-        // 순차적으로 어셈블리별 처리
-        foreach (var assembly in assemblies)
+        try
         {
-            if (token.IsCancellationRequested) break;
+            // 플러그인 타입과 어셈블리 먼저 로드 (가장 중요한 타입들)
+            var pluginTypes = NodeServices.ModelService.NodeTypes;
+            var pluginAssemblies = pluginTypes
+                .Select(t => t.Assembly)
+                .Distinct()
+                .ToHashSet();
+                
+            // 플러그인 타입 직접 추가 (확실히 포함되도록)
+            pluginTypesList.AddRange(pluginTypes);
+            allTypes.AddRange(pluginTypes);
             
-            try
+            // 추가로 플러그인 어셈블리의 모든 타입 포함
+            foreach (var assembly in pluginAssemblies)
             {
-                // GetTypes() 호출 - 각 어셈블리에 대해 한 번만 수행
-                var types = assembly.GetTypes()
-                    .ToList();
+                if (token.IsCancellationRequested) break;
                 
-                // 타입 정보 추가
-                allTypes.AddRange(types);
-                
-                // 플러그인 타입 구분
-                if (pluginAssemblies.Contains(assembly))
+                try
                 {
-                    pluginTypesList.AddRange(types);
+                    var types = assembly.GetTypes().ToList();
+                    // 중복 제거하며 추가
+                    var newPluginTypes = types.Except(pluginTypesList).ToList();
+                    pluginTypesList.AddRange(newPluginTypes);
+                    
+                    // 전체 타입에도 추가
+                    var newAllTypes = types.Except(allTypes).ToList();
+                    allTypes.AddRange(newAllTypes);
+                }
+                catch (ReflectionTypeLoadException ex)
+                {
+                    // 로드할 수 있는 타입만 추가
+                    if (ex.Types != null)
+                    {
+                        var validTypes = ex.Types.Where(t => t != null).ToList();
+                        pluginTypesList.AddRange(validTypes.Except(pluginTypesList));
+                        allTypes.AddRange(validTypes.Except(allTypes));
+                    }
                 }
             }
-            catch (ReflectionTypeLoadException) { }
+            
+            // 필요한 어셈블리만 필터링 - 시스템 어셈블리 제외, 플러그인 어셈블리 제외(이미 처리됨)
+            var assemblies = AppDomain.CurrentDomain.GetAssemblies()
+                .Where(a => !systemAssemblies.Contains(a.GetName().Name) && !pluginAssemblies.Contains(a))
+                .ToList();
+                
+            // 이제 나머지 어셈블리 처리
+            foreach (var assembly in assemblies)
+            {
+                if (token.IsCancellationRequested) break;
+                
+                try
+                {
+                    // GetTypes() 호출 - 각 어셈블리에 대해 한 번만 수행
+                    var types = assembly.GetTypes()
+                        .ToList();
+                    
+                    // 중복 제거하며 타입 정보 추가
+                    var newTypes = types.Except(allTypes).ToList();
+                    allTypes.AddRange(newTypes);
+                }
+                catch (ReflectionTypeLoadException ex)
+                {
+                    // 로드할 수 있는 타입만 추가
+                    if (ex.Types != null)
+                    {
+                        var validTypes = ex.Types.Where(t => t != null).ToList();
+                        allTypes.AddRange(validTypes.Except(allTypes));
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"타입 로드 중 오류 발생: {ex}");
         }
         
         // 결과 정렬
         _allTypes = allTypes.OrderBy(t => t.FullName).ToList();
         _pluginTypes = pluginTypesList.OrderBy(t => t.FullName).ToList();
+        
+        // 디버그 정보
+        System.Diagnostics.Debug.WriteLine($"로드된 전체 타입 수: {_allTypes.Count}, 플러그인 타입 수: {_pluginTypes.Count}");
     }
 
     /// <summary>
@@ -330,8 +375,11 @@ public class TypeRegistry
         var acronymIndex = new Dictionary<string, HashSet<Type>>(StringComparer.OrdinalIgnoreCase);
         var namespaceIndex = new Dictionary<string, HashSet<Type>>(StringComparer.OrdinalIgnoreCase);
         
-        // 타입별 순차 처리
-        foreach (var type in _allTypes)
+        // 타입별 순차 처리 - 모든 타입과 플러그인 타입 통합 인덱스 구축
+        var allTypesToIndex = new HashSet<Type>(_allTypes);
+        allTypesToIndex.UnionWith(_pluginTypes); // 누락되는 플러그인 타입을 추가
+
+        foreach (var type in allTypesToIndex)
         {
             if (token.IsCancellationRequested) break;
             
@@ -343,7 +391,8 @@ public class TypeRegistry
             var words = SplitPascalCase(typeName);
             foreach (var word in words)
             {
-                if (word.Length <= 1) continue; // 단일 문자 단어는 제외
+                // 빈 단어가 아닌 경우 인덱싱 (길이 1도 허용)
+                if (string.IsNullOrEmpty(word)) continue;
                 
                 var lowerWord = word.ToLowerInvariant();
                 AddToIndex(wordIndex, lowerWord, type);
@@ -465,8 +514,8 @@ public class TypeRegistry
         if (_namespaceToTypesIndex.TryGetValue(term, out var nsMatches))
             result.UnionWith(nsMatches.Intersect(sourceTypes));
         
-        // 4. 약어 매칭 (대문자 검색어인 경우만)
-        if (term.All(char.IsUpper) && _acronymToTypesIndex.TryGetValue(term.ToLowerInvariant(), out var acronymMatches))
+        // 4. 약어 매칭 - 모든 검색어에 대해 시도 (대문자 검색어만 제한하지 않음)
+        if (_acronymToTypesIndex.TryGetValue(term.ToLowerInvariant(), out var acronymMatches))
             result.UnionWith(acronymMatches.Intersect(sourceTypes));
         
         // 모든 인덱스에서 찾지 못한 경우 부분 문자열 검색
@@ -537,18 +586,69 @@ public class TypeRegistry
         if (string.IsNullOrEmpty(input))
             yield break;
 
+        // 제네릭 타입 처리 - 제네릭 파라미터 부분 제거
+        var genericIndex = input.IndexOf('`');
+        if (genericIndex > 0)
+            input = input.Substring(0, genericIndex);
+
         var currentWord = new StringBuilder(input[0].ToString());
+        bool wasUpper = char.IsUpper(input[0]);
+        bool wasDigit = char.IsDigit(input[0]);
         
         for (int i = 1; i < input.Length; i++)
         {
-            if (char.IsUpper(input[i]) && 
-                (char.IsLower(input[i - 1]) || 
-                 (i + 1 < input.Length && char.IsLower(input[i + 1]))))
+            var c = input[i];
+            bool isUpper = char.IsUpper(c);
+            bool isDigit = char.IsDigit(c);
+            bool isSpecial = !char.IsLetterOrDigit(c);
+            
+            // 특수문자는 단어 구분자로 처리
+            if (isSpecial)
             {
-                yield return currentWord.ToString();
-                currentWord.Clear();
+                if (currentWord.Length > 0)
+                {
+                    yield return currentWord.ToString();
+                    currentWord.Clear();
+                }
+                continue;
             }
-            currentWord.Append(input[i]);
+            
+            // 1. 소문자 -> 대문자 전환점: 새 단어 시작
+            // 2. 숫자 -> 문자 전환점: 새 단어 시작
+            // 3. 연속된 대문자 다음에 소문자 (약어 다음에 새 단어): 약어 분리 후 새 단어 시작
+            // 4. 연속된 숫자 다음에 문자: 새 단어 시작
+            
+            bool isTransition = 
+                (wasUpper && !isUpper) || // 대문자 → 소문자
+                (!wasUpper && isUpper) || // 소문자 → 대문자
+                (wasDigit != isDigit);    // 숫자 ↔ 문자 전환점
+                
+            // 약어 처리 (연속된 대문자 다음에 소문자가 오면 마지막 대문자는 다음 단어의 시작)
+            bool isAcronymTransition = wasUpper && isUpper && 
+                (i + 1 < input.Length && !char.IsUpper(input[i + 1]) && !char.IsDigit(input[i + 1]));
+                
+            if (isTransition || isAcronymTransition)
+            {
+                if (currentWord.Length > 0)
+                {
+                    // 약어 전환점이면 마지막 문자를 현재 단어에서 제외
+                    if (isAcronymTransition && currentWord.Length > 1)
+                    {
+                        var word = currentWord.ToString();
+                        yield return word;
+                        currentWord.Clear();
+                    }
+                    else 
+                    {
+                        yield return currentWord.ToString();
+                        currentWord.Clear();
+                    }
+                }
+            }
+            
+            currentWord.Append(c);
+            wasUpper = isUpper;
+            wasDigit = isDigit;
         }
         
         if (currentWord.Length > 0)
