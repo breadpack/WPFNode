@@ -81,14 +81,46 @@ public class TypeRegistry
                 _isInitialized = true;
                 _initializationCompletionSource.TrySetResult(true);
             }
+            catch (OperationCanceledException)
+            {
+                System.Diagnostics.Debug.WriteLine("TypeRegistry 초기화 작업이 취소되었습니다.");
+                _initializationCompletionSource.TrySetCanceled();
+                throw;
+            }
             catch (Exception ex)
             {
-                if (ex is OperationCanceledException)
-                    _initializationCompletionSource.TrySetCanceled();
-                else
-                    _initializationCompletionSource.TrySetException(ex);
+                // 심각한 오류만 로깅
+                System.Diagnostics.Debug.WriteLine($"TypeRegistry 초기화 중 오류 발생: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine(ex.StackTrace);
                 
-                throw;
+                try
+                {
+                    // 백업 초기화 시도 - 최소한의 필수 기능만 초기화
+                    System.Diagnostics.Debug.WriteLine("최소 기능으로 TypeRegistry 초기화 시도 중...");
+                    BackupInitialize();
+                    
+                    // 초기화 성공으로 간주 (부분적 기능만 가능하더라도)
+                    _isInitialized = true;
+                    _initializationCompletionSource.TrySetResult(true);
+                }
+                catch (Exception backupEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"백업 초기화도 실패: {backupEx.Message}");
+                    
+                    // 백업 초기화도 실패했지만, 빈 컬렉션이라도 설정하여 최소한의 앱 동작은 보장
+                    _allTypes = new List<Type>();
+                    _pluginTypes = new List<Type>();
+                    _rootNamespaceNodes = new List<NamespaceTypeNode>();
+                    _pluginNamespaceNodes = new List<NamespaceTypeNode>();
+                    _wordToTypesIndex = new Dictionary<string, HashSet<Type>>(StringComparer.OrdinalIgnoreCase);
+                    _prefixToTypesIndex = new Dictionary<string, HashSet<Type>>(StringComparer.OrdinalIgnoreCase);
+                    _acronymToTypesIndex = new Dictionary<string, HashSet<Type>>(StringComparer.OrdinalIgnoreCase);
+                    _namespaceToTypesIndex = new Dictionary<string, HashSet<Type>>(StringComparer.OrdinalIgnoreCase);
+                    
+                    // 그래도 초기화 성공으로 설정 (앱 사용은 가능)
+                    _isInitialized = true;
+                    _initializationCompletionSource.TrySetResult(true);
+                }
             }
                     
             return _initializationCompletionSource.Task;
@@ -259,47 +291,154 @@ public class TypeRegistry
         try
         {
             // 플러그인 타입과 어셈블리 먼저 로드 (가장 중요한 타입들)
-            var pluginTypes = NodeServices.ModelService.NodeTypes;
-            var pluginAssemblies = pluginTypes
-                .Select(t => t.Assembly)
-                .Distinct()
-                .ToHashSet();
-                
-            // 플러그인 타입 직접 추가 (확실히 포함되도록)
-            pluginTypesList.AddRange(pluginTypes);
-            allTypes.AddRange(pluginTypes);
-            
-            // 추가로 플러그인 어셈블리의 모든 타입 포함
-            foreach (var assembly in pluginAssemblies)
+            try
             {
-                if (token.IsCancellationRequested) break;
+                var pluginTypes = NodeServices.ModelService.NodeTypes;
                 
-                try
+                if (pluginTypes != null)
                 {
-                    var types = assembly.GetTypes().ToList();
-                    // 중복 제거하며 추가
-                    var newPluginTypes = types.Except(pluginTypesList).ToList();
-                    pluginTypesList.AddRange(newPluginTypes);
+                    var pluginAssemblies = pluginTypes
+                        .Where(t => t != null) // null 체크 추가
+                        .Select(t => t.Assembly)
+                        .Where(a => a != null) // null 체크 추가
+                        .Distinct()
+                        .ToHashSet();
                     
-                    // 전체 타입에도 추가
-                    var newAllTypes = types.Except(allTypes).ToList();
-                    allTypes.AddRange(newAllTypes);
-                }
-                catch (ReflectionTypeLoadException ex)
-                {
-                    // 로드할 수 있는 타입만 추가
-                    if (ex.Types != null)
+                    // 플러그인 타입 직접 추가 (확실히 포함되도록)
+                    pluginTypesList.AddRange(pluginTypes.Where(t => t != null)); // null 체크 추가
+                    allTypes.AddRange(pluginTypes.Where(t => t != null)); // null 체크 추가
+                    
+                    // 추가로 플러그인 어셈블리의 모든 타입 포함
+                    foreach (var assembly in pluginAssemblies)
                     {
-                        var validTypes = ex.Types.Where(t => t != null).ToList();
-                        pluginTypesList.AddRange(validTypes.Except(pluginTypesList));
-                        allTypes.AddRange(validTypes.Except(allTypes));
+                        if (token.IsCancellationRequested) break;
+                        
+                        try
+                        {
+                            var types = assembly.GetTypes().ToList();
+                            // 중복 제거하며 추가
+                            var newPluginTypes = types.Except(pluginTypesList).ToList();
+                            pluginTypesList.AddRange(newPluginTypes);
+                            
+                            // 전체 타입에도 추가
+                            var newAllTypes = types.Except(allTypes).ToList();
+                            allTypes.AddRange(newAllTypes);
+                        }
+                        catch (ReflectionTypeLoadException ex)
+                        {
+                            // 로드할 수 있는 타입만 추가
+                            if (ex.Types != null)
+                            {
+                                var validTypes = ex.Types.Where(t => t != null).ToList();
+                                pluginTypesList.AddRange(validTypes.Except(pluginTypesList));
+                                allTypes.AddRange(validTypes.Except(allTypes));
+                            }
+                            
+                            // 로더 예외 세부 정보 기록
+                            if (ex.LoaderExceptions != null)
+                            {
+                                foreach (var loaderEx in ex.LoaderExceptions.Where(le => le != null))
+                                {
+                                    System.Diagnostics.Debug.WriteLine($"플러그인 어셈블리 {assembly.GetName().Name} 타입 로드 예외: {loaderEx.Message}");
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"플러그인 어셈블리 {assembly.GetName().Name} 처리 중 예외 발생: {ex.Message}");
+                            // 개별 어셈블리 처리 실패는 무시하고 계속 진행
+                        }
+                    }
+                    
+                    try
+                    {
+                        // 필요한 어셈블리만 필터링 - 시스템 어셈블리 제외, 플러그인 어셈블리 제외(이미 처리됨)
+                        var assemblies = AppDomain.CurrentDomain.GetAssemblies()
+                            .Where(a => a != null && !systemAssemblies.Contains(a.GetName().Name) && !pluginAssemblies.Contains(a))
+                            .ToList();
+                            
+                        // 이제 나머지 어셈블리 처리
+                        foreach (var assembly in assemblies)
+                        {
+                            if (token.IsCancellationRequested) break;
+                            
+                            try
+                            {
+                                // GetTypes() 호출 - 각 어셈블리에 대해 한 번만 수행
+                                var types = assembly.GetTypes()
+                                    .ToList();
+                                
+                                // 중복 제거하며 타입 정보 추가
+                                var newTypes = types.Except(allTypes).ToList();
+                                allTypes.AddRange(newTypes);
+                            }
+                            catch (ReflectionTypeLoadException ex)
+                            {
+                                // 로드할 수 있는 타입만 추가
+                                if (ex.Types != null)
+                                {
+                                    var validTypes = ex.Types.Where(t => t != null).ToList();
+                                    allTypes.AddRange(validTypes.Except(allTypes));
+                                }
+                                
+                                // 로더 예외 세부 정보 기록
+                                if (ex.LoaderExceptions != null)
+                                {
+                                    foreach (var loaderEx in ex.LoaderExceptions.Where(le => le != null))
+                                    {
+                                        System.Diagnostics.Debug.WriteLine($"어셈블리 {assembly.GetName().Name} 타입 로드 예외: {loaderEx.Message}");
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"어셈블리 {assembly.GetName().Name} 처리 중 예외 발생: {ex.Message}");
+                                // 개별 어셈블리 처리 실패는 무시하고 계속 진행
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"AppDomain.CurrentDomain.GetAssemblies() 처리 중 예외 발생: {ex.Message}");
                     }
                 }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("NodeServices.ModelService.NodeTypes가 null입니다.");
+                    // 플러그인 타입을 로드할 수 없는 경우 일반 어셈블리 로드로 대체
+                    LoadAssembliesWithoutPlugins(token, systemAssemblies, allTypes);
+                }
             }
-            
-            // 필요한 어셈블리만 필터링 - 시스템 어셈블리 제외, 플러그인 어셈블리 제외(이미 처리됨)
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"NodeServices.ModelService.NodeTypes 접근 중 예외 발생: {ex.Message}");
+                // NodeServices.ModelService.NodeTypes 접근 실패 시 일반 어셈블리 로드로 대체
+                LoadAssembliesWithoutPlugins(token, systemAssemblies, allTypes);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"타입 로드 중 예외 발생: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine(ex.StackTrace);
+        }
+        
+        // 결과 정렬 및 할당 (최소한의 타입이라도 제공)
+        _allTypes = allTypes.Where(t => t != null).OrderBy(t => t.FullName).ToList();
+        _pluginTypes = pluginTypesList.Where(t => t != null).OrderBy(t => t.FullName).ToList();
+        
+        // 디버그 정보
+        System.Diagnostics.Debug.WriteLine($"로드된 전체 타입 수: {_allTypes.Count}, 플러그인 타입 수: {_pluginTypes.Count}");
+    }
+    
+    /// <summary>
+    /// 플러그인 없이 어셈블리에서 타입을 로드합니다.
+    /// </summary>
+    private void LoadAssembliesWithoutPlugins(CancellationToken token, HashSet<string> systemAssemblies, List<Type> allTypes)
+    {
+        try
+        {
             var assemblies = AppDomain.CurrentDomain.GetAssemblies()
-                .Where(a => !systemAssemblies.Contains(a.GetName().Name) && !pluginAssemblies.Contains(a))
+                .Where(a => a != null && !systemAssemblies.Contains(a.GetName().Name))
                 .ToList();
                 
             // 이제 나머지 어셈블리 처리
@@ -310,8 +449,7 @@ public class TypeRegistry
                 try
                 {
                     // GetTypes() 호출 - 각 어셈블리에 대해 한 번만 수행
-                    var types = assembly.GetTypes()
-                        .ToList();
+                    var types = assembly.GetTypes().ToList();
                     
                     // 중복 제거하며 타입 정보 추가
                     var newTypes = types.Except(allTypes).ToList();
@@ -326,19 +464,17 @@ public class TypeRegistry
                         allTypes.AddRange(validTypes.Except(allTypes));
                     }
                 }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"어셈블리 {assembly.GetName().Name} 처리 중 예외 발생: {ex.Message}");
+                    // 계속 진행
+                }
             }
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"타입 로드 중 오류 발생: {ex}");
+            System.Diagnostics.Debug.WriteLine($"LoadAssembliesWithoutPlugins 처리 중 예외 발생: {ex.Message}");
         }
-        
-        // 결과 정렬
-        _allTypes = allTypes.OrderBy(t => t.FullName).ToList();
-        _pluginTypes = pluginTypesList.OrderBy(t => t.FullName).ToList();
-        
-        // 디버그 정보
-        System.Diagnostics.Debug.WriteLine($"로드된 전체 타입 수: {_allTypes.Count}, 플러그인 타입 수: {_pluginTypes.Count}");
     }
 
     /// <summary>
@@ -653,5 +789,111 @@ public class TypeRegistry
         
         if (currentWord.Length > 0)
             yield return currentWord.ToString();
+    }
+
+    /// <summary>
+    /// 최소한의 기능으로 백업 초기화를 수행합니다.
+    /// </summary>
+    private void BackupInitialize()
+    {
+        try
+        {
+            var allTypes = new List<Type>();
+            var rootNodes = new List<NamespaceTypeNode>();
+            
+            // 기본 시스템 어셈블리 제외
+            var systemAssemblies = new HashSet<string> {
+                "mscorlib", "System", "System.Core", "WindowsBase", "PresentationCore", "PresentationFramework"
+            };
+            
+            // 안전하게 접근 가능한 어셈블리만 처리
+            var assemblies = AppDomain.CurrentDomain.GetAssemblies()
+                .Where(a => a != null && !systemAssemblies.Contains(a.GetName().Name))
+                .ToList();
+                
+            foreach (var assembly in assemblies)
+            {
+                try
+                {
+                    Type[] types = new Type[0];
+                    try
+                    {
+                        types = assembly.GetTypes();
+                    }
+                    catch (ReflectionTypeLoadException ex)
+                    {
+                        if (ex.Types != null)
+                        {
+                            types = ex.Types.Where(t => t != null).ToArray();
+                        }
+                    }
+                    
+                    // 안전하게 타입 추가
+                    if (types.Length > 0)
+                    {
+                        allTypes.AddRange(types);
+                    }
+                }
+                catch
+                {
+                    // 개별 어셈블리 예외는 무시
+                }
+            }
+            
+            // 중복 제거 및 정렬
+            _allTypes = allTypes.Distinct().OrderBy(t => t.FullName).ToList();
+            _pluginTypes = new List<Type>(); // 플러그인 타입은 빈 리스트로 초기화
+            
+            // 최소한의 검색 인덱스 구축
+            var wordIndex = new Dictionary<string, HashSet<Type>>(StringComparer.OrdinalIgnoreCase);
+            var namespaceIndex = new Dictionary<string, HashSet<Type>>(StringComparer.OrdinalIgnoreCase);
+            
+            foreach (var type in _allTypes)
+            {
+                try
+                {
+                    // 타입 이름의 단어 추출 (간소화된 방식)
+                    var typeName = type.Name;
+                    
+                    AddToIndex(wordIndex, typeName.ToLowerInvariant(), type);
+                    
+                    // 네임스페이스 인덱싱 (간소화된 방식)
+                    if (!string.IsNullOrEmpty(type.Namespace))
+                    {
+                        AddToIndex(namespaceIndex, type.Namespace.ToLowerInvariant(), type);
+                    }
+                }
+                catch
+                {
+                    // 개별 타입 처리 중 예외는 무시
+                }
+            }
+            
+            // 최소한의 인덱스 설정
+            _wordToTypesIndex = wordIndex;
+            _namespaceToTypesIndex = namespaceIndex;
+            _prefixToTypesIndex = new Dictionary<string, HashSet<Type>>(StringComparer.OrdinalIgnoreCase);
+            _acronymToTypesIndex = new Dictionary<string, HashSet<Type>>(StringComparer.OrdinalIgnoreCase);
+            
+            // 네임스페이스 트리 구성 (최소한의 방식)
+            try
+            {
+                _rootNamespaceNodes = CreateNamespaceNodes(_allTypes, CancellationToken.None).ToList();
+                _pluginNamespaceNodes = new List<NamespaceTypeNode>(); // 빈 목록으로 초기화
+            }
+            catch
+            {
+                // 네임스페이스 트리 구성 실패 시 빈 목록으로 초기화
+                _rootNamespaceNodes = new List<NamespaceTypeNode>();
+                _pluginNamespaceNodes = new List<NamespaceTypeNode>();
+            }
+            
+            System.Diagnostics.Debug.WriteLine($"백업 초기화 완료: 타입 {_allTypes.Count}개 로드됨");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"백업 초기화 중 오류 발생: {ex.Message}");
+            throw; // 백업 초기화도 실패하면 다시 예외 발생
+        }
     }
 }
