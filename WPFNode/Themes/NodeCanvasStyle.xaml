@@ -34,6 +34,20 @@
                                     </TransformGroup>
                                 </Canvas.RenderTransform>
 
+                                <!-- 연결선 -->
+                                <ItemsControl ItemsSource="{Binding Connections}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <Canvas IsItemsHost="True"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <local:ConnectionControl DataContext="{Binding}"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
                                 <!-- 노드 -->
                                 <ItemsControl ItemsSource="{Binding Nodes}">
                                     <ItemsControl.ItemsPanel>
@@ -69,20 +83,6 @@
                                             </Setter>
                                         </Style>
                                     </ItemsControl.ItemContainerStyle>
-                                </ItemsControl>
-
-                                <!-- 연결선 -->
-                                <ItemsControl ItemsSource="{Binding Connections}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <Canvas IsItemsHost="True" ZIndex="3"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <local:ConnectionControl DataContext="{Binding}"/>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                             </Canvas>
                         </ScrollViewer>

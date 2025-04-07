@@ -13,11 +13,6 @@ public class NodeCanvasStateManager
 {
     private readonly NodeCanvasControl _owner;
     
-    // 캐시 저장소 제거
-    // private readonly Dictionary<NodePortViewModel, PortControl> _portControlCache = new();
-    // private readonly Dictionary<NodePortViewModel, NodeControl> _nodeControlCache = new();
-    // private readonly Dictionary<ConnectionViewModel, ConnectionControl> _connectionControlCache = new();
-
     public NodeCanvasStateManager(NodeCanvasControl owner)
     {
         _owner = owner;
@@ -25,23 +20,13 @@ public class NodeCanvasStateManager
 
     public void Initialize(NodeCanvasViewModel viewModel)
     {
-        // ClearCache(); // 캐시 기능 제거
         SubscribeToViewModelEvents(viewModel);
-        // InitializeControlCache(viewModel); // 캐시 기능 제거
     }
 
     public void Cleanup(NodeCanvasViewModel viewModel)
     {
         UnsubscribeFromViewModelEvents(viewModel);
-        // ClearCache(); // 캐시 기능 제거
     }
-
-    // private void ClearCache()
-    // {
-    //     _portControlCache.Clear();
-    //     _nodeControlCache.Clear();
-    //     _connectionControlCache.Clear();
-    // }
 
     private void SubscribeToViewModelEvents(NodeCanvasViewModel viewModel)
     {
@@ -89,7 +74,6 @@ public class NodeCanvasStateManager
                 foreach (NodeViewModel node in e.NewItems!)
                 {
                     SubscribeToNodeEvents(node);
-                    // CacheNodeControls(node); // 캐시 기능 제거
                 }
                 break;
 
@@ -97,92 +81,25 @@ public class NodeCanvasStateManager
                 foreach (NodeViewModel node in e.OldItems!)
                 {
                     UnsubscribeFromNodeEvents(node);
-                    // RemoveNodeFromCache(node); // 캐시 기능 제거
                 }
                 break;
 
             case NotifyCollectionChangedAction.Reset:
-                // ClearCache(); // 캐시 기능 제거
-                // InitializeControlCache(_owner.ViewModel); // 캐시 기능 제거
                 break;
         }
     }
 
     private void OnConnectionsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        // 캐시 기능을 사용하지 않으므로 필요없음
-        // switch (e.Action)
-        // {
-        //     case NotifyCollectionChangedAction.Add:
-        //         foreach (ConnectionViewModel connection in e.NewItems!)
-        //         {
-        //             CacheConnectionControl(connection);
-        //         }
-        //         break;
-
-        //     case NotifyCollectionChangedAction.Remove:
-        //         foreach (ConnectionViewModel connection in e.OldItems!)
-        //         {
-        //             _connectionControlCache.Remove(connection);
-        //         }
-        //         break;
-
-        //     case NotifyCollectionChangedAction.Reset:
-        //         _connectionControlCache.Clear();
-        //         break;
-        // }
     }
 
     private void OnPortsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        // 캐시 기능을 사용하지 않으므로 필요없음
-        // if (sender is IEnumerable<NodePortViewModel> ports)
-        // {
-        //     switch (e.Action)
-        //     {
-        //         case NotifyCollectionChangedAction.Add:
-        //             foreach (NodePortViewModel port in e.NewItems!)
-        //             {
-        //                 var nodeViewModel = _owner.ViewModel?.Nodes.FirstOrDefault(n => 
-        //                     n.InputPorts.Contains(port) || n.OutputPorts.Contains(port));
-        //                 if (nodeViewModel != null)
-        //                 {
-        //                     CachePortControl(nodeViewModel, port);
-        //                 }
-        //             }
-        //             break;
-
-        //         case NotifyCollectionChangedAction.Remove:
-        //             foreach (NodePortViewModel port in e.OldItems!)
-        //             {
-        //                 _portControlCache.Remove(port);
-        //                 _nodeControlCache.Remove(port);
-        //             }
-        //             break;
-
-        //         case NotifyCollectionChangedAction.Reset:
-        //             var nodePorts = ports.ToList();
-        //             foreach (var port in nodePorts)
-        //             {
-        //                 _portControlCache.Remove(port);
-        //                 _nodeControlCache.Remove(port);
-        //             }
-        //             break;
-        //     }
-        // }
     }
 
     public PortControl? FindPortControl(NodePortViewModel port)
     {
-        // 캐시 확인 제거
-        // if (_portControlCache.TryGetValue(port, out var cachedPortControl))
-        //     return cachedPortControl;
-
-        var portControl = FindPortControlInVisualTree(port);
-        // if (portControl != null)
-        //     _portControlCache[port] = portControl;
-            
-        return portControl;
+        return FindPortControlInVisualTree(port);
     }
     
     /// <summary>
@@ -199,99 +116,6 @@ public class NodeCanvasStateManager
                                  n.FlowInPorts.Contains(port) || 
                                  n.FlowOutPorts.Contains(port));
     }
-
-    // 다음 메서드들은 캐시 관련이므로 제거
-    // private void InitializeControlCache(INodeCanvasViewModel viewModel)
-    // {
-    //     foreach (var node in viewModel.Nodes)
-    //     {
-    //         CacheNodeControls(node);
-    //     }
-        
-    //     foreach (var connection in viewModel.Connections)
-    //     {
-    //         CacheConnectionControl(connection);
-    //     }
-    // }
-
-    // private void CacheNodeControls(NodeViewModel nodeViewModel)
-    // {
-    //     var canvas = _owner.GetDragCanvas();
-    //     if (canvas == null) return;
-
-    //     var nodeItemsControl = FindChildrenOfType<ItemsControl>(canvas).Skip(1).FirstOrDefault();
-    //     if (nodeItemsControl == null) return;
-
-    //     var container = nodeItemsControl.ItemContainerGenerator.ContainerFromItem(nodeViewModel);
-    //     if (container == null) return;
-
-    //     var nodeControl = FindChildOfType<NodeControl>(container);
-    //     if (nodeControl == null) return;
-
-    //     foreach (var port in nodeViewModel.InputPorts.Concat(nodeViewModel.OutputPorts))
-    //     {
-    //         CachePortControl(nodeViewModel, port);
-    //     }
-    // }
-
-    // private void CachePortControl(NodeViewModel nodeViewModel, NodePortViewModel port)
-    // {
-    //     var nodeControl = _nodeControlCache.Values.FirstOrDefault(nc => nc.ViewModel == nodeViewModel);
-    //     if (nodeControl == null) return;
-
-    //     var portControl = nodeControl.FindPortControl(port);
-    //     if (portControl != null)
-    //     {
-    //         _portControlCache[port] = portControl;
-    //         _nodeControlCache[port] = nodeControl;
-    //     }
-    // }
-
-    // private void CacheConnectionControl(ConnectionViewModel connection)
-    // {
-    //     var canvas = _owner.GetDragCanvas();
-    //     if (canvas == null) return;
-
-    //     var connectionItemsControl = FindChildrenOfType<ItemsControl>(canvas).FirstOrDefault();
-    //     if (connectionItemsControl == null) return;
-
-    //     var container = connectionItemsControl.ItemContainerGenerator.ContainerFromItem(connection);
-    //     if (container == null)
-    //     {
-    //         // 컨테이너가 아직 생성되지 않았다면, ItemContainerGenerator가 준비될 때까지 대기
-    //         connectionItemsControl.ItemContainerGenerator.StatusChanged += (s, e) =>
-    //         {
-    //             if (connectionItemsControl.ItemContainerGenerator.Status == GeneratorStatus.ContainersGenerated)
-    //             {
-    //                 var newContainer = connectionItemsControl.ItemContainerGenerator.ContainerFromItem(connection);
-    //                 if (newContainer != null)
-    //                 {
-    //                     var connectionControl = FindChildOfType<ConnectionControl>(newContainer);
-    //                     if (connectionControl != null)
-    //                     {
-    //                         _connectionControlCache[connection] = connectionControl;
-    //                     }
-    //                 }
-    //             }
-    //         };
-    //         return;
-    //     }
-
-    //     var connectionControl = FindChildOfType<ConnectionControl>(container);
-    //     if (connectionControl != null)
-    //     {
-    //         _connectionControlCache[connection] = connectionControl;
-    //     }
-    // }
-
-    // private void RemoveNodeFromCache(NodeViewModel node)
-    // {
-    //     foreach (var port in node.InputPorts.Concat(node.OutputPorts))
-    //     {
-    //         _portControlCache.Remove(port);
-    //         _nodeControlCache.Remove(port);
-    //     }
-    // }
 
     private PortControl? FindPortControlInVisualTree(NodePortViewModel port)
     {
@@ -311,11 +135,10 @@ public class NodeCanvasStateManager
         if (canvas == null) return null;
 
         // 노드를 표시하는 ItemsControl 찾기 (일반적으로 두 번째 ItemsControl)
-        var nodeItemsControl = FindChildrenOfType<ItemsControl>(canvas).FirstOrDefault();
-        if (nodeItemsControl == null) return null;
-
-        // 해당 노드의 컨테이너 찾기
-        var container = nodeItemsControl.ItemContainerGenerator.ContainerFromItem(nodeViewModel);
+        var nodeItemsControl = FindChildrenOfType<ItemsControl>(canvas);
+        
+        var container = nodeItemsControl.Select(n => n.ItemContainerGenerator.ContainerFromItem(nodeViewModel))
+                        .FirstOrDefault(n => n != null);
         if (container == null) return null;
 
         // 노드 컨트롤 찾기
