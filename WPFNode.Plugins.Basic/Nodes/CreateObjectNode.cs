@@ -105,7 +105,7 @@ namespace WPFNode.Plugins.Basic.Nodes {
 
                         if (prop.Value != null) {
                             try {
-                                targetProp.SetValue(newObject, Convert.ChangeType(prop.Value, targetProp.PropertyType));
+                                targetProp.SetValue(newObject, prop.Value);
                             }
                             catch (Exception ex) {
                                 Console.WriteLine($"Property {prop.Name} 설정 중 오류: {ex.Message}");
@@ -119,7 +119,7 @@ namespace WPFNode.Plugins.Basic.Nodes {
 
                         if (prop.Value != null) {
                             try {
-                                targetField.SetValue(newObject, Convert.ChangeType(prop.Value, targetField.FieldType));
+                                targetField.SetValue(newObject, prop.Value);
                             }
                             catch (Exception ex) {
                                 Console.WriteLine($"Field {prop.Name} 설정 중 오류: {ex.Message}");
