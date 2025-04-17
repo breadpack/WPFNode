@@ -7,9 +7,9 @@ namespace WPFNode.Models;
 
 public class FlowInPort : IFlowInPort, INotifyPropertyChanged
 {
-    private readonly int _index;
-    private bool _isVisible = true;
-    private IConnection? _connection;
+    private readonly int              _index;
+    private          bool             _isVisible = true;
+    private          List<IConnection> _connections = new();
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -28,7 +28,7 @@ public class FlowInPort : IFlowInPort, INotifyPropertyChanged
     /// </summary>
     public Type? ConnectedType => null;
     public bool IsInput => true;
-    public bool IsConnected => _connection != null;
+    public bool IsConnected => _connections.Count > 0;
     public bool IsVisible
     {
         get => _isVisible;
@@ -38,7 +38,10 @@ public class FlowInPort : IFlowInPort, INotifyPropertyChanged
             {
                 if (!value && IsConnected)
                 {
-                    _connection?.Disconnect();
+                    foreach (var connection in _connections)
+                        connection.Disconnect();
+                    
+                    _connections.Clear();
                 }
 
                 _isVisible = value;
@@ -47,10 +50,9 @@ public class FlowInPort : IFlowInPort, INotifyPropertyChanged
         }
     }
 
-    public IReadOnlyList<IConnection> Connections => _connection != null ? new[] { _connection } : Array.Empty<IConnection>();
-    public IConnection? Connection => _connection;
-    public INode Node { get; private set; }
-    public int GetPortIndex() => _index;
+    public IReadOnlyList<IConnection> Connections    => _connections;
+    public INode                      Node           { get; private set; }
+    public int                        GetPortIndex() => _index;
 
     public bool CanAcceptType(Type sourceType)
     {
@@ -65,12 +67,10 @@ public class FlowInPort : IFlowInPort, INotifyPropertyChanged
             throw new ArgumentNullException(nameof(connection));
 
         // 기존 연결이 있으면 제거
-        _connection?.Disconnect();
-
-        _connection = connection;
+        _connections.Add(connection);
         OnPropertyChanged(nameof(Connections));
         OnPropertyChanged(nameof(IsConnected));
-        OnPropertyChanged(nameof(Connection));
+        OnPropertyChanged(nameof(_connections));
     }
 
     public void RemoveConnection(IConnection connection)
@@ -80,13 +80,10 @@ public class FlowInPort : IFlowInPort, INotifyPropertyChanged
         if (!connection.Target.Equals(this))
             throw new NodeConnectionException("연결의 타겟 포트가 일치하지 않습니다.", this, connection.Target);
 
-        if (_connection == connection)
-        {
-            _connection = null;
-            OnPropertyChanged(nameof(Connections));
-            OnPropertyChanged(nameof(IsConnected));
-            OnPropertyChanged(nameof(Connection));
-        }
+        _connections.Remove(connection);
+        OnPropertyChanged(nameof(Connections));
+        OnPropertyChanged(nameof(IsConnected));
+        OnPropertyChanged(nameof(_connections));
     }
 
     public IConnection Connect(IFlowOutPort source)
@@ -99,9 +96,6 @@ public class FlowInPort : IFlowInPort, INotifyPropertyChanged
 
         if (source.Node == Node)
             throw new NodeConnectionException("같은 노드의 포트와는 연결할 수 없습니다.", source, this);
-
-        // 기존 연결이 있으면 삭제
-        _connection?.Disconnect();
 
         // Canvas를 통해 새로운 연결 생성
         var canvas = ((NodeBase)Node!).Canvas;
@@ -125,7 +119,10 @@ public class FlowInPort : IFlowInPort, INotifyPropertyChanged
 
     public void Disconnect()
     {
-        _connection?.Disconnect();
+        foreach (var connection in _connections)
+            connection.Disconnect();
+                    
+        _connections.Clear();
     }
 
     protected virtual void OnPropertyChanged(string propertyName)

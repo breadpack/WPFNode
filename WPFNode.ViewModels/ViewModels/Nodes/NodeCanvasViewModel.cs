@@ -334,7 +334,7 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
         // 입력 포트에 기존 연결이 있는지 확인하고 제거
         var inputPort          = source.IsInput ? source : target;
         var existingConnection = inputPort.Connections.FirstOrDefault()?.Model;
-        if (existingConnection != null) {
+        if (existingConnection is { Target: not IFlowInPort }) {
             _canvas.Disconnect(existingConnection);
         }
 

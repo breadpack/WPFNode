@@ -4,8 +4,6 @@ using WPFNode.Models;
 namespace WPFNode.Interfaces;
 
 public interface IFlowInPort : IPort {
-    // Flow In 포트는 하나의 연결만 가능
-    IConnection? Connection { get; }
     IConnection  Connect(IFlowOutPort source);
 }
 
