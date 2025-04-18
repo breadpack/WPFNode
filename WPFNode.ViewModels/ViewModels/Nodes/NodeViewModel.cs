@@ -13,11 +13,11 @@ namespace WPFNode.ViewModels.Nodes;
 
 public class NodeViewModel : ViewModelBase, INodeViewModel, ISelectable, IDisposable
 {
-    private readonly NodeBase _model;
+    private readonly NodeBase            _model;
     private readonly INodeCommandService _commandService;
     private readonly NodeCanvasViewModel _canvas;
-    private Point _position;
-    private string _name;
+    private          Point               _position;
+    private          string              _name;
 
     private readonly ObservableCollection<NodePortViewModel> _inputPorts;
     private readonly ObservableCollection<NodePortViewModel> _outputPorts;
@@ -131,6 +131,9 @@ public class NodeViewModel : ViewModelBase, INodeViewModel, ISelectable, IDispos
             }
         }
     }
+
+    public Point StartPosition     { get; set; }
+    public Point DragStartPosition { get; set; }
 
     /// <summary>
     /// 노드가 선택되었는지 확인합니다.

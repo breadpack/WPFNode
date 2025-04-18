@@ -14,26 +14,21 @@ using System.Linq;
 namespace WPFNode.Controls;
 
 [ContentProperty(nameof(Content))]
-public class NodeControl : ContentControl, INodeControl
-{
-    private Point? _dragStart;
-    private Point _nodeStartPosition;
+public class NodeControl : ContentControl, INodeControl {
     private ContextMenu? _contextMenu;
-    private Canvas? _parentCanvas;
+    private Canvas?      _parentCanvas;
 
-    static NodeControl()
-    {
-        DefaultStyleKeyProperty.OverrideMetadata(typeof(NodeControl), 
-            new FrameworkPropertyMetadata(typeof(NodeControl)));
+    static NodeControl() {
+        DefaultStyleKeyProperty.OverrideMetadata(typeof(NodeControl),
+                                                 new FrameworkPropertyMetadata(typeof(NodeControl)));
     }
 
-    public NodeViewModel? ViewModel
-    {
+    public NodeViewModel? ViewModel {
         get => (NodeViewModel?)DataContext;
         set => DataContext = value;
     }
 
-    private double CanvasWidth => ParentCanvas?.ActualWidth ?? 4000;
+    private double CanvasWidth  => ParentCanvas?.ActualWidth ?? 4000;
     private double CanvasHeight => ParentCanvas?.ActualHeight ?? 4000;
 
     public static readonly DependencyProperty CenteredXProperty =
@@ -50,20 +45,17 @@ public class NodeControl : ContentControl, INodeControl
             typeof(NodeControl),
             new FrameworkPropertyMetadata(0.0, FrameworkPropertyMetadataOptions.AffectsRender));
 
-    public double CenteredX
-    {
+    public double CenteredX {
         get => (double)GetValue(CenteredXProperty);
         private set => SetValue(CenteredXProperty, value);
     }
 
-    public double CenteredY
-    {
+    public double CenteredY {
         get => (double)GetValue(CenteredYProperty);
         private set => SetValue(CenteredYProperty, value);
     }
 
-    private void UpdateCenteredPosition()
-    {
+    private void UpdateCenteredPosition() {
         CenteredX = (ViewModel?.Model.X ?? 0) + CanvasWidth / 2;
         CenteredY = (ViewModel?.Model.Y ?? 0) + CanvasHeight / 2;
     }
@@ -89,66 +81,59 @@ public class NodeControl : ContentControl, INodeControl
             typeof(NodeControl),
             new PropertyMetadata(null));
 
-    public object? Content
-    {
+    public object? Content {
         get => GetValue(ContentProperty);
         set => SetValue(ContentProperty, value);
     }
 
-    public object HeaderContent
-    {
+    public object HeaderContent {
         get => GetValue(HeaderContentProperty);
         set => SetValue(HeaderContentProperty, value);
     }
 
-    public Brush HeaderBackground
-    {
+    public Brush HeaderBackground {
         get => (Brush)GetValue(HeaderBackgroundProperty);
         set => SetValue(HeaderBackgroundProperty, value);
     }
 
-    public NodeControl()
-    {
-        Background = Brushes.White;
-        BorderBrush = Brushes.Gray;
+    public NodeControl() {
+        Background      = Brushes.White;
+        BorderBrush     = Brushes.Gray;
         BorderThickness = new Thickness(1);
 
         MouseLeftButtonDown += OnNodeDragStart;
-        MouseLeftButtonUp += OnNodeDragEnd;
-        MouseMove += OnNodeDrag;
+        MouseLeftButtonUp   += OnNodeDragEnd;
+        MouseMove           += OnNodeDrag;
 
         InitializeContextMenu();
         DataContextChanged += OnDataContextChanged;
-        Loaded += OnControlLoaded;
+        Loaded             += OnControlLoaded;
     }
 
-    private void OnControlLoaded(object sender, RoutedEventArgs e)
-    {
-        if (ParentCanvas != null)
-        {
+    private void OnControlLoaded(object sender, RoutedEventArgs e) {
+        if (ParentCanvas != null) {
             ParentCanvas.SizeChanged += OnCanvasSizeChanged;
         }
+
         UpdateCenteredPosition();
     }
 
-    private void OnCanvasSizeChanged(object sender, SizeChangedEventArgs e)
-    {
+    private void OnCanvasSizeChanged(object sender, SizeChangedEventArgs e) {
         UpdateCenteredPosition();
     }
 
-    private void InitializeContextMenu()
-    {
+    private void InitializeContextMenu() {
         _contextMenu = new ContextMenu();
-        
+
         var copyMenuItem = new MenuItem { Header = "복사" };
         copyMenuItem.Click += (s, e) => CopySelectedNodes();
-        
+
         var pasteMenuItem = new MenuItem { Header = "붙여넣기" };
         pasteMenuItem.Click += (s, e) => PasteNodes();
-        
+
         var duplicateMenuItem = new MenuItem { Header = "복제" };
         duplicateMenuItem.Click += (s, e) => DuplicateSelectedNodes();
-        
+
         var deleteMenuItem = new MenuItem { Header = "삭제" };
         deleteMenuItem.Click += (s, e) => DeleteSelectedNodes();
 
@@ -159,21 +144,18 @@ public class NodeControl : ContentControl, INodeControl
         _contextMenu.Items.Add(deleteMenuItem);
 
         ContextMenu = _contextMenu;
-        
+
         // 키보드 이벤트 핸들러 추가
         PreviewKeyDown += OnNodeKeyDown;
-        Focusable = true; // 키 이벤트를 받기 위해 필요
+        Focusable      =  true; // 키 이벤트를 받기 위해 필요
     }
-    
-    private void OnNodeKeyDown(object sender, KeyEventArgs e)
-    {
-        if (Keyboard.Modifiers == ModifierKeys.Control)
-        {
+
+    private void OnNodeKeyDown(object sender, KeyEventArgs e) {
+        if (Keyboard.Modifiers == ModifierKeys.Control) {
             var canvasViewModel = GetCanvasViewModel();
             if (canvasViewModel == null) return;
-            
-            switch (e.Key)
-            {
+
+            switch (e.Key) {
                 case Key.C:
                     canvasViewModel.CopyCommand.Execute(null);
                     e.Handled = true;
@@ -189,146 +171,133 @@ public class NodeControl : ContentControl, INodeControl
             }
         }
     }
-    
-    private INodeCanvasViewModel? GetCanvasViewModel()
-    {
+
+    private INodeCanvasViewModel? GetCanvasViewModel() {
         var canvas = this.GetParentOfType<NodeCanvasControl>();
         return canvas?.ViewModel;
     }
 
-    private void CopySelectedNodes()
-    {
+    private void CopySelectedNodes() {
         var canvasViewModel = GetCanvasViewModel();
-        if (canvasViewModel != null)
-        {
+        if (canvasViewModel != null) {
             canvasViewModel.CopyCommand.Execute(null);
         }
     }
 
-    private void PasteNodes()
-    {
+    private void PasteNodes() {
         var canvasViewModel = GetCanvasViewModel();
-        if (canvasViewModel != null)
-        {
+        if (canvasViewModel != null) {
             canvasViewModel.PasteCommand.Execute(null);
         }
     }
-    
-    private void DuplicateSelectedNodes()
-    {
+
+    private void DuplicateSelectedNodes() {
         var canvasViewModel = GetCanvasViewModel();
-        if (canvasViewModel != null)
-        {
+        if (canvasViewModel != null) {
             canvasViewModel.DuplicateCommand.Execute(null);
         }
     }
 
-    private void DeleteSelectedNodes()
-    {
+    private void DeleteSelectedNodes() {
         var canvas = this.GetParentOfType<NodeCanvasControl>();
         if (canvas?.ViewModel == null) return;
 
         var selectedNodes = canvas.ViewModel.GetSelectedItemsOfType<NodeViewModel>().ToList();
-        foreach (var node in selectedNodes)
-        {
+        foreach (var node in selectedNodes) {
+            ViewModel?.Deselect();
             canvas.ViewModel.RemoveNodeCommand.Execute(node);
         }
     }
 
-    private void OnNodeDragStart(object sender, MouseButtonEventArgs e)
-    {
+    private void OnNodeDragStart(object sender, MouseButtonEventArgs e) {
         if (e.Source is PortControl) return;
 
         if (ViewModel == null) return;
 
-        if ((Keyboard.Modifiers & ModifierKeys.Control) == 0)
-        {
-            var canvas = this.GetParentOfType<NodeCanvasControl>();
-            if (canvas?.ViewModel != null)
-            {
-                foreach (var node in canvas.ViewModel.Nodes)
-                {
+        var canvas = this.GetParentOfType<NodeCanvasControl>();
+        if ((Keyboard.Modifiers & ModifierKeys.Control) == 0) {
+            if (canvas?.ViewModel != null) {
+                foreach (var node in canvas.ViewModel.Nodes) {
                     if (node != ViewModel)
                         node.Deselect();
                 }
             }
         }
 
-        ViewModel.Select();
-        _dragStart = e.GetPosition(this.Parent as IInputElement);
-        _nodeStartPosition = ViewModel.Position;
+        ViewModel.Select(false);
+        var dragPosition = e.GetPosition(this.Parent as IInputElement);
+        ViewModel.DragStartPosition = dragPosition;
+        ViewModel.StartPosition     = ViewModel.Position;
+        
+        if (canvas?.ViewModel != null) {
+            var selectedNodes = canvas.ViewModel.Nodes.Where(n => n.IsSelected);
+            foreach (var node in selectedNodes) {
+                node.StartPosition     = node.Position;
+                node.DragStartPosition = dragPosition;
+            }
+        }
+        
         CaptureMouse();
         e.Handled = true;
     }
 
-    private void OnNodeDragEnd(object sender, MouseButtonEventArgs e)
-    {
-        if (_dragStart.HasValue && ViewModel != null)
-        {
-            var currentPos = e.GetPosition(this.Parent as IInputElement);
-            var totalDelta = currentPos - _dragStart.Value;
+    private void OnNodeDragEnd(object sender, MouseButtonEventArgs e) {
+        if (ViewModel != null) {
+            if ((Keyboard.Modifiers & ModifierKeys.Control) == 0) {
+                var currentPos = e.GetPosition(this.Parent as IInputElement);
+                var totalDelta = currentPos - ViewModel.DragStartPosition;
 
-            if (totalDelta.X != 0 || totalDelta.Y != 0)
-            {
                 var canvas = this.GetParentOfType<NodeCanvasControl>();
-                if (canvas?.ViewModel != null)
-                {
+                if (canvas?.ViewModel != null) {
                     var selectedNodes = canvas.ViewModel.Nodes.Where(n => n.IsSelected);
-                    foreach (var node in selectedNodes)
-                    {
+                    foreach (var node in selectedNodes) {
                         node.Position = new Point(
-                            _nodeStartPosition.X + totalDelta.X,
-                            _nodeStartPosition.Y + totalDelta.Y);
+                            node.StartPosition.X + totalDelta.X,
+                            node.StartPosition.Y + totalDelta.Y);
                     }
                 }
+
                 UpdateCenteredPosition();
             }
 
-            _dragStart = null;
             ReleaseMouseCapture();
             e.Handled = true;
         }
     }
 
-    private void OnNodeDrag(object sender, MouseEventArgs e)
-    {
-        if (_dragStart.HasValue && ViewModel != null && e.LeftButton == MouseButtonState.Pressed)
-        {
+    private void OnNodeDrag(object sender, MouseEventArgs e) {
+        if (ViewModel != null && e.LeftButton == MouseButtonState.Pressed) {
             var currentPos = e.GetPosition(this.Parent as IInputElement);
-            var delta = currentPos - _dragStart.Value;
 
             var canvas = this.GetParentOfType<NodeCanvasControl>();
-            if (canvas?.ViewModel != null)
-            {
+            if (canvas?.ViewModel != null) {
                 var selectedNodes = canvas.ViewModel.GetSelectedItemsOfType<NodeViewModel>();
-                foreach (var node in selectedNodes)
-                {
+                var delta         = currentPos - ViewModel.DragStartPosition;
+                foreach (var node in selectedNodes) {
+
                     node.Position = new Point(
-                        _nodeStartPosition.X + delta.X,
-                        _nodeStartPosition.Y + delta.Y);
+                        node.StartPosition.X + delta.X,
+                        node.StartPosition.Y + delta.Y);
                 }
             }
+
             UpdateCenteredPosition();
             e.Handled = true;
         }
     }
 
-    private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
-    {
-        if (e.OldValue is NodeViewModel oldViewModel)
-        {
+    private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e) {
+        if (e.OldValue is NodeViewModel oldViewModel) {
             oldViewModel.PropertyChanged -= OnViewModelPropertyChanged;
         }
 
-        if (e.NewValue is NodeViewModel viewModel)
-        {
-            HeaderContent = viewModel.Model.Name;
+        if (e.NewValue is NodeViewModel viewModel) {
+            HeaderContent             =  viewModel.Model.Name;
             viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
             // NodeServices를 통해 PluginService 접근
             var style = WPFNodeServices.UIService.FindNodeStyle(viewModel.Model.GetType());
-            if (style != null)
-            {
+            if (style != null) {
                 // 스타일을 복제하여 사용
                 Style = new Style(typeof(NodeControl), style);
             }
@@ -337,98 +306,81 @@ public class NodeControl : ContentControl, INodeControl
         }
     }
 
-    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(NodeViewModel.Position))
-        {
+    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) {
+        if (e.PropertyName == nameof(NodeViewModel.Position)) {
             UpdateCenteredPosition();
         }
-        else if (e.PropertyName == nameof(NodeViewModel.Properties)) {
-            
-        }
+        else if (e.PropertyName == nameof(NodeViewModel.Properties)) { }
     }
 
-    private Canvas? ParentCanvas
-    {
-        get
-        {
-            if (_parentCanvas == null)
-            {
+    private Canvas? ParentCanvas {
+        get {
+            if (_parentCanvas == null) {
                 var canvas = this.GetParentOfType<NodeCanvasControl>();
-                if (canvas != null)
-                {
+                if (canvas != null) {
                     _parentCanvas = canvas.GetDragCanvas();
                 }
             }
+
             return _parentCanvas;
         }
     }
 
-    public PortControl? FindPortControl(NodePortViewModel port)
-    {
+    public PortControl? FindPortControl(NodePortViewModel port) {
         // 모든 ItemsControl 찾기
         var portItemsControls = FindChildrenOfType<ItemsControl>(this);
-        
+
         // ItemsSource로 포트 컬렉션을 가진 ItemsControl 찾기
-        foreach (var itemsControl in portItemsControls)
-        {
-            if (itemsControl.ItemsSource is IEnumerable<NodePortViewModel> ports &&
-                ports.Contains(port))
-            {
+        foreach (var itemsControl in portItemsControls) {
+            if (itemsControl.ItemsSource is IEnumerable<NodePortViewModel> ports && ports.Contains(port)) {
                 var container = itemsControl.ItemContainerGenerator.ContainerFromItem(port) as ContentPresenter;
                 if (container == null) continue;
-                
+
                 var portControl = FindChildOfType<PortControl>(container);
-                if (portControl != null)
-                {
+                if (portControl != null) {
                     return portControl;
                 }
             }
         }
-        
+
         return null;
     }
 
     // 자식 요소 중 특정 타입 찾기 (DFS)
-    private T? FindChildOfType<T>(DependencyObject parent) where T : DependencyObject
-    {
+    private T? FindChildOfType<T>(DependencyObject parent) where T : DependencyObject {
         if (parent == null) return null;
 
-        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
-        {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++) {
             var child = VisualTreeHelper.GetChild(parent, i);
-            
+
             if (child is T result)
                 return result;
-                
+
             var foundInChild = FindChildOfType<T>(child);
             if (foundInChild != null)
                 return foundInChild;
         }
-        
+
         return null;
     }
 
     // 자식 요소들 중 특정 타입 모두 찾기 - BFS 방식으로 최적화
-    private IEnumerable<T> FindChildrenOfType<T>(DependencyObject parent) where T : DependencyObject
-    {
+    private IEnumerable<T> FindChildrenOfType<T>(DependencyObject parent) where T : DependencyObject {
         if (parent == null) yield break;
 
         var queue = new Queue<DependencyObject>();
         queue.Enqueue(parent);
 
-        while (queue.Count > 0)
-        {
-            var current = queue.Dequeue();
+        while (queue.Count > 0) {
+            var current    = queue.Dequeue();
             int childCount = VisualTreeHelper.GetChildrenCount(current);
-            
-            for (int i = 0; i < childCount; i++)
-            {
+
+            for (int i = 0; i < childCount; i++) {
                 var child = VisualTreeHelper.GetChild(current, i);
-                
+
                 if (child is T result)
                     yield return result;
-                
+
                 queue.Enqueue(child);
             }
         }

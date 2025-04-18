@@ -493,8 +493,8 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
         var addedNodeViewModels = new List<NodeViewModel>();
 
         // 복제 오프셋 - 복제는 원래 위치에서 좀 더 가까운 거리에 배치
-        var duplicateOffsetX = 30;
-        var duplicateOffsetY = 30;
+        var duplicateOffsetX = 0;
+        var duplicateOffsetY = 0;
 
         // 각 노드를 복제
         foreach (var nodeVM in selectedNodes) {
@@ -504,6 +504,8 @@ public partial class NodeCanvasViewModel : ObservableObject, INodeCanvasViewMode
                 var newNode  = _canvas.CreateNodeFromJson(nodeJson, duplicateOffsetX, duplicateOffsetY);
                 if (newNode != null) {
                     var newNodeVM = Nodes.FirstOrDefault(vm => vm.Id == newNode.Guid);
+                    newNodeVM.DragStartPosition = nodeVM.DragStartPosition;
+                    newNodeVM.StartPosition   = nodeVM.StartPosition;
                     if (newNodeVM != null) {
                         addedNodeViewModels.Add(newNodeVM);
                     }

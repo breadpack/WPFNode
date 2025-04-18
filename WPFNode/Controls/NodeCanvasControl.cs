@@ -1061,10 +1061,12 @@ public partial class NodeCanvasControl : Control, INodeCanvasControl
             {
                 case NodeViewModel nodeVM:
                     ViewModel.RemoveNodeCommand.Execute(nodeVM);
+                    nodeVM.Deselect();
                     break;
                     
                 case ConnectionViewModel connectionVM:
                     ViewModel.DisconnectCommand.Execute((connectionVM.Source, connectionVM.Target));
+                    connectionVM.Deselect();
                     break;
                     
                 // 향후 다른 유형의 선택 가능한 항목이 추가되면 여기에 케이스 추가
