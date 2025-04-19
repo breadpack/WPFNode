@@ -111,8 +111,8 @@ public abstract class PortControl : Control
         _portCenter = GetConnectionPointCenter(this);
         
         var canvas = this.GetParentOfType<NodeCanvasControl>();
-        if (canvas != null)
-        {
+        if (canvas != null) {
+            canvas.DeSelectAllItems();   
             canvas.StartPortDrag(ViewModel);
             _dragCanvas = canvas.GetDragCanvas();
             if (_dragCanvas != null)
