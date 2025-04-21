@@ -32,6 +32,9 @@ public class StringFormatNode : NodeBase {
 
     [NodeProperty("형식 문자열", CanConnectToPort = true, OnValueChanged = nameof(OnFormatStringChanged))]
     public NodeProperty<string> FormatString { get; private set; }
+    
+    [NodeProperty("빈 문자 0으로 변환", CanConnectToPort = false)]
+    public NodeProperty<bool> UseZero { get; set; }
 
     private          int                         _lastParameterCount = 0;
     private readonly Dictionary<int, IInputPort> _parameterPorts     = new Dictionary<int, IInputPort>();
@@ -106,7 +109,7 @@ public class StringFormatNode : NodeBase {
                     try {
                         // 동적으로 타입 처리
                         dynamic dynamicPort = port;
-                        parameters[i] = dynamicPort.GetValueOrDefault() ?? "";
+                        parameters[i] = dynamicPort.GetValueOrDefault() ?? (UseZero.Value ? "0" :"");
                     }
                     catch {
                         parameters[i] = "";
