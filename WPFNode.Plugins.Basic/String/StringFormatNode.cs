@@ -109,15 +109,19 @@ public class StringFormatNode : NodeBase {
                     try {
                         // 동적으로 타입 처리
                         dynamic dynamicPort = port;
-                        parameters[i] = dynamicPort.GetValueOrDefault() ?? (UseZero.Value ? "0" :"");
+                        parameters[i] = dynamicPort.GetValueOrDefault() ?? "";
                     }
                     catch {
-                        parameters[i] = UseZero.Value ? "0" :"";
+                        parameters[i] = "";
                         Logger?.LogWarning($"파라미터 {i} 값을 가져오는 중 오류 발생");
                     }
                 }
                 else {
-                    parameters[i] = UseZero.Value ? "0" :"";
+                    parameters[i] = "";
+                }
+                
+                if(UseZero.Value && parameters[i] is string str && string.IsNullOrWhiteSpace(str)) {
+                    parameters[i] = "0"; // 빈 문자열을 0으로 변환
                 }
             }
 
