@@ -112,12 +112,12 @@ public class StringFormatNode : NodeBase {
                         parameters[i] = dynamicPort.GetValueOrDefault() ?? (UseZero.Value ? "0" :"");
                     }
                     catch {
-                        parameters[i] = "";
+                        parameters[i] = UseZero.Value ? "0" :"";
                         Logger?.LogWarning($"파라미터 {i} 값을 가져오는 중 오류 발생");
                     }
                 }
                 else {
-                    parameters[i] = "";
+                    parameters[i] = UseZero.Value ? "0" :"";
                 }
             }
 
