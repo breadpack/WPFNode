@@ -44,7 +44,7 @@ public class TypeRegistry
     {
         // 기본적으로 문제가 되는 것으로 알려진 어셈블리/타입에 대한 기본 필터 설정
         // 이 필터는 사용자가 나중에 IncludeAssemblyPrefix 또는 ResetFilters로 제거할 수 있음
-        //ExcludeAssemblyPrefix("UnityEngine");
+        //ExcludeAssemblyPrefix("UnityEngine"); 제발요
     }
 
     // 전체 타입 컬렉션
