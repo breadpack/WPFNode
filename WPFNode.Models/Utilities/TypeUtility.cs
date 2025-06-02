@@ -287,6 +287,11 @@ public static class ValueConversionExtensions
             var converter = TypeDescriptor.GetConverter(targetType);
             if (converter.CanConvertFrom(sourceValue.GetType()))
             {
+                if (sourceValue is string sourceString && string.IsNullOrEmpty(sourceString)) {
+                    result = Activator.CreateInstance(targetType);
+                    return true;
+                }
+                
                 result = converter.ConvertFrom(sourceValue);
                 return true;
             }
