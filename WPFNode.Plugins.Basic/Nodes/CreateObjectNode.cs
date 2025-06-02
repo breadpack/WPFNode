@@ -52,7 +52,7 @@ namespace WPFNode.Plugins.Basic.Nodes {
 
             // 타겟 타입의 쓰기 가능한 속성과 필드들 가져오기
             var targetProperties = targetType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                                             .Where(p => p.CanWrite)
+                                             .Where(p => p.CanWrite && p.GetIndexParameters().Length == 0)
                                              .ToList();
 
             var targetFields = targetType.GetFields(BindingFlags.Public | BindingFlags.Instance)
