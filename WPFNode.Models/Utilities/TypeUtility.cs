@@ -189,9 +189,16 @@ public static class ValueConversionExtensions
     {
         result = null;
         
+        // 빈 문자열이나 null을 숫자 타입으로 변환할 때 0으로 기본 처리 (성능 최적화)
+        if (string.IsNullOrEmpty(sourceString) && targetType.IsNumericType())
+        {
+            result = GetNumericZero(targetType);
+            return result != null;
+        }
+        
         try 
         {
-            // TryParse 메서드 시도
+            // TryParse 메서드 시도 (예외 없는 안전한 방법 우선)
             var tryParseMethod = targetType.GetMethod("TryParse", 
                 BindingFlags.Public | BindingFlags.Static, 
                 null, 
@@ -206,9 +213,16 @@ public static class ValueConversionExtensions
                     result = parameters[1];
                     return true;
                 }
+                // TryParse 실패 시 빈 문자열이면 0으로 처리
+                if (string.IsNullOrWhiteSpace(sourceString) && targetType.IsNumericType())
+                {
+                    result = GetNumericZero(targetType);
+                    return result != null;
+                }
+                return false; // TryParse 실패 시 Parse 시도하지 않음 (성능 최적화)
             }
             
-            // Parse 메서드 시도
+            // Parse 메서드 시도 (TryParse가 없는 경우만)
             var parseMethod = targetType.GetMethod("Parse", 
                 BindingFlags.Public | BindingFlags.Static, 
                 null, 
@@ -217,6 +231,13 @@ public static class ValueConversionExtensions
                 
             if (parseMethod != null)
             {
+                // 빈 문자열 체크로 예외 방지
+                if (string.IsNullOrWhiteSpace(sourceString) && targetType.IsNumericType())
+                {
+                    result = GetNumericZero(targetType);
+                    return result != null;
+                }
+                
                 result = parseMethod.Invoke(null, new object[] { sourceString });
                 return true;
             }
@@ -225,8 +246,41 @@ public static class ValueConversionExtensions
         }
         catch
         {
+            // 예외 발생 시 숫자 타입이면 0으로 폴백
+            if (targetType.IsNumericType())
+            {
+                result = GetNumericZero(targetType);
+                return result != null;
+            }
             return false;
         }
+    }
+    
+    /// <summary>
+    /// 숫자 타입에 대한 0 값을 반환합니다. (성능 최적화용)
+    /// </summary>
+    private static object? GetNumericZero(Type numericType)
+    {
+        if (numericType == typeof(byte)) return (byte)0;
+        if (numericType == typeof(sbyte)) return (sbyte)0;
+        if (numericType == typeof(short)) return (short)0;
+        if (numericType == typeof(ushort)) return (ushort)0;
+        if (numericType == typeof(int)) return 0;
+        if (numericType == typeof(uint)) return 0U;
+        if (numericType == typeof(long)) return 0L;
+        if (numericType == typeof(ulong)) return 0UL;
+        if (numericType == typeof(float)) return 0.0f;
+        if (numericType == typeof(double)) return 0.0;
+        if (numericType == typeof(decimal)) return 0m;
+        
+        // Nullable 타입 처리
+        var underlyingType = Nullable.GetUnderlyingType(numericType);
+        if (underlyingType != null && underlyingType.IsNumericType())
+        {
+            return GetNumericZero(underlyingType);
+        }
+        
+        return null;
     }
     
     /// <summary>
@@ -397,6 +451,17 @@ public static class ValueConversionExtensions
                 case ConversionStrategy.Parse:
                     if (sourceValue is string sourceString && cacheEntry.Method != null)
                     {
+                        // 빈 문자열을 숫자 타입으로 변환할 때 0으로 기본 처리 (성능 최적화)
+                        if (string.IsNullOrEmpty(sourceString) && targetType.IsNumericType())
+                        {
+                            var zeroValue = GetNumericZero(targetType);
+                            if (zeroValue != null)
+                            {
+                                result = (T)zeroValue;
+                                return true;
+                            }
+                        }
+                        
                         if (cacheEntry.Method.Name == "TryParse")
                         {
                             var parameters = new object[] { sourceString, default(T)! };
@@ -405,9 +470,30 @@ public static class ValueConversionExtensions
                                 result = (T)parameters[1];
                                 return true;
                             }
+                            // TryParse 실패 시 빈 문자열이면 0으로 처리
+                            if (string.IsNullOrWhiteSpace(sourceString) && targetType.IsNumericType())
+                            {
+                                var zeroValue = GetNumericZero(targetType);
+                                if (zeroValue != null)
+                                {
+                                    result = (T)zeroValue;
+                                    return true;
+                                }
+                            }
                         }
                         else if (cacheEntry.Method.Name == "Parse")
                         {
+                            // 빈 문자열 체크로 예외 방지
+                            if (string.IsNullOrWhiteSpace(sourceString) && targetType.IsNumericType())
+                            {
+                                var zeroValue = GetNumericZero(targetType);
+                                if (zeroValue != null)
+                                {
+                                    result = (T)zeroValue;
+                                    return true;
+                                }
+                            }
+                            
                             result = (T)cacheEntry.Method.Invoke(null, new object[] { sourceString })!;
                             return true;
                         }
@@ -757,6 +843,13 @@ public static class ValueConversionExtensions
                 case ConversionStrategy.Parse:
                     if (sourceValue is string sourceString && cacheEntry.Method != null)
                     {
+                        // 빈 문자열을 숫자 타입으로 변환할 때 0으로 기본 처리 (성능 최적화)
+                        if (string.IsNullOrEmpty(sourceString) && targetType.IsNumericType())
+                        {
+                            result = GetNumericZero(targetType);
+                            return result != null;
+                        }
+                        
                         if (cacheEntry.Method.Name == "TryParse")
                         {
                             var parameters = new object[] { sourceString, Activator.CreateInstance(targetType)! };
@@ -765,9 +858,22 @@ public static class ValueConversionExtensions
                                 result = parameters[1];
                                 return true;
                             }
+                            // TryParse 실패 시 빈 문자열이면 0으로 처리
+                            if (string.IsNullOrWhiteSpace(sourceString) && targetType.IsNumericType())
+                            {
+                                result = GetNumericZero(targetType);
+                                return result != null;
+                            }
                         }
                         else if (cacheEntry.Method.Name == "Parse")
                         {
+                            // 빈 문자열 체크로 예외 방지
+                            if (string.IsNullOrWhiteSpace(sourceString) && targetType.IsNumericType())
+                            {
+                                result = GetNumericZero(targetType);
+                                return result != null;
+                            }
+                            
                             result = cacheEntry.Method.Invoke(null, new object[] { sourceString });
                             return true;
                         }
