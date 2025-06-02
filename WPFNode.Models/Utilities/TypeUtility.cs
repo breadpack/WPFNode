@@ -200,14 +200,12 @@ public static class ValueConversionExtensions
                 
             if (tryParseMethod != null)
             {
-                var parameters = new object?[] { sourceString, null };
-                var success = (bool)tryParseMethod.Invoke(null, parameters)!;
-                if (success)
+                var parameters = new object[] { sourceString, Activator.CreateInstance(targetType)! };
+                if ((bool)tryParseMethod.Invoke(null, parameters)!)
                 {
                     result = parameters[1];
                     return true;
                 }
-                return false;
             }
             
             // Parse 메서드 시도
@@ -338,6 +336,119 @@ public static class ValueConversionExtensions
     }
 
     /// <summary>
+    /// 캐시된 변환 전략을 실행합니다.
+    /// </summary>
+    private static bool ExecuteCachedConversion<T>(object? sourceValue, ConversionCacheEntry cacheEntry, out T? result)
+    {
+        result = default;
+        if (sourceValue == null) return false;
+
+        try
+        {
+            var sourceType = sourceValue.GetType();
+            var targetType = typeof(T);
+
+            switch (cacheEntry.Strategy)
+            {
+                case ConversionStrategy.Direct:
+                    if (sourceValue is T directValue)
+                    {
+                        result = directValue;
+                        return true;
+                    }
+                    break;
+
+                case ConversionStrategy.Numeric:
+                    if (sourceType.IsNumericType() && targetType.IsNumericType())
+                    {
+                        if (TryNumericConversion(sourceValue, targetType, out var numericResult))
+                        {
+                            result = (T)numericResult!;
+                            return true;
+                        }
+                    }
+                    break;
+
+                case ConversionStrategy.SourceImplicit:
+                case ConversionStrategy.TargetImplicit:
+                    if (cacheEntry.Method != null)
+                    {
+                        result = (T)cacheEntry.Method.Invoke(null, new[] { sourceValue })!;
+                        return true;
+                    }
+                    break;
+
+                case ConversionStrategy.Explicit:
+                    if (cacheEntry.Method != null)
+                    {
+                        result = (T)cacheEntry.Method.Invoke(null, new[] { sourceValue })!;
+                        return true;
+                    }
+                    break;
+
+                case ConversionStrategy.Constructor:
+                    if (cacheEntry.Constructor != null)
+                    {
+                        result = (T)cacheEntry.Constructor.Invoke(new[] { sourceValue })!;
+                        return true;
+                    }
+                    break;
+
+                case ConversionStrategy.Parse:
+                    if (sourceValue is string sourceString && cacheEntry.Method != null)
+                    {
+                        if (cacheEntry.Method.Name == "TryParse")
+                        {
+                            var parameters = new object[] { sourceString, default(T)! };
+                            if ((bool)cacheEntry.Method.Invoke(null, parameters)!)
+                            {
+                                result = (T)parameters[1];
+                                return true;
+                            }
+                        }
+                        else if (cacheEntry.Method.Name == "Parse")
+                        {
+                            result = (T)cacheEntry.Method.Invoke(null, new object[] { sourceString })!;
+                            return true;
+                        }
+                    }
+                    break;
+
+                case ConversionStrategy.TypeConverter:
+                    if (TryTypeConverter(sourceValue, targetType, out var convertedResult))
+                    {
+                        result = (T)convertedResult!;
+                        return true;
+                    }
+                    break;
+
+                case ConversionStrategy.ToString:
+                    if (targetType == typeof(string))
+                    {
+                        result = (T)(object)sourceValue.ToString()!;
+                        return true;
+                    }
+                    break;
+            }
+
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 변환 전략을 캐시에 저장합니다.
+    /// </summary>
+    private static void CacheConversionResult(Type sourceType, Type targetType, ConversionStrategy strategy, MethodInfo? method = null, ConstructorInfo? constructor = null)
+    {
+        var entry = new ConversionCacheEntry(strategy, method, constructor);
+        ConversionCache.CacheConversionStrategy(sourceType, targetType, entry);
+    }
+
+    /// <summary>
     /// 값을 대상 타입으로 변환을 시도합니다.
     /// </summary>
     public static bool TryConvertTo<T>(this object? sourceValue, out T? result)
@@ -350,18 +461,33 @@ public static class ValueConversionExtensions
             var sourceType = sourceValue.GetType();
             var targetType = typeof(T);
 
+            // 캐시에서 변환 전략 조회
+            if (ConversionCache.TryGetConversionStrategy(sourceType, targetType, out var cachedEntry))
+            {
+                if (ExecuteCachedConversion(sourceValue, cachedEntry, out result))
+                {
+                    return true;
+                }
+            }
+
             // 1. 직접 타입 변환 가능한 경우
             if (sourceValue is T typedValue)
             {
                 result = typedValue;
+                CacheConversionResult(sourceType, targetType, ConversionStrategy.Direct);
                 return true;
             }
 
             // 2. 숫자 타입 간 변환
             if (sourceType.IsNumericType() && targetType.IsNumericType())
             {
-                result = (T)Convert.ChangeType(sourceValue, targetType);
-                return true;
+                // 직접 캐스팅을 사용하여 C# 표준 동작 (버림) 유지
+                if (TryNumericConversion(sourceValue, targetType, out var numericResult))
+                {
+                    result = (T)numericResult!;
+                    CacheConversionResult(sourceType, targetType, ConversionStrategy.Numeric);
+                    return true;
+                }
             }
 
             // 3. 소스 타입에서 정의된 암시적 변환 연산자 확인
@@ -374,6 +500,7 @@ public static class ValueConversionExtensions
             if (sourceImplicitOp != null && sourceImplicitOp.ReturnType == targetType)
             {
                 result = (T)sourceImplicitOp.Invoke(null, new[] { sourceValue })!;
+                CacheConversionResult(sourceType, targetType, ConversionStrategy.SourceImplicit, sourceImplicitOp);
                 return true;
             }
             
@@ -387,6 +514,7 @@ public static class ValueConversionExtensions
             if (targetImplicitOp != null && targetImplicitOp.ReturnType == targetType)
             {
                 result = (T)targetImplicitOp.Invoke(null, new[] { sourceValue })!;
+                CacheConversionResult(sourceType, targetType, ConversionStrategy.TargetImplicit, targetImplicitOp);
                 return true;
             }
             
@@ -394,6 +522,10 @@ public static class ValueConversionExtensions
             if (TryExplicitConversion(sourceValue, sourceType, targetType, out var explicitResult))
             {
                 result = (T)explicitResult!;
+                // 명시적 변환에서 사용된 메서드 정보를 가져와서 캐시
+                var explicitOp = sourceType.GetMethod("op_Explicit", BindingFlags.Public | BindingFlags.Static, null, new[] { sourceType }, null) ??
+                                targetType.GetMethod("op_Explicit", BindingFlags.Public | BindingFlags.Static, null, new[] { sourceType }, null);
+                CacheConversionResult(sourceType, targetType, ConversionStrategy.Explicit, explicitOp);
                 return true;
             }
             
@@ -401,6 +533,8 @@ public static class ValueConversionExtensions
             if (TryConstructorConversion(sourceValue, sourceType, targetType, out var constructedResult))
             {
                 result = (T)constructedResult!;
+                var constructor = targetType.GetConstructor(new[] { sourceType });
+                CacheConversionResult(sourceType, targetType, ConversionStrategy.Constructor, null, constructor);
                 return true;
             }
 
@@ -408,6 +542,9 @@ public static class ValueConversionExtensions
             if (sourceValue is string sourceString && TryParseString(sourceString, targetType, out var parsedResult))
             {
                 result = (T)parsedResult!;
+                var parseMethod = targetType.GetMethod("TryParse", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(string), targetType.MakeByRefType() }, null) ??
+                                 targetType.GetMethod("Parse", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(string) }, null);
+                CacheConversionResult(sourceType, targetType, ConversionStrategy.Parse, parseMethod);
                 return true;
             }
             
@@ -415,6 +552,7 @@ public static class ValueConversionExtensions
             if (TryTypeConverter(sourceValue, targetType, out var convertedResult))
             {
                 result = (T)convertedResult!;
+                CacheConversionResult(sourceType, targetType, ConversionStrategy.TypeConverter);
                 return true;
             }
 
@@ -422,6 +560,7 @@ public static class ValueConversionExtensions
             if (targetType == typeof(string))
             {
                 result = (T)(object)sourceValue.ToString()!;
+                CacheConversionResult(sourceType, targetType, ConversionStrategy.ToString);
                 return true;
             }
 
@@ -444,16 +583,31 @@ public static class ValueConversionExtensions
         {
             var sourceType = sourceValue.GetType();
 
+            // 캐시에서 변환 전략 조회
+            if (ConversionCache.TryGetConversionStrategy(sourceType, targetType, out var cachedEntry))
+            {
+                if (ExecuteCachedConversionNonGeneric(sourceValue, cachedEntry, targetType, out var cachedResult))
+                {
+                    return cachedResult;
+                }
+            }
+
             // 1. 직접 타입 변환 가능한 경우
             if (targetType.IsAssignableFrom(sourceType))
             {
+                CacheConversionResult(sourceType, targetType, ConversionStrategy.Direct);
                 return sourceValue;
             }
 
             // 2. 숫자 타입 간 변환
             if (sourceType.IsNumericType() && targetType.IsNumericType())
             {
-                return Convert.ChangeType(sourceValue, targetType);
+                // 직접 캐스팅을 사용하여 C# 표준 동작 (버림) 유지
+                if (TryNumericConversion(sourceValue, targetType, out var numericResult))
+                {
+                    CacheConversionResult(sourceType, targetType, ConversionStrategy.Numeric);
+                    return numericResult;
+                }
             }
 
             // 3. 소스 타입에서 정의된 암시적 변환 연산자 확인
@@ -465,7 +619,9 @@ public static class ValueConversionExtensions
 
             if (sourceImplicitOp != null && sourceImplicitOp.ReturnType == targetType)
             {
-                return sourceImplicitOp.Invoke(null, new[] { sourceValue });
+                var result = sourceImplicitOp.Invoke(null, new[] { sourceValue });
+                CacheConversionResult(sourceType, targetType, ConversionStrategy.SourceImplicit, sourceImplicitOp);
+                return result;
             }
             
             // 4. 대상 타입에서 정의된 암시적 변환 연산자 확인
@@ -477,43 +633,58 @@ public static class ValueConversionExtensions
                 
             if (targetImplicitOp != null && targetImplicitOp.ReturnType == targetType)
             {
-                return targetImplicitOp.Invoke(null, new[] { sourceValue });
+                var result = targetImplicitOp.Invoke(null, new[] { sourceValue });
+                CacheConversionResult(sourceType, targetType, ConversionStrategy.TargetImplicit, targetImplicitOp);
+                return result;
             }
             
             // 5. 명시적 변환 연산자 확인
             if (TryExplicitConversion(sourceValue, sourceType, targetType, out var explicitResult))
             {
+                var explicitOp = sourceType.GetMethod("op_Explicit", BindingFlags.Public | BindingFlags.Static, null, new[] { sourceType }, null) ??
+                                targetType.GetMethod("op_Explicit", BindingFlags.Public | BindingFlags.Static, null, new[] { sourceType }, null);
+                CacheConversionResult(sourceType, targetType, ConversionStrategy.Explicit, explicitOp);
                 return explicitResult;
             }
             
             // 6. 생성자를 통한 변환 시도
             if (TryConstructorConversion(sourceValue, sourceType, targetType, out var constructedResult))
             {
+                var constructor = targetType.GetConstructor(new[] { sourceType });
+                CacheConversionResult(sourceType, targetType, ConversionStrategy.Constructor, null, constructor);
                 return constructedResult;
             }
 
             // 7. 문자열 변환 시도 (Parse/TryParse)
             if (sourceValue is string sourceString && TryParseString(sourceString, targetType, out var parsedResult))
             {
+                var parseMethod = targetType.GetMethod("TryParse", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(string), targetType.MakeByRefType() }, null) ??
+                                 targetType.GetMethod("Parse", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(string) }, null);
+                CacheConversionResult(sourceType, targetType, ConversionStrategy.Parse, parseMethod);
                 return parsedResult;
             }
             
             // 8. TypeConverter 사용
             if (TryTypeConverter(sourceValue, targetType, out var convertedResult))
             {
+                CacheConversionResult(sourceType, targetType, ConversionStrategy.TypeConverter);
                 return convertedResult;
             }
 
             // 9. 문자열로 변환
             if (targetType == typeof(string))
             {
-                return sourceValue.ToString();
+                var result = sourceValue.ToString();
+                CacheConversionResult(sourceType, targetType, ConversionStrategy.ToString);
+                return result;
             }
             
             // 10. 마지막 수단으로 Convert.ChangeType 시도
             try
             {
-                return Convert.ChangeType(sourceValue, targetType, CultureInfo.InvariantCulture);
+                var result = Convert.ChangeType(sourceValue, targetType, CultureInfo.InvariantCulture);
+                CacheConversionResult(sourceType, targetType, ConversionStrategy.Numeric);
+                return result;
             }
             catch
             {
@@ -524,5 +695,339 @@ public static class ValueConversionExtensions
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// 캐시된 변환 전략을 실행합니다 (비제네릭 버전).
+    /// </summary>
+    private static bool ExecuteCachedConversionNonGeneric(object? sourceValue, ConversionCacheEntry cacheEntry, Type targetType, out object? result)
+    {
+        result = null;
+        if (sourceValue == null) return false;
+
+        try
+        {
+            var sourceType = sourceValue.GetType();
+
+            switch (cacheEntry.Strategy)
+            {
+                case ConversionStrategy.Direct:
+                    if (targetType.IsAssignableFrom(sourceType))
+                    {
+                        result = sourceValue;
+                        return true;
+                    }
+                    break;
+
+                case ConversionStrategy.Numeric:
+                    if (sourceType.IsNumericType() && targetType.IsNumericType())
+                    {
+                        if (TryNumericConversion(sourceValue, targetType, out result))
+                        {
+                            return true;
+                        }
+                    }
+                    break;
+
+                case ConversionStrategy.SourceImplicit:
+                case ConversionStrategy.TargetImplicit:
+                    if (cacheEntry.Method != null)
+                    {
+                        result = cacheEntry.Method.Invoke(null, new[] { sourceValue });
+                        return true;
+                    }
+                    break;
+
+                case ConversionStrategy.Explicit:
+                    if (cacheEntry.Method != null)
+                    {
+                        result = cacheEntry.Method.Invoke(null, new[] { sourceValue });
+                        return true;
+                    }
+                    break;
+
+                case ConversionStrategy.Constructor:
+                    if (cacheEntry.Constructor != null)
+                    {
+                        result = cacheEntry.Constructor.Invoke(new[] { sourceValue });
+                        return true;
+                    }
+                    break;
+
+                case ConversionStrategy.Parse:
+                    if (sourceValue is string sourceString && cacheEntry.Method != null)
+                    {
+                        if (cacheEntry.Method.Name == "TryParse")
+                        {
+                            var parameters = new object[] { sourceString, Activator.CreateInstance(targetType)! };
+                            if ((bool)cacheEntry.Method.Invoke(null, parameters)!)
+                            {
+                                result = parameters[1];
+                                return true;
+                            }
+                        }
+                        else if (cacheEntry.Method.Name == "Parse")
+                        {
+                            result = cacheEntry.Method.Invoke(null, new object[] { sourceString });
+                            return true;
+                        }
+                    }
+                    break;
+
+                case ConversionStrategy.TypeConverter:
+                    if (TryTypeConverter(sourceValue, targetType, out result))
+                    {
+                        return true;
+                    }
+                    break;
+
+                case ConversionStrategy.ToString:
+                    if (targetType == typeof(string))
+                    {
+                        result = sourceValue.ToString();
+                        return true;
+                    }
+                    break;
+            }
+
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 숫자 타입 간 직접 캐스팅을 수행합니다. (C# 표준 동작 유지)
+    /// </summary>
+    private static bool TryNumericConversion(object sourceValue, Type targetType, out object? result)
+    {
+        result = null;
+        
+        try
+        {
+            // 각 소스 타입별로 직접 처리
+            switch (sourceValue)
+            {
+                case byte b:
+                    result = ConvertFromByte(b, targetType);
+                    break;
+                case sbyte sb:
+                    result = ConvertFromSByte(sb, targetType);
+                    break;
+                case short s:
+                    result = ConvertFromShort(s, targetType);
+                    break;
+                case ushort us:
+                    result = ConvertFromUShort(us, targetType);
+                    break;
+                case int i:
+                    result = ConvertFromInt(i, targetType);
+                    break;
+                case uint ui:
+                    result = ConvertFromUInt(ui, targetType);
+                    break;
+                case long l:
+                    result = ConvertFromLong(l, targetType);
+                    break;
+                case ulong ul:
+                    result = ConvertFromULong(ul, targetType);
+                    break;
+                case float f:
+                    result = ConvertFromFloat(f, targetType);
+                    break;
+                case double d:
+                    result = ConvertFromDouble(d, targetType);
+                    break;
+                case decimal dec:
+                    result = ConvertFromDecimal(dec, targetType);
+                    break;
+                default:
+                    return false;
+            }
+                
+            return result != null;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static object? ConvertFromByte(byte value, Type targetType)
+    {
+        if (targetType == typeof(byte)) return value;
+        if (targetType == typeof(sbyte)) return (sbyte)value;
+        if (targetType == typeof(short)) return (short)value;
+        if (targetType == typeof(ushort)) return (ushort)value;
+        if (targetType == typeof(int)) return (int)value;
+        if (targetType == typeof(uint)) return (uint)value;
+        if (targetType == typeof(long)) return (long)value;
+        if (targetType == typeof(ulong)) return (ulong)value;
+        if (targetType == typeof(float)) return (float)value;
+        if (targetType == typeof(double)) return (double)value;
+        if (targetType == typeof(decimal)) return (decimal)value;
+        return null;
+    }
+
+    private static object? ConvertFromSByte(sbyte value, Type targetType)
+    {
+        if (targetType == typeof(byte)) return (byte)value;
+        if (targetType == typeof(sbyte)) return value;
+        if (targetType == typeof(short)) return (short)value;
+        if (targetType == typeof(ushort)) return (ushort)value;
+        if (targetType == typeof(int)) return (int)value;
+        if (targetType == typeof(uint)) return (uint)value;
+        if (targetType == typeof(long)) return (long)value;
+        if (targetType == typeof(ulong)) return (ulong)value;
+        if (targetType == typeof(float)) return (float)value;
+        if (targetType == typeof(double)) return (double)value;
+        if (targetType == typeof(decimal)) return (decimal)value;
+        return null;
+    }
+
+    private static object? ConvertFromShort(short value, Type targetType)
+    {
+        if (targetType == typeof(byte)) return (byte)value;
+        if (targetType == typeof(sbyte)) return (sbyte)value;
+        if (targetType == typeof(short)) return value;
+        if (targetType == typeof(ushort)) return (ushort)value;
+        if (targetType == typeof(int)) return (int)value;
+        if (targetType == typeof(uint)) return (uint)value;
+        if (targetType == typeof(long)) return (long)value;
+        if (targetType == typeof(ulong)) return (ulong)value;
+        if (targetType == typeof(float)) return (float)value;
+        if (targetType == typeof(double)) return (double)value;
+        if (targetType == typeof(decimal)) return (decimal)value;
+        return null;
+    }
+
+    private static object? ConvertFromUShort(ushort value, Type targetType)
+    {
+        if (targetType == typeof(byte)) return (byte)value;
+        if (targetType == typeof(sbyte)) return (sbyte)value;
+        if (targetType == typeof(short)) return (short)value;
+        if (targetType == typeof(ushort)) return value;
+        if (targetType == typeof(int)) return (int)value;
+        if (targetType == typeof(uint)) return (uint)value;
+        if (targetType == typeof(long)) return (long)value;
+        if (targetType == typeof(ulong)) return (ulong)value;
+        if (targetType == typeof(float)) return (float)value;
+        if (targetType == typeof(double)) return (double)value;
+        if (targetType == typeof(decimal)) return (decimal)value;
+        return null;
+    }
+
+    private static object? ConvertFromInt(int value, Type targetType)
+    {
+        if (targetType == typeof(byte)) return (byte)value;
+        if (targetType == typeof(sbyte)) return (sbyte)value;
+        if (targetType == typeof(short)) return (short)value;
+        if (targetType == typeof(ushort)) return (ushort)value;
+        if (targetType == typeof(int)) return value;
+        if (targetType == typeof(uint)) return (uint)value;
+        if (targetType == typeof(long)) return (long)value;
+        if (targetType == typeof(ulong)) return (ulong)value;
+        if (targetType == typeof(float)) return (float)value;
+        if (targetType == typeof(double)) return (double)value;
+        if (targetType == typeof(decimal)) return (decimal)value;
+        return null;
+    }
+
+    private static object? ConvertFromUInt(uint value, Type targetType)
+    {
+        if (targetType == typeof(byte)) return (byte)value;
+        if (targetType == typeof(sbyte)) return (sbyte)value;
+        if (targetType == typeof(short)) return (short)value;
+        if (targetType == typeof(ushort)) return (ushort)value;
+        if (targetType == typeof(int)) return (int)value;
+        if (targetType == typeof(uint)) return value;
+        if (targetType == typeof(long)) return (long)value;
+        if (targetType == typeof(ulong)) return (ulong)value;
+        if (targetType == typeof(float)) return (float)value;
+        if (targetType == typeof(double)) return (double)value;
+        if (targetType == typeof(decimal)) return (decimal)value;
+        return null;
+    }
+
+    private static object? ConvertFromLong(long value, Type targetType)
+    {
+        if (targetType == typeof(byte)) return (byte)value;
+        if (targetType == typeof(sbyte)) return (sbyte)value;
+        if (targetType == typeof(short)) return (short)value;
+        if (targetType == typeof(ushort)) return (ushort)value;
+        if (targetType == typeof(int)) return (int)value;
+        if (targetType == typeof(uint)) return (uint)value;
+        if (targetType == typeof(long)) return value;
+        if (targetType == typeof(ulong)) return (ulong)value;
+        if (targetType == typeof(float)) return (float)value;
+        if (targetType == typeof(double)) return (double)value;
+        if (targetType == typeof(decimal)) return (decimal)value;
+        return null;
+    }
+
+    private static object? ConvertFromULong(ulong value, Type targetType)
+    {
+        if (targetType == typeof(byte)) return (byte)value;
+        if (targetType == typeof(sbyte)) return (sbyte)value;
+        if (targetType == typeof(short)) return (short)value;
+        if (targetType == typeof(ushort)) return (ushort)value;
+        if (targetType == typeof(int)) return (int)value;
+        if (targetType == typeof(uint)) return (uint)value;
+        if (targetType == typeof(long)) return (long)value;
+        if (targetType == typeof(ulong)) return value;
+        if (targetType == typeof(float)) return (float)value;
+        if (targetType == typeof(double)) return (double)value;
+        if (targetType == typeof(decimal)) return (decimal)value;
+        return null;
+    }
+
+    private static object? ConvertFromFloat(float value, Type targetType)
+    {
+        if (targetType == typeof(byte)) return (byte)value;
+        if (targetType == typeof(sbyte)) return (sbyte)value;
+        if (targetType == typeof(short)) return (short)value;
+        if (targetType == typeof(ushort)) return (ushort)value;
+        if (targetType == typeof(int)) return (int)value;
+        if (targetType == typeof(uint)) return (uint)value;
+        if (targetType == typeof(long)) return (long)value;
+        if (targetType == typeof(ulong)) return (ulong)value;
+        if (targetType == typeof(float)) return value;
+        if (targetType == typeof(double)) return (double)value;
+        if (targetType == typeof(decimal)) return (decimal)value;
+        return null;
+    }
+
+    private static object? ConvertFromDouble(double value, Type targetType)
+    {
+        if (targetType == typeof(byte)) return (byte)value;
+        if (targetType == typeof(sbyte)) return (sbyte)value;
+        if (targetType == typeof(short)) return (short)value;
+        if (targetType == typeof(ushort)) return (ushort)value;
+        if (targetType == typeof(int)) return (int)value; // 여기서 버림 발생
+        if (targetType == typeof(uint)) return (uint)value;
+        if (targetType == typeof(long)) return (long)value;
+        if (targetType == typeof(ulong)) return (ulong)value;
+        if (targetType == typeof(float)) return (float)value;
+        if (targetType == typeof(double)) return value;
+        if (targetType == typeof(decimal)) return (decimal)value;
+        return null;
+    }
+
+    private static object? ConvertFromDecimal(decimal value, Type targetType)
+    {
+        if (targetType == typeof(byte)) return (byte)value;
+        if (targetType == typeof(sbyte)) return (sbyte)value;
+        if (targetType == typeof(short)) return (short)value;
+        if (targetType == typeof(ushort)) return (ushort)value;
+        if (targetType == typeof(int)) return (int)value;
+        if (targetType == typeof(uint)) return (uint)value;
+        if (targetType == typeof(long)) return (long)value;
+        if (targetType == typeof(ulong)) return (ulong)value;
+        if (targetType == typeof(float)) return (float)value;
+        if (targetType == typeof(double)) return (double)value;
+        if (targetType == typeof(decimal)) return value;
+        return null;
     }
 }
