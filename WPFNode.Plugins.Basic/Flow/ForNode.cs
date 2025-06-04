@@ -64,25 +64,9 @@ public class ForNode : NodeBase
     /// </summary>
     [NodeFlowOut("Complete")]
     public FlowOutPort LoopComplete { get; private set; }
-    
-    public ForNode(INodeCanvas canvas, Guid id, ILogger? logger = null) 
-        : base(canvas, id, logger)
-    {
-        // NodeProperty 속성 초기화 및 기본값 설정
-        // CreateProperty 대신에 직접 생성하여 초기화
-        StartIndex = new NodeProperty<int>(nameof(StartIndex), "시작 인덱스", this, 1);
-        EndIndex = new NodeProperty<int>(nameof(EndIndex), "종료 인덱스", this, 2);
-        Step = new NodeProperty<int>(nameof(Step), "증가/감소 단계", this, 3);
-        
-        // 기본값 설정
-        StartIndex.Value = 0;
-        EndIndex.Value = 10;
-        Step.Value = 1;
-    }
-    
     // 테스트에서 사용하는 생성자 추가
     public ForNode(INodeCanvas canvas, Guid id) 
-        : this(canvas, id, null)
+        : base(canvas, id)
     {
     }
     
