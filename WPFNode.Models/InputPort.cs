@@ -132,6 +132,12 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
             }
         }
         
+        // 🆕 단일 요소 → 컨테이너 변환 지원
+        if (!sourceIsCollection && targetIsCollection && targetElementType != null) {
+            // 소스 타입이 타겟 요소 타입과 호환되는지 확인
+            return sourceType == targetElementType || sourceType.CanConvertTo(targetElementType);
+        }
+        
         return false;
     }
 
@@ -386,18 +392,20 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
             return false;
         }
         
-        // 소스가 IEnumerable이 아니면 변환 불가
-        if (!(sourceValue is System.Collections.IEnumerable sourceCollection)) {
-            return false;
+        List<object> items;
+        
+        // 🆕 소스가 IEnumerable인지 확인하고, 아니면 단일 요소로 처리
+        // 단, string은 IEnumerable<char>이지만 단일 요소로 처리
+        if (sourceValue is System.Collections.IEnumerable sourceCollection && sourceValue.GetType() != typeof(string)) {
+            // 기존 로직: 컬렉션 → 컬렉션
+            bool sourceIsGenericCollection = IsCollectionType(sourceValue.GetType(), out Type? sourceElementType);
+            items = CollectItems(sourceCollection, targetElementType, sourceIsGenericCollection, sourceElementType);
+        } else {
+            // 🆕 새로운 로직: 단일 요소 → 컨테이너 (string 포함)
+            items = CollectSingleItem(sourceValue, targetElementType);
         }
         
-        // 소스의 컬렉션 여부 확인
-        bool sourceIsGenericCollection = IsCollectionType(sourceValue.GetType(), out Type? sourceElementType);
-        
         try {
-            // 요소 수집 (참조 유지 또는 변환)
-            List<object> items = CollectItems(sourceCollection, targetElementType, sourceIsGenericCollection, sourceElementType);
-            
             if (items.Count == 0) {
                 return false;
             }
@@ -511,6 +519,32 @@ public class InputPort<T> : IInputPort<T>, INotifyPropertyChanged {
         result = (T)hashSet;
         LogDebug($"HashSet<{elementType.Name}> 생성 완료: {items.Count}개 항목", hashSet);
         return true;
+    }
+    
+    /// <summary>
+    /// 단일 요소를 컬렉션 항목으로 수집합니다. 기존 CollectItems 로직을 재사용합니다.
+    /// </summary>
+    private List<object> CollectSingleItem(object sourceValue, Type targetElementType) {
+        var items = new List<object>();
+        
+        // 호환 가능한 타입이면 그대로 사용
+        if (targetElementType.IsAssignableFrom(sourceValue.GetType())) {
+            items.Add(sourceValue);
+            LogDebug($"단일 요소 직접 추가: {sourceValue.GetType().Name} -> {targetElementType.Name}", sourceValue);
+        }
+        // 변환 필요
+        else {
+            var convertedItem = sourceValue.TryConvertTo(targetElementType);
+            if (convertedItem != null) {
+                items.Add(convertedItem);
+                LogDebug($"단일 요소 변환 추가: {sourceValue.GetType().Name} -> {targetElementType.Name}", convertedItem);
+            }
+            else {
+                LogDebug($"단일 요소 변환 실패: {sourceValue.GetType().Name} -> {targetElementType.Name}");
+            }
+        }
+        
+        return items;
     }
     
     public void AddConnection(IConnection connection) {
