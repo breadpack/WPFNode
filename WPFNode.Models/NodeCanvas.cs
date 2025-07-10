@@ -165,10 +165,12 @@ public partial class NodeCanvas : INodeCanvas, INotifyPropertyChanged
         if (!_nodes.Contains(nodeBase)) 
             throw new NodeValidationException($"노드가 캔버스에 존재하지 않습니다: {nodeBase.Id}");
 
-        // 노드와 관련된 모든 연결 제거
+        // 노드와 관련된 모든 연결 제거 (InputPort, OutputPort, FlowInPort, FlowOutPort 모두 포함)
         var connectionsToRemove = _connections
             .Where(c => node.InputPorts.Contains(c.Target) || 
-                       node.OutputPorts.Contains(c.Source))
+                       node.OutputPorts.Contains(c.Source) ||
+                       node.FlowInPorts.Contains(c.Target) ||
+                       node.FlowOutPorts.Contains(c.Source))
             .ToList();
         
         foreach (var connection in connectionsToRemove)
