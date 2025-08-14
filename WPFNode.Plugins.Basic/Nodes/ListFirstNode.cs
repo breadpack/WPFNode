@@ -44,7 +44,7 @@ namespace WPFNode.Plugins.Basic.Nodes {
             if (ListInput.CurrentResolvedType != null && ListInput.CurrentResolvedType != typeof(object))
             {
                 listType    = ListInput.CurrentResolvedType;
-                elementType = listType.GetElementType() ?? typeof(object); // 요소 타입 추출
+                elementType = listType.GenericTypeArguments?.FirstOrDefault() ?? typeof(object); // 요소 타입 추출
                 Logger?.LogDebug($"ListInput 타입({listType.Name}) 기반. ItemType: {elementType.Name}, Output ListType: {listType.Name} 사용.");
             }
             else
