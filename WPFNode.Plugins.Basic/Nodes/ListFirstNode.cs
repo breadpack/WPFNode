@@ -27,7 +27,7 @@ namespace WPFNode.Plugins.Basic.Nodes {
         // ResultOutput: Configure에서 동적으로 관리됨.
         private IOutputPort _resultOutput;
 
-        public ListFirstNode(INodeCanvas canvas, Guid guid, ILogger? logger = null) : base(canvas, guid, logger) {
+        public ListFirstNode(INodeCanvas canvas, Guid guid) : base(canvas, guid) {
             Name = "List.First";
         }
         
